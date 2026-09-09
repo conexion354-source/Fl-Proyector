@@ -33,6 +33,9 @@ jobs:
       - name: Comprobar el proyecto
         run: pnpm check
 
+      - name: Compilar la aplicación
+        run: pnpm build
+
       - name: Compilar y publicar instalador
         shell: pwsh
         env:
@@ -42,4 +45,3 @@ jobs:
           "-c.publish.provider=github"
           "-c.publish.owner=${{ github.repository_owner }}"
           "-c.publish.repo=${{ github.event.repository.name }}"
-
