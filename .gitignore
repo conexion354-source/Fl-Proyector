@@ -1,0 +1,15 @@
+node_modules/
+.android-tools/
+android-remote/.gradle/
+android-remote/app/build/
+android-remote/local.properties
+android-remote/**/*.jks
+android-remote/**/*.keystore
+dist/
+dist-electron/
+release/
+*.log
+.DS_Store
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts

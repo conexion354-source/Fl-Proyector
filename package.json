@@ -1,0 +1,120 @@
+{
+  "name": "fl-proyector",
+  "version": "10.11.0",
+  "description": "Software de proyeccion profesional para iglesias",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/conexion354-source/Fl-Proyector.git"
+  },
+  "main": "dist-electron/electron/main.js",
+  "author": "Fl Iglesia",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"tsc -p electron/tsconfig.json --watch --preserveWatchOutput\" \"wait-on tcp:5173 file:dist-electron/main.js && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "build": "tsc -p electron/tsconfig.json && tsc -b && vite build",
+    "check": "tsc -p electron/tsconfig.json --noEmit && tsc -b --pretty false",
+    "preview": "vite preview",
+    "postinstall": "electron-builder install-app-deps || echo 'Aviso: si la ruta contiene espacios, ejecute pnpm native:rebuild desde un enlace sin espacios'",
+    "native:rebuild": "electron-builder install-app-deps",
+    "dist": "pnpm build && electron-builder",
+    "dist:win": "pnpm build && electron-builder --win --x64",
+    "dist:mac": "pnpm build && bash scripts/build-mac.sh"
+  },
+  "dependencies": {
+    "@ai-sdk/react": "^4.0.96",
+    "@fontsource/bebas-neue": "^5.3.0",
+    "@fontsource/noto-sans": "^5.3.0",
+    "@fontsource/raleway": "^5.3.0",
+    "@tiptap/extension-color": "latest",
+    "@tiptap/extension-font-family": "latest",
+    "@tiptap/extension-highlight": "latest",
+    "@tiptap/extension-text-align": "latest",
+    "@tiptap/extension-text-style": "latest",
+    "@tiptap/react": "latest",
+    "@tiptap/starter-kit": "latest",
+    "ai": "^6.0.277",
+    "better-sqlite3": "latest",
+    "chokidar": "latest",
+    "electron-updater": "^6.8.9",
+    "express": "latest",
+    "fast-xml-parser": "^5.11.1",
+    "ffmpeg-static": "latest",
+    "framer-motion": "^13.2.0",
+    "i18next": "^26.4.2",
+    "jspdf": "^4.2.1",
+    "jszip": "^3.10.1",
+    "lucide-react": "latest",
+    "pptx-react-viewer": "^3.7.0",
+    "qrcode": "^1.5.4",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-i18next": "^17.0.13",
+    "react-icons": "^5.7.0",
+    "socket.io": "latest"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "latest",
+    "@types/express": "latest",
+    "@types/node": "latest",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "autoprefixer": "latest",
+    "concurrently": "latest",
+    "cross-env": "latest",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "postcss": "latest",
+    "tailwindcss": "^3.4.17",
+    "typescript": "latest",
+    "vite": "latest",
+    "wait-on": "latest"
+  },
+  "build": {
+    "appId": "com.fliglesia.proyector",
+    "productName": "Fl Proyector",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "conexion354-source",
+        "repo": "Fl-Proyector"
+      }
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**/*",
+      "node_modules/better-sqlite3/**/*"
+    ],
+    "npmRebuild": false,
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "electron/preload.cjs",
+      "assets/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "icon": "assets/fl-proyector.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.video"
+    },
+    "win": {
+      "icon": "assets/fl-proyector.ico",
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Fl-Proyector-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
