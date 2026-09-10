@@ -10,7 +10,7 @@
   "author": "Fl Iglesia",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k \"vite\" \"tsc -p electron/tsconfig.json --watch --preserveWatchOutput\" \"wait-on tcp:5173 file:dist-electron/main.js && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "dev": "concurrently -k \"vite\" \"tsc -p electron/tsconfig.json --watch --preserveWatchOutput\" \"wait-on tcp:5173 file:dist-electron/electron/main.js && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
     "build": "tsc -p electron/tsconfig.json && tsc -b && vite build",
     "check": "tsc -p electron/tsconfig.json --noEmit && tsc -b --pretty false",
     "preview": "vite preview",
