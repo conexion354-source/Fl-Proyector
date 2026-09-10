@@ -62,6 +62,19 @@ public class MainActivity extends Activity {
         if (link != null) connectAutomatically(link);
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        // A phone can move from one Wi‑Fi network to another while the app
+        // remains open. Re-probe the remembered server and automatically scan
+        // the new local subnet when it is no longer reachable.
+        if (webView == null || activeUrl == null) return;
+        final String remembered = activeUrl;
+        connectionWorker.execute(() -> {
+            if (!probe(remembered) && !isFinishing() && !isDestroyed())
+                connectAutomatically(null);
+        });
+    }
+
     private String serverFromIntent(android.content.Intent intent) {
         Uri data = intent.getData();
         if (data == null || !"flremoto".equals(data.getScheme())) return null;
