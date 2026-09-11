@@ -46,6 +46,11 @@ import { EmptyState } from "./EmptyState";
 import { withSaveNotification } from "./SaveNotification";
 import { buildBibleSlides } from "../bibleDisplay";
 import {
+  normalizeSongSectionTypes,
+  songSectionLabel,
+  splitSongStanzas,
+} from "../../shared/songSections";
+import {
   clampColumnWidth,
   ColumnResizer,
   storedColumnWidth,
@@ -86,23 +91,6 @@ const itemColors = [
   "#ec4899",
   "#64748b",
 ];
-
-function splitSongStanzas(html: string) {
-  const marker = "___FL_STANZA___";
-  const normalized = html
-    // In the song editor, Enter creates a new paragraph and therefore a new
-    // stanza. Shift+Enter remains a line break inside the current stanza.
-    .replace(/<\/p>\s*<p[^>]*>/gi, `</p>${marker}<p>`)
-    // Tiptap writes an empty paragraph as a <br> with a trailing class.
-    // Treat that visual paragraph break as the stanza delimiter.
-    .replace(/<p[^>]*>(?:\s|&nbsp;|<br\b[^>]*>)*<\/p>/gi, marker)
-    .replace(/(?:<br\s*\/?\s*>\s*){2,}/gi, marker)
-    .replace(/<hr[^>]*>/gi, marker);
-  return normalized
-    .split(marker)
-    .map((section) => section.trim())
-    .filter((section) => section.replace(/<[^>]+>/g, "").trim());
-}
 
 function splitAnnouncementPages(html: string, limit = 240) {
   const root = document.createElement("div");
@@ -163,6 +151,7 @@ function bibleSections(
   payload: Record<string, unknown>,
   settings: BibleDisplaySettings,
   fallbackReference = "",
+  viewport?: ProjectionState["outputViewport"],
 ) {
   if (Array.isArray(payload.bibleEntries))
     return (
@@ -172,7 +161,13 @@ function bibleSections(
         version: string;
       }>
     ).flatMap((entry) =>
-      buildBibleSlides(entry.text, entry.reference, entry.version, settings),
+      buildBibleSlides(
+        entry.text,
+        entry.reference,
+        entry.version,
+        settings,
+        viewport,
+      ),
     );
   const saved = Array.isArray(payload.sections)
     ? (payload.sections.filter(
@@ -191,6 +186,7 @@ function bibleSections(
       labels[index] || fallbackReference || `Texto ${index + 1}`,
       String(payload.version || ""),
       settings,
+      viewport,
     ),
   );
 }
@@ -701,7 +697,12 @@ export function MeetingBuilder({
 
   const fireBibleSection = (item: MeetingItem, index: number) => {
     const payload = item.payload as any;
-    const sections = bibleSections(payload, state.bibleStyle, item.title);
+    const sections = bibleSections(
+      payload,
+      state.bibleStyle,
+      item.title,
+      state.outputViewport,
+    );
     if (!sections.length) return;
     const safeIndex = Math.max(0, Math.min(index, sections.length - 1));
     const background = mediaById(payload.backgroundId);
@@ -818,7 +819,12 @@ export function MeetingBuilder({
           ? song
             ? splitSongStanzas(song.content).length
             : 0
-          : bibleSections(selected.payload, state.bibleStyle, selected.title)
+          : bibleSections(
+              selected.payload,
+              state.bibleStyle,
+              selected.title,
+              state.outputViewport,
+            )
               .length;
       if (!count || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
       event.preventDefault();
@@ -1525,9 +1531,17 @@ function ItemSummary({
   const html =
     item.type === "song" ? song?.content : String(payload.html || "");
   const stanzas = song ? splitSongStanzas(song.content) : [];
+  const sectionTypes = song
+    ? normalizeSongSectionTypes(song.sectionTypes, stanzas.length)
+    : [];
   const scriptureSections =
     item.type === "bible"
-      ? bibleSections(payload, projection.bibleStyle, item.title)
+      ? bibleSections(
+          payload,
+          projection.bibleStyle,
+          item.title,
+          projection.outputViewport,
+        )
       : [];
   return (
     <div className="item-summary">
@@ -1564,10 +1578,11 @@ function ItemSummary({
               (stanza, index) => (
                 <button
                   className={activeStanza === index ? "active" : ""}
+                  data-section-type={sectionTypes[index] || "verse"}
                   onClick={() => onStanza(index)}
                   key={index}
                 >
-                  <b>ESTROFA {index + 1}</b>
+                  <b>{songSectionLabel(sectionTypes, index).toLocaleUpperCase("es-AR")}</b>
                   <div dangerouslySetInnerHTML={{ __html: stanza }} />
                 </button>
               ),

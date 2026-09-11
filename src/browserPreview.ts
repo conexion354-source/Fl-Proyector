@@ -103,6 +103,9 @@ if (!window.flProyector) {
           label: "Pantalla integrada",
           width: 1920,
           height: 1080,
+          cssWidth: 1920,
+          cssHeight: 1080,
+          scaleFactor: 1,
           primary: true,
         },
         {
@@ -110,6 +113,9 @@ if (!window.flProyector) {
           label: "Proyector HDMI",
           width: 1920,
           height: 1080,
+          cssWidth: 1920,
+          cssHeight: 1080,
+          scaleFactor: 1,
           primary: false,
         },
       ],
@@ -121,6 +127,7 @@ if (!window.flProyector) {
           ? [`http://${location.hostname}:3001`]
           : [],
     }),
+    enableWindowsRemoteAccess: async () => true,
     listMedia: async () => media,
     importMedia: async () => media,
     chooseMediaFiles: async () => {
@@ -353,6 +360,51 @@ if (!window.flProyector) {
       window.open(url, "_blank", "noopener,noreferrer");
       return true;
     },
+    getUpdateStatus: async () => ({
+      state: "development",
+      currentVersion: "10.11.2",
+      availableVersion: null,
+      progress: null,
+      message: "La búsqueda está desactivada mientras se prueba el sistema.",
+      packaged: false,
+    }),
+    getReleaseHistory: async () => [
+      {
+        version: "10.11.2",
+        title: "Proyección y trabajo en red más confiables",
+        publishedAt: "2026-09-11T14:26:08Z",
+        changes: [
+          "Se adaptaron los textos bíblicos y las canciones a la resolución real de la pantalla, sin cortar palabras.",
+          "Se mejoró la división inteligente de versículos largos y el uso de los márgenes seguros.",
+          "Se incorporó la clasificación de estrofas, coros, puentes y otras partes de las canciones.",
+          "Se corrigió la restauración del fondo al quitar videos desde el control remoto.",
+          "El instalador habilita el modo colaborador en el Firewall de Windows para la red local.",
+          "Se eliminó la barra File/Edit/View de Windows y se mejoró el historial de actualizaciones.",
+        ],
+      },
+      {
+        version: "10.11.1",
+        title: "Control remoto más confiable",
+        publishedAt: "2026-09-10T13:34:11Z",
+        changes: [
+          "Se corrigió el control de reproducción multimedia desde el teléfono.",
+          "Se mejoró la reconexión de la app móvil con FL Proyector.",
+        ],
+      },
+      {
+        version: "10.11.0",
+        title: "Primera versión pública",
+        publishedAt: "2026-09-09T20:33:22Z",
+        changes: [
+          "Se publicó el instalador de Windows en GitHub.",
+          "Se incorporó la comprobación y descarga de actualizaciones.",
+        ],
+      },
+    ],
+    checkForUpdates: async () => window.flProyector.getUpdateStatus(),
+    downloadUpdate: async () => window.flProyector.getUpdateStatus(),
+    installUpdate: async () => false,
+    onUpdateStatus: () => () => {},
     platform: "browser-preview",
   };
   window.flProyector = api;

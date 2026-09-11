@@ -76,7 +76,7 @@ export class AppDatabase {
       CREATE TABLE IF NOT EXISTS song_categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE COLLATE NOCASE);
       CREATE TABLE IF NOT EXISTS songs (
         id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, category_id INTEGER REFERENCES song_categories(id) ON DELETE SET NULL,
-        content TEXT NOT NULL DEFAULT '', color TEXT NOT NULL DEFAULT '#8b5cf6', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        content TEXT NOT NULL DEFAULT '', section_types TEXT NOT NULL DEFAULT '[]', color TEXT NOT NULL DEFAULT '#8b5cf6', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
       CREATE TABLE IF NOT EXISTS bible_versions (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, language TEXT NOT NULL DEFAULT 'es', enabled INTEGER NOT NULL DEFAULT 1);
       CREATE TABLE IF NOT EXISTS bible_verses (
@@ -113,6 +113,10 @@ export class AppDatabase {
     if (!songColumns.has("color"))
       this.db.exec(
         "ALTER TABLE songs ADD COLUMN color TEXT NOT NULL DEFAULT '#8b5cf6'",
+      );
+    if (!songColumns.has("section_types"))
+      this.db.exec(
+        "ALTER TABLE songs ADD COLUMN section_types TEXT NOT NULL DEFAULT '[]'",
       );
     const meetingColumns = new Set(
       (
@@ -220,31 +224,44 @@ export class AppDatabase {
     const filter = `%${search}%`;
     const rows = this.db
       .prepare(
-        `SELECT s.id,s.title,s.color,s.category_id categoryId,c.name categoryName,s.content,s.shadow_enabled shadowEnabled,s.shadow_color shadowColor,s.shadow_blur shadowBlur,s.created_at createdAt,s.updated_at updatedAt FROM songs s LEFT JOIN song_categories c ON c.id=s.category_id WHERE (s.title LIKE ? OR s.content LIKE ?) AND (? IS NULL OR s.category_id=?) ORDER BY s.title COLLATE NOCASE`,
+        `SELECT s.id,s.title,s.color,s.category_id categoryId,c.name categoryName,s.content,s.section_types sectionTypes,s.shadow_enabled shadowEnabled,s.shadow_color shadowColor,s.shadow_blur shadowBlur,s.created_at createdAt,s.updated_at updatedAt FROM songs s LEFT JOIN song_categories c ON c.id=s.category_id WHERE (s.title LIKE ? OR s.content LIKE ?) AND (? IS NULL OR s.category_id=?) ORDER BY s.title COLLATE NOCASE`,
       )
       .all(filter, filter, categoryId ?? null, categoryId ?? null) as Array<
-      Omit<Song, "shadowEnabled"> & { shadowEnabled: number }
+      Omit<Song, "shadowEnabled" | "sectionTypes"> & {
+        shadowEnabled: number;
+        sectionTypes: string;
+      }
     >;
     return rows.map((row) => ({
       ...row,
       shadowEnabled: Boolean(row.shadowEnabled),
+      sectionTypes: (() => {
+        try {
+          const parsed = JSON.parse(row.sectionTypes);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })(),
     }));
   }
   saveSong(song: Partial<Song> & { title: string; content: string }) {
     const shadowEnabled = song.shadowEnabled === false ? 0 : 1,
       shadowColor = song.shadowColor || "#000000",
       shadowBlur = Math.max(0, Math.min(40, Number(song.shadowBlur ?? 14))),
-      color = song.color || "#8b5cf6";
+      color = song.color || "#8b5cf6",
+      sectionTypes = JSON.stringify(song.sectionTypes || []);
     if (song.id) {
       this.db
         .prepare(
-          "UPDATE songs SET title=?,color=?,category_id=?,content=?,shadow_enabled=?,shadow_color=?,shadow_blur=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+          "UPDATE songs SET title=?,color=?,category_id=?,content=?,section_types=?,shadow_enabled=?,shadow_color=?,shadow_blur=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
         )
         .run(
           song.title,
           color,
           song.categoryId ?? null,
           song.content,
+          sectionTypes,
           shadowEnabled,
           shadowColor,
           shadowBlur,
@@ -255,13 +272,14 @@ export class AppDatabase {
     return Number(
       this.db
         .prepare(
-          "INSERT INTO songs(title,color,category_id,content,shadow_enabled,shadow_color,shadow_blur) VALUES (?,?,?,?,?,?,?)",
+          "INSERT INTO songs(title,color,category_id,content,section_types,shadow_enabled,shadow_color,shadow_blur) VALUES (?,?,?,?,?,?,?,?)",
         )
         .run(
           song.title,
           color,
           song.categoryId ?? null,
           song.content,
+          sectionTypes,
           shadowEnabled,
           shadowColor,
           shadowBlur,

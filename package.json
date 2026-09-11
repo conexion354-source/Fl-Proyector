@@ -1,6 +1,6 @@
 {
   "name": "fl-proyector",
-  "version": "10.11.1",
+  "version": "10.11.2",
   "description": "Software de proyeccion profesional para iglesias",
   "repository": {
     "type": "git",
@@ -114,7 +114,10 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "perMachine": true,
+      "include": "build/installer.nsh"
     }
   }
 }

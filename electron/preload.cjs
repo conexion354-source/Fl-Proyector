@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld("flProyector", {
   openProjection: () => ipcRenderer.invoke("projection:open"),
   closeProjection: () => ipcRenderer.invoke("projection:close"),
   projectionStatus: () => ipcRenderer.invoke("projection:status"),
+  enableWindowsRemoteAccess: () =>
+    ipcRenderer.invoke("remote:enable-windows-access"),
   listMedia: () => ipcRenderer.invoke("media:list"),
   importMedia: (paths) => ipcRenderer.invoke("media:import", paths),
   chooseMediaFiles: () => ipcRenderer.invoke("media:choose"),
@@ -81,6 +83,7 @@ contextBridge.exposeInMainWorld("flProyector", {
   openPresentation: (path) => ipcRenderer.invoke("presentation:open", path),
   openExternal: (url) => ipcRenderer.invoke("app:open-external", url),
   getUpdateStatus: () => ipcRenderer.invoke("updates:get-status"),
+  getReleaseHistory: () => ipcRenderer.invoke("updates:release-history"),
   checkForUpdates: () => ipcRenderer.invoke("updates:check"),
   downloadUpdate: () => ipcRenderer.invoke("updates:download"),
   installUpdate: () => ipcRenderer.invoke("updates:install"),

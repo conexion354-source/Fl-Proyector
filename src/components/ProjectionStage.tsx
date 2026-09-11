@@ -25,6 +25,11 @@ export function ProjectionStage({
   onVideoMetadata,
   onVideoTime,
 }: Props) {
+  const outputViewport = state.outputViewport ?? {
+    width: 1920,
+    height: 1080,
+    scaleFactor: 1,
+  };
   const [now, setNow] = useState(Date.now());
   const [previousUrl, setPreviousUrl] = useState<string | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string | null>(
@@ -62,14 +67,19 @@ export function ProjectionStage({
       return;
     }
     const measure = () => {
-      const scale = preview ? 0.28 : 1;
-      const requestedSize = Math.max(8 * scale, state.text.fontSize * scale);
+      const host = element.parentElement;
+      const scale = preview && host
+        ? Math.max(
+            0.01,
+            Math.min(
+              host.clientWidth / outputViewport.width,
+              host.clientHeight / outputViewport.height,
+            ),
+          )
+        : 1;
+      const requestedSize = Math.max(4 * scale, state.text.fontSize * scale);
       const shouldFillBible =
         state.text.kind === "biblia" && state.bibleStyle.fillScreen;
-      const minimumSize =
-        state.text.kind === "biblia"
-          ? state.bibleStyle.minimumFontSize
-          : state.songStyle.minimumFontSize;
       // In fill mode the configured size is the starting point, not a ceiling.
       // The real rendered safe area determines how far a short passage can grow,
       // so this also adapts naturally to 4:3, 16:9 and ultrawide outputs.
@@ -77,17 +87,15 @@ export function ProjectionStage({
         requestedSize,
         Math.min(element.clientWidth * 0.24, element.clientHeight * 0.58),
       );
-      let low = Math.min(
-          requestedSize,
-          Math.max(8 * scale, minimumSize * scale),
-        ),
+      // The configured font size is a preferred maximum. The safety floor may
+      // go lower when necessary so a line is never clipped by the projector.
+      let low = Math.min(requestedSize, Math.max(2, 7 * scale)),
         high = shouldFillBible ? responsiveCeiling : requestedSize,
         best = low;
-      for (let step = 0; step < 9; step++) {
+      for (let step = 0; step < 12; step++) {
         const middle = (low + high) / 2;
-        if (preview)
-          element.style.setProperty("--fit-text-size", middle + "px");
-        else element.style.fontSize = `${middle}px`;
+        element.style.fontSize = `${middle}px`;
+        element.style.setProperty("--fit-text-size", `${middle}px`);
         if (
           element.scrollHeight <= element.clientHeight + 1 &&
           element.scrollWidth <= element.clientWidth + 1
@@ -101,9 +109,12 @@ export function ProjectionStage({
     const frame = requestAnimationFrame(measure);
     const observer = new ResizeObserver(measure);
     if (element.parentElement) observer.observe(element.parentElement);
+    document.fonts?.ready.then(measure).catch(() => undefined);
+    window.addEventListener("resize", measure);
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      window.removeEventListener("resize", measure);
     };
   }, [
     state.text.html,
@@ -111,22 +122,26 @@ export function ProjectionStage({
     state.text.fontSize,
     state.text.fontFamily,
     state.text.position,
-    state.bibleStyle.minimumFontSize,
+    state.text.title,
+    state.text.titlePosition,
     state.bibleStyle.longVerseMode,
-    state.songStyle.autoFit,
-    state.songStyle.minimumFontSize,
+    state.bibleStyle.uppercase,
     state.bibleStyle.horizontalMargin,
     state.bibleStyle.verticalMargin,
     state.bibleStyle.fillScreen,
-    state.songStyle.minimumFontSize,
+    state.songStyle.uppercase,
+    outputViewport.width,
+    outputViewport.height,
     preview,
   ]);
 
   const bibleSafeArea = state.text.kind === "biblia";
+  const songSafeArea = state.text.kind === "canto";
+  const projectionSafeArea = bibleSafeArea || songSafeArea;
   const bibleFill = bibleSafeArea && state.bibleStyle.fillScreen;
-  const fitText =
-    state.text.kind === "biblia" ||
-    (state.text.kind === "canto" && state.songStyle.autoFit);
+  // Both Bible and songs always shrink as a last safety measure. autoFit can
+  // still govern authoring behaviour, but never permits output clipping.
+  const fitText = projectionSafeArea;
   const uppercase =
     (state.text.kind === "biblia" && state.bibleStyle.uppercase) ||
     (state.text.kind === "canto" && state.songStyle.uppercase);
@@ -144,14 +159,24 @@ export function ProjectionStage({
       ? `0 3px ${state.text.shadowBlur}px ${state.text.shadowColor}`
       : "none",
     textTransform: uppercase ? "uppercase" : "none",
-    ...(bibleSafeArea
+    ...(projectionSafeArea
       ? {
-          left: `${state.bibleStyle.horizontalMargin}%`,
-          right: `${state.bibleStyle.horizontalMargin}%`,
-          // The safe area is a real projection boundary, not merely a
-          // setting: references and verse text are both contained here.
-          top: `${state.bibleStyle.verticalMargin}%`,
-          bottom: `${state.bibleStyle.verticalMargin}%`,
+          left: bibleSafeArea
+            ? `${state.bibleStyle.horizontalMargin}%`
+            : "8%",
+          right: bibleSafeArea
+            ? `${state.bibleStyle.horizontalMargin}%`
+            : "8%",
+          top: bibleSafeArea
+            ? `${state.bibleStyle.verticalMargin}%`
+            : state.text.title && state.text.titlePosition === "top"
+              ? "17%"
+              : "8%",
+          bottom: bibleSafeArea
+            ? `${state.bibleStyle.verticalMargin}%`
+            : state.text.title && state.text.titlePosition === "bottom"
+              ? "17%"
+              : "8%",
           height: "auto",
           maxWidth: "none",
           transform: "none",
@@ -161,7 +186,7 @@ export function ProjectionStage({
       ? {
           // A fixed box lets us calculate the largest readable type size
           // instead of allowing the element to grow with its contents.
-          height: bibleSafeArea ? "auto" : "84%",
+          height: "auto",
           overflow: "hidden",
           "--fit-text-size": fitTextSize + "px",
         }
@@ -213,7 +238,7 @@ export function ProjectionStage({
 
       <div
         ref={textRef}
-        className={`projection-text position-${state.text.position} template-${state.text.template} ${bibleSafeArea ? "bible-safe-area" : ""} ${bibleFill ? "bible-fill" : ""} ${fitText ? "auto-fit-text" : ""} ${state.text.visible ? "layer-visible" : "layer-hidden"}`}
+        className={`projection-text position-${state.text.position} template-${state.text.template} ${projectionSafeArea ? "projection-safe-area" : ""} ${bibleSafeArea ? "bible-safe-area" : ""} ${bibleFill ? "bible-fill" : ""} ${fitText ? "auto-fit-text" : ""} ${state.text.visible ? "layer-visible" : "layer-hidden"}`}
         style={textStyle}
         dangerouslySetInnerHTML={{ __html: projectedHtml }}
       />

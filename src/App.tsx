@@ -39,7 +39,11 @@ import {
   storedColumnWidth,
 } from "./components/ColumnResizer";
 import { useProjectionState } from "./hooks/useProjectionState";
-import { initialDisplaySettings, type DisplaySettings } from "../shared/types";
+import {
+  initialDisplaySettings,
+  type DisplayInfo,
+  type DisplaySettings,
+} from "../shared/types";
 
 type Tab = "reuniones" | "canciones" | "fondos" | "biblia" | "remoto" | "ajustes";
 
@@ -69,13 +73,7 @@ export function App() {
   >(null);
   const [status, setStatus] = useState({
     open: false,
-    displays: [] as Array<{
-      id: number;
-      label: string;
-      width: number;
-      height: number;
-      primary: boolean;
-    }>,
+    displays: [] as DisplayInfo[],
     remoteUrls: [] as string[],
   });
   const [videoTime, setVideoTime] = useState(0);
@@ -100,9 +98,18 @@ export function App() {
   const showSidePreview = tab !== "remoto";
   const isSettings = tab === "ajustes";
   const activeDisplaySettings = displayPreviewSettings ?? displaySettings;
-  const previewAspectRatio = activeDisplaySettings.aspectRatio === "custom"
-    ? "16 / 9"
-    : activeDisplaySettings.aspectRatio.replace(":", " / ");
+  const previewDisplay =
+    status.displays.find(
+      (display) => display.id === activeDisplaySettings.mainDisplayId,
+    ) ??
+    status.displays.find((display) => !display.primary) ??
+    status.displays.find((display) => display.primary);
+  const previewAspectRatio =
+    activeDisplaySettings.aspectRatio === "auto"
+      ? `${previewDisplay?.cssWidth || 16} / ${previewDisplay?.cssHeight || 9}`
+      : activeDisplaySettings.aspectRatio === "custom"
+        ? "16 / 9"
+        : activeDisplaySettings.aspectRatio.replace(":", " / ");
   const refreshStatus = () =>
     window.flProyector.projectionStatus().then(setStatus);
   useEffect(() => {
@@ -325,7 +332,13 @@ export function App() {
               <span className="live-dot" />
               {isSettings ? "Vista previa de ajustes" : "Vista en vivo"}
             </div>
-            <span>{activeDisplaySettings.aspectRatio === "custom" ? "16:9" : activeDisplaySettings.aspectRatio}</span>
+            <span>
+              {activeDisplaySettings.aspectRatio === "auto"
+                ? `${previewDisplay?.width || 0}×${previewDisplay?.height || 0}`
+                : activeDisplaySettings.aspectRatio === "custom"
+                  ? "16:9"
+                  : activeDisplaySettings.aspectRatio}
+            </span>
           </div>
           <div className="preview-frame" style={{ aspectRatio: previewAspectRatio, backgroundColor: activeDisplaySettings.backgroundColor }}>
             <ProjectionStage

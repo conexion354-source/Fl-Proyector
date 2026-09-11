@@ -1907,6 +1907,23 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
 .app-shell .version-product-row h3 { margin:0 0 4px; color:var(--fl-text); font-size:16px; }
 .app-shell .version-product-row p { margin:0; color:var(--fl-muted); font-size:13px; }
 .app-shell .version-product-row strong { color:var(--fl-text); }
+.app-shell .version-history-button {
+  display:inline-flex;
+  height:32px;
+  margin-left:auto;
+  flex:0 0 auto;
+  align-items:center;
+  gap:7px;
+  padding:0 13px;
+  color:var(--fl-text);
+  border:1px solid var(--fl-border-strong);
+  border-radius:4px;
+  background:var(--fl-control);
+  font-size:12px;
+  font-weight:600;
+}
+.app-shell .version-history-button:hover { background:var(--fl-hover); }
+.app-shell .version-history-button svg { width:15px; }
 .app-shell .version-update-row {
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
@@ -1958,10 +1975,187 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   font-size:11px;
   line-height:1.45;
 }
+.app-shell .version-history-backdrop {
+  z-index:120;
+  padding:20px;
+}
+.app-shell .version-history-dialog {
+  display:flex;
+  width:min(620px,calc(100vw - 40px));
+  max-height:min(680px,calc(100vh - 40px));
+  flex-direction:column;
+  overflow:hidden;
+  color:var(--fl-text);
+  border:1px solid var(--fl-border);
+  border-radius:10px;
+  background:var(--fl-surface);
+  box-shadow:0 24px 64px rgba(0,0,0,.28);
+}
+.app-shell .version-history-dialog > header {
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:16px 18px;
+  border-bottom:1px solid var(--fl-border);
+  background:var(--fl-surface);
+}
+.app-shell .version-history-dialog > header h2 {
+  margin:2px 38px 0 0;
+  color:var(--fl-text);
+  font-size:18px;
+}
+.app-shell .version-history-dialog > header .dialog-close {
+  position:absolute;
+  top:16px;
+  right:16px;
+  display:grid;
+  width:30px;
+  height:30px;
+  padding:0;
+  place-items:center;
+  color:var(--fl-muted);
+  border:0;
+  border-radius:4px;
+  background:transparent;
+}
+.app-shell .version-history-dialog > header .dialog-close:hover { background:var(--fl-hover); }
+.app-shell .version-history-dialog > header .dialog-close svg { width:16px; }
+.app-shell .version-history-list {
+  display:flex;
+  min-height:180px;
+  flex:1 1 auto;
+  flex-direction:column;
+  gap:10px;
+  overflow:auto;
+  padding:14px 18px;
+  background:var(--fl-surface-alt);
+}
+.app-shell .version-history-entry {
+  padding:14px 16px;
+  color:var(--fl-text);
+  border:1px solid var(--fl-border);
+  border-radius:8px;
+  background:var(--fl-surface);
+}
+.app-shell .version-history-heading {
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.app-shell .version-history-heading > span { font-size:12px; font-weight:700; }
+.app-shell .version-history-heading > em {
+  padding:2px 7px;
+  color:var(--fl-accent);
+  border-radius:999px;
+  background:var(--fl-accent-soft);
+  font-size:9px;
+  font-style:normal;
+  font-weight:700;
+  text-transform:uppercase;
+}
+.app-shell .version-history-heading > time {
+  margin-left:auto;
+  color:var(--fl-muted);
+  font-size:10px;
+}
+.app-shell .version-history-entry h3 {
+  margin:8px 0 5px;
+  color:var(--fl-text);
+  font-size:14px;
+}
+.app-shell .version-history-entry ul {
+  display:grid;
+  gap:4px;
+  margin:0;
+  padding-left:18px;
+  color:var(--fl-muted);
+  font-size:12px;
+  line-height:1.45;
+}
+.app-shell .version-history-empty {
+  display:flex;
+  min-height:180px;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  color:var(--fl-muted);
+  font-size:12px;
+}
+.app-shell .version-history-empty svg { width:16px; }
+.app-shell .version-history-dialog > footer {
+  display:flex;
+  min-height:56px;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 18px;
+  color:var(--fl-muted);
+  border-top:1px solid var(--fl-border);
+  background:var(--fl-surface);
+  font-size:10px;
+}
+.app-shell .version-history-dialog > footer button { height:32px; padding:0 18px; }
 @keyframes version-update-spin { to { transform:rotate(360deg); } }
 @media (max-width:720px) {
   .app-shell .version-update-row { grid-template-columns:1fr; }
   .app-shell .version-update-button { width:100%; }
+  .app-shell .version-product-row { flex-wrap:wrap; }
+  .app-shell .version-history-button { width:100%; margin-left:58px; justify-content:center; }
+  .app-shell .version-history-heading { align-items:flex-start; flex-wrap:wrap; }
+  .app-shell .version-history-heading > time { width:100%; margin-left:0; }
+}
+
+/* Windows LAN access: compact, explicit firewall recovery. */
+.app-shell .remote-firewall {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px 14px;
+  align-items:center;
+  margin-top:14px;
+  padding:12px;
+  color:var(--fl-text);
+  border:1px solid var(--fl-border);
+  border-radius:8px;
+  background:var(--fl-surface-alt);
+}
+.app-shell .remote-firewall > div {
+  display:flex;
+  min-width:0;
+  align-items:center;
+  gap:9px;
+  color:var(--fl-muted);
+  font-size:11px;
+  line-height:1.4;
+}
+.app-shell .remote-firewall > div svg { flex:0 0 auto; color:var(--fl-accent); }
+.app-shell .remote-firewall > div span,
+.app-shell .remote-firewall > div b { display:block; }
+.app-shell .remote-firewall > div b { margin-bottom:2px; color:var(--fl-text); font-size:12px; }
+.app-shell .remote-firewall > button {
+  height:32px;
+  padding:0 13px;
+  color:var(--fl-text);
+  border:1px solid var(--fl-border-strong);
+  border-radius:4px;
+  background:var(--fl-control);
+  font-size:11px;
+  font-weight:700;
+}
+.app-shell .remote-firewall > button:hover:not(:disabled) { background:var(--fl-hover); }
+.app-shell .remote-firewall > button:disabled { opacity:.65; }
+.app-shell .remote-firewall > small {
+  grid-column:1/-1;
+  color:var(--fl-muted);
+  font-size:10px;
+}
+.app-shell .remote-firewall.success { border-color:color-mix(in srgb,#16a34a 55%,var(--fl-border)); }
+.app-shell .remote-firewall.success > small { color:#15803d; }
+.app-shell .remote-firewall.error { border-color:color-mix(in srgb,var(--fl-danger) 55%,var(--fl-border)); }
+.app-shell .remote-firewall.error > small { color:var(--fl-danger); }
+@media (max-width:720px) {
+  .app-shell .remote-firewall { grid-template-columns:1fr; }
+  .app-shell .remote-firewall > button { width:100%; }
 }
 
 /* Native color inputs are controls; preset black swatches are real colors and

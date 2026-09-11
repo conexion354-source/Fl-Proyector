@@ -5,7 +5,10 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { isLongBibleVerse } from "../shared/bibleLayout.js";
+import {
+  isLongBibleVerse,
+  splitBibleVerse,
+} from "../shared/bibleLayout.js";
 import type {
   BibleBook,
   BibleVerse,
@@ -38,6 +41,8 @@ type MultimediaRemoteSource = {
   listMeetings: () => Meeting[];
   listItems: (meetingId: number) => RemoteMultimediaItem[];
   project: (itemId: number) => void;
+  clear: () => void;
+  activeItemId: () => number | null;
 };
 
 type CollaboratorSource = {
@@ -139,7 +144,21 @@ export function startRemoteServer(
     const title = String(source.title ?? "").trim();
     const content = String(source.content ?? "").trim();
     if (!title) return response.status(400).json({ error: "Indicá el título de la canción." });
-    const id = collaborator.saveSong({ id: Number.isInteger(source.id) ? source.id : undefined, title, content, color: typeof source.color === "string" ? source.color : "#665cff", categoryId: null });
+    const existing = Number.isInteger(source.id)
+      ? collaborator.listSongs().find((song) => song.id === source.id)
+      : undefined;
+    const id = collaborator.saveSong({
+      ...existing,
+      id: Number.isInteger(source.id) ? source.id : undefined,
+      title,
+      content,
+      color:
+        typeof source.color === "string"
+          ? source.color
+          : existing?.color || "#665cff",
+      categoryId: existing?.categoryId ?? null,
+      sectionTypes: existing?.sectionTypes || [],
+    });
     return response.json({ id });
   });
   app.get("/api/collaborator/meetings", collaboratorOnly, (_request, response) => response.json(collaborator.listMeetings()));
@@ -184,15 +203,19 @@ export function startRemoteServer(
       return res.json(verses);
     return res.json(
       verses.flatMap<unknown>((verse) => {
-        if (!isLongBibleVerse(verse.text, bibleStyle))
+        if (!isLongBibleVerse(verse.text, bibleStyle, getState().outputViewport))
           return [verse];
-        const parts = splitVerseForRemote(verse.text);
+        const parts = splitBibleVerse(
+          verse.text,
+          bibleStyle,
+          getState().outputViewport,
+        );
         return parts.map((text, index) => ({
           ...verse,
           text,
           // The controller uses this label in the list and in the reference
           // sent to projection, e.g. Juan 3:16a / Juan 3:16b.
-          verse: `${verse.verse}${parts.length > 1 ? (index === 0 ? "a" : "b") : ""}`,
+          verse: `${verse.verse}${parts.length > 1 ? String.fromCharCode(97 + Math.min(index, 25)) : ""}`,
         }));
       }),
     );
@@ -202,30 +225,31 @@ export function startRemoteServer(
   );
   app.get("/api/remote/multimedia/:meetingId", (req, res) => {
     const meetingId = Number(req.params.meetingId);
-    return res.json(Number.isInteger(meetingId) ? multimedia.listItems(meetingId) : []);
+    const activeItemId = multimedia.activeItemId();
+    return res.json(
+      Number.isInteger(meetingId)
+        ? multimedia
+            .listItems(meetingId)
+            .map((item) => ({ ...item, active: item.id === activeItemId }))
+        : [],
+    );
   });
   app.post("/api/remote/patch", (req, res) => {
     const patch = req.body as ProjectionPatch;
-    // A Bible selection is always exclusive: it replaces any media or slide
-    // that the remote previously sent to the live output.
-    if (patch.text?.kind === "biblia")
+    // Bible replaces foreground multimedia, but preserves the church
+    // background (including an animated background and its playback state).
+    if (patch.text?.kind === "biblia") {
+      multimedia.clear();
       applyPatch({
         ...patch,
         presentation: { visible: false },
         lowerThird: { visible: false },
-        video: { playing: false },
-        background: { id: null, url: null, name: "", kind: null },
       });
-    else applyPatch(patch);
+    } else applyPatch(patch);
     res.status(204).end();
   });
   app.post("/api/remote/clear", (_req, res) => {
-    applyPatch({
-      blackout: false, logo: false, text: { visible: false },
-      lowerThird: { visible: false }, presentation: { visible: false },
-      background: { id: null, url: null, name: "", kind: null },
-      video: { playing: false },
-    });
+    multimedia.clear();
     res.status(204).end();
   });
   app.post("/api/remote/multimedia/:itemId", (req, res) => {
@@ -290,24 +314,6 @@ export function startRemoteServer(
   };
 }
 
-function splitVerseForRemote(text: string) {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length < 2) return [text];
-  const target = text.length / 2;
-  let total = 0;
-  let splitAt = 1;
-  let closest = Number.POSITIVE_INFINITY;
-  for (let index = 0; index < words.length - 1; index += 1) {
-    total += words[index].length + (index ? 1 : 0);
-    const distance = Math.abs(target - total);
-    if (distance < closest) {
-      closest = distance;
-      splitAt = index + 1;
-    }
-  }
-  return [words.slice(0, splitAt).join(" "), words.slice(splitAt).join(" ")];
-}
-
 const collaboratorHtml = String.raw`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FL Proyector · Colaborador</title><style>
 :root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#edf0f8;background:#f3f5f9}*{box-sizing:border-box}body{margin:0}.top{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:#171a22;color:#fff;border-bottom:1px solid #303746}.brand{font-weight:800;letter-spacing:.04em}.brand i{display:inline-grid;place-items:center;width:28px;height:28px;margin-right:8px;border-radius:8px;background:#6046ec;font-style:normal}.mode{font-size:12px;color:#b9c2d6}.shell{display:grid;grid-template-columns:235px minmax(0,1fr);min-height:calc(100vh - 58px)}aside{padding:18px 12px;background:#20242e;color:#dbe0ec;border-right:1px solid #dce1ea}aside h3{font-size:11px;letter-spacing:.1em;color:#9da7ba;margin:8px 10px 10px}nav button{display:block;width:100%;border:0;border-radius:8px;padding:11px 12px;text-align:left;background:transparent;color:inherit;font:650 14px inherit}nav button.active{background:#e9e5ff;color:#432cb7}main{padding:28px;max-width:1200px;width:100%;margin:auto}.page-title{display:flex;align-items:start;justify-content:space-between;gap:16px;margin-bottom:20px}.page-title h1{margin:0;font-size:25px;color:#202532}.page-title p{margin:5px 0 0;color:#667188;font-size:14px}.panel{background:#fff;border:1px solid #dce1ea;border-radius:12px;box-shadow:0 3px 16px #2630480a}.toolbar{display:flex;gap:9px;align-items:center;padding:12px;border-bottom:1px solid #e7eaf0}.toolbar input{flex:1}.list{display:grid;gap:1px}.song,.meeting{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border-bottom:1px solid #edf0f4}.song:last-child,.meeting:last-child{border-bottom:0}.song b,.meeting b{display:block;color:#202532}.song span,.meeting span{color:#717b90;font-size:12px}.button,button{border:1px solid #c9d0df;border-radius:8px;padding:9px 12px;background:#fff;color:#252b38;font:700 13px inherit;cursor:pointer}.button.primary,button.primary{background:#5b42ea;border-color:#5b42ea;color:#fff}.button:disabled,button:disabled{opacity:.5;cursor:default}.edit{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}.form{padding:17px}.form label{display:grid;gap:6px;margin-bottom:14px;color:#586379;font-size:12px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd2df;border-radius:8px;padding:10px;font:15px inherit;color:#202532;background:#fff}textarea{min-height:330px;resize:vertical;line-height:1.5}.side-panel{padding:17px}.side-panel h3{margin:0 0 12px;font-size:15px}.item{padding:9px 0;border-bottom:1px solid #edf0f4;font-size:13px}.item:last-child{border:0}.row-actions{display:flex;gap:8px;flex-wrap:wrap}.empty{padding:30px;color:#788297;text-align:center}.login{display:grid;place-items:center;min-height:100vh;background:linear-gradient(135deg,#17182d,#0d1018)}.login-card{width:min(400px,calc(100% - 32px));padding:28px;background:#fff;border-radius:16px;box-shadow:0 20px 60px #0005}.login-card h1{margin:0 0 7px;color:#202532}.login-card p{margin:0 0 20px;color:#687389}.error{min-height:18px;color:#c5303f;font-size:13px;margin:8px 0}.hidden{display:none!important}@media(max-width:760px){.shell{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid #dce1ea;padding:8px;overflow:auto}aside h3{display:none}nav{display:flex;gap:5px}nav button{white-space:nowrap;width:auto}.edit{grid-template-columns:1fr}main{padding:16px}.top{padding:0 15px}}
 </style></head><body><section id="login" class="login"><form id="login-form" class="login-card"><h1>FL Proyector</h1><p>Acceso de colaborador. Podés preparar reuniones y editar canciones, sin controlar la pantalla de proyección.</p><label>Código de acceso<input id="access-code" type="password" autocomplete="current-password" required autofocus></label><div id="login-error" class="error"></div><button class="primary" type="submit">Ingresar</button></form></section><section id="app" class="hidden"><header class="top"><div class="brand"><i>▤</i>FL PROYECTOR</div><div class="mode">MODO COLABORADOR · sin acceso al proyector</div><button id="logout">Salir</button></header><div class="shell"><aside><h3>PREPARACIÓN</h3><nav><button class="active" data-page="songs">Canciones</button><button data-page="meetings">Reuniones</button></nav></aside><main><section id="songs-page"><div class="page-title"><div><h1>Canciones</h1><p>Creá y corregí los cánticos de la biblioteca.</p></div><button id="new-song" class="primary">+ Nueva canción</button></div><div class="edit"><div class="panel"><div class="toolbar"><input id="song-search" placeholder="Buscar canción"></div><div id="song-list" class="list"></div></div><form id="song-form" class="panel form"><input id="song-id" type="hidden"><label>Título<input id="song-title" required placeholder="Título de la canción"></label><label>Letra<textarea id="song-content" placeholder="Pegá la letra aquí. Cada párrafo es una estrofa."></textarea></label><div class="row-actions"><button class="primary" type="submit">Guardar canción</button></div></form></div></section><section id="meetings-page" class="hidden"><div class="page-title"><div><h1>Reuniones</h1><p>Armá el orden del culto mientras otro operador proyecta.</p></div><button id="new-meeting" class="primary">+ Nueva reunión</button></div><div class="edit"><div class="panel"><div id="meeting-list" class="list"></div></div><div class="panel side-panel"><h3 id="meeting-title">Elegí una reunión</h3><div id="meeting-items" class="empty">Seleccioná una reunión para ver su orden.</div><div id="add-song-row" class="hidden"><h3>Agregar canción</h3><select id="add-song-select"></select><button id="add-song" class="primary">Agregar al culto</button></div></div></div></section></main></div></section><script>
@@ -365,7 +371,7 @@ const remoteHtml = String.raw`<!doctype html>
   function loadMeetings(){return request("/api/remote/meetings").then(function(data){mediaMeeting.innerHTML=data.map(function(meeting){return "<option value=\""+meeting.id+"\">"+escapeHtml(meeting.name)+"</option>";}).join("");if(!data.length){mediaList.innerHTML="<div class=\"empty\">No hay reuniones creadas.</div>";return;}loadMedia();}).catch(function(){mediaList.innerHTML="<div class=\"empty\">No se pudieron cargar las reuniones.</div>";});}
   function itemControls(item){if(Number(item.id)!==Number(activeMediaItemId))return "";if(item.kind==="presentation")return "<div class=\"item-controls\"><button data-presentation=\"-1\" aria-label=\"Diapositiva anterior\">← Anterior</button><button data-presentation=\"1\" aria-label=\"Diapositiva siguiente\">Siguiente →</button></div>";if(item.kind!=="video")return "";var video=projectionState&&projectionState.video||{},duration=Math.max(0,Number(video.duration||0)),current=Math.min(Number(video.currentTime||video.seekTime||0),duration||Number(video.currentTime||video.seekTime||0)),max=Math.max(duration,1);return "<div class=\"item-video-controls\"><div class=\"item-controls\"><button data-video=\"play\">"+(video.playing?"❚❚ Pausar":"▶ Reproducir")+"</button><button data-video=\"mute\">"+(video.muted?"🔊 Activar sonido":"🔇 Silenciar")+"</button></div><label class=\"seek-label\">"+formatTime(current)+" <input data-video=\"seek\" type=\"range\" min=\"0\" max=\""+max+"\" step=\"0.1\" value=\""+current+"\"> "+formatTime(duration)+"</label><label class=\"volume-label\">Volumen <input data-video=\"volume\" type=\"range\" min=\"0\" max=\"1\" step=\"0.05\" value=\""+(video.volume==null?1:video.volume)+"\"></label></div>";}
   function formatTime(value){value=Math.max(0,Math.floor(Number(value)||0));return Math.floor(value/60)+":"+String(value%60).padStart(2,"0");}
-  function loadMedia(){var id=mediaMeeting.value;if(!id)return;mediaList.innerHTML="<div class=\"loading\">Cargando contenido…</div>";request("/api/remote/multimedia/"+encodeURIComponent(id)).then(function(items){if(!items.length){mediaList.innerHTML="<div class=\"empty\">Esta reunión no tiene contenido.</div>";return;}mediaList.innerHTML=items.map(function(item){var label=item.kind==="presentation"?"PowerPoint":item.kind==="video"?"Video":item.kind==="announcement"?"Anuncio":"Imagen",live=Number(item.id)===Number(activeMediaItemId);return "<article class=\"media-item"+(live?" live":"")+"\" data-id=\""+item.id+"\"><button class=\"media-launch\" data-launch=\"1\"><span><b>"+escapeHtml(item.title)+"</b><span>"+(live?"En vivo · tocá para quitar":label)+"</span></span><i class=\"badge\">"+(live?"EN VIVO":label)+"</i></button>"+itemControls(item)+"</article>";}).join("");}).catch(function(){mediaList.innerHTML="<div class=\"empty\">No se pudo cargar el contenido.</div>";});}
+  function loadMedia(){var id=mediaMeeting.value;if(!id)return;mediaList.innerHTML="<div class=\"loading\">Cargando contenido…</div>";request("/api/remote/multimedia/"+encodeURIComponent(id)).then(function(items){var activeItem=items.find(function(item){return item.active;});activeMediaItemId=activeItem?activeItem.id:null;if(!items.length){mediaList.innerHTML="<div class=\"empty\">Esta reunión no tiene contenido.</div>";return;}mediaList.innerHTML=items.map(function(item){var label=item.kind==="presentation"?"PowerPoint":item.kind==="video"?"Video":item.kind==="announcement"?"Anuncio":"Imagen",live=Number(item.id)===Number(activeMediaItemId);return "<article class=\"media-item"+(live?" live":"")+"\" data-id=\""+item.id+"\"><button class=\"media-launch\" data-launch=\"1\"><span><b>"+escapeHtml(item.title)+"</b><span>"+(live?"En vivo · tocá para quitar":label)+"</span></span><i class=\"badge\">"+(live?"EN VIVO":label)+"</i></button>"+itemControls(item)+"</article>";}).join("");}).catch(function(){mediaList.innerHTML="<div class=\"empty\">No se pudo cargar el contenido.</div>";});}
   function renderTransport(){transport.innerHTML="";}
   function selectedVersion(){return versions.find(function(item){return String(item.id)===versionSelect.value;});}
   function selectedBook(){return books.find(function(item){return item.book===bookSelect.value;});}
@@ -376,7 +382,7 @@ const remoteHtml = String.raw`<!doctype html>
   function verseKey(index){var verse=verses[index];return verse?[versionSelect.value,verse.book,verse.chapter,verse.verse].join("|"):"";}
   function highlightsFor(index){return verseHighlights[verseKey(index)]||[];}
   function renderVerses(){if(!verses.length){versesElement.innerHTML="<div class=\"empty\">No hay versículos en este capítulo.</div>";return;}versesElement.innerHTML=verses.map(function(verse,index){var marked=escapeHtml(verse.text), highlights=highlightsFor(index);highlights.forEach(function(highlight){if(highlight&&highlight.color)marked=marked.replace(escapeHtml(highlight.text),"<mark style=\"background:"+highlight.color+";color:#111827;padding:.04em .12em;border-radius:.12em\">"+escapeHtml(highlight.text)+"</mark>");});return "<article class=\"verse"+(index===selectedVerse?" selected":"")+"\" data-index=\""+index+"\" role=\"button\" tabindex=\"0\"><span class=\"ref\">"+escapeHtml(verse.book+" "+verse.chapter+":"+verse.verse)+"</span><span class=\"text\">"+marked+"</span></article>";}).join("");}
-  function sendVerse(index,highlight){var verse=verses[index], version=selectedVersion();if(!verse||!projectionState)return;selectedVerse=index;renderVerses();var style=projectionState.bibleStyle||{}, reference=verse.book+" "+verse.chapter+":"+verse.verse, refText=[];if(style.showReference!==false)refText.push(reference);if(style.showVersion!==false&&version)refText.push(version.code||version.name);var referenceHtml=refText.length?"<p style=\"margin:"+(style.referencePosition==="before"?"0 0 .7em":".7em 0 0")+";text-shadow:none\"><span style=\"display:inline-block;color:"+(style.referenceColor||"#fff")+";font-family:"+escapeHtml(style.referenceFontFamily||"Inter")+";font-size:"+Math.max(.2,Math.min(1.5,Number(style.referenceFontSize||24)/Number(style.textFontSize||60)))+"em;font-weight:750;background:"+(style.referenceBackground||"#4f46e5")+";padding:.35em .75em;border-radius:999px\">"+escapeHtml(refText.join(" · "))+"</span></p>":"", verseText=escapeHtml(verse.text), highlights=Array.isArray(highlight)?highlight:(highlight?[highlight]:highlightsFor(index));highlights.forEach(function(value){if(value&&value.text&&value.color)verseText=verseText.replace(escapeHtml(value.text),"<mark style=\"background:"+value.color+";color:#111827;padding:.04em .12em;border-radius:.12em\">"+escapeHtml(value.text)+"</mark>");});var verseHtml="<p style=\"font-family:"+escapeHtml(style.textFontFamily||"Inter")+";color:"+(style.textColor||"#fff")+"\">"+verseText+"</p>";command("/api/remote/patch",{blackout:false,logo:false,presentation:{visible:false},lowerThird:{visible:false},text:{html:style.referencePosition==="before"?referenceHtml+verseHtml:verseHtml+referenceHtml,visible:true,kind:"biblia",fontSize:Number(style.textFontSize||60),fontFamily:style.textFontFamily||"Inter",align:"center",color:style.textColor||"#ffffff",backgroundColor:"rgba(0,0,0,0)",position:"center",borderRadius:0,template:"plain",shadowEnabled:style.textShadowEnabled!==false,shadowColor:style.textShadowColor||"#000000",shadowBlur:Number(style.textShadowBlur||14),title:"",titlePosition:"bottom",titleColor:"#ffffff",titleBackground:"#4f46e5",titleFontSize:30,titleStyle:"none"}});notify(reference+" en pantalla");}
+  function sendVerse(index,highlight){var verse=verses[index], version=selectedVersion();if(!verse||!projectionState)return;selectedVerse=index;renderVerses();var style=projectionState.bibleStyle||{}, uppercase=style.uppercase===true, reference=verse.book+" "+verse.chapter+":"+verse.verse, refText=[];if(style.showReference!==false)refText.push(reference);if(style.showVersion!==false&&version)refText.push(version.code||version.name);var referenceHtml=refText.length?"<p style=\"margin:"+(style.referencePosition==="before"?"0 0 .7em":".7em 0 0")+";text-shadow:none;text-transform:"+(uppercase?"uppercase":"none")+"\"><span style=\"display:inline-block;color:"+(style.referenceColor||"#fff")+";font-family:"+escapeHtml(style.referenceFontFamily||"Inter")+";font-size:"+Math.max(.2,Math.min(1.5,Number(style.referenceFontSize||24)/Number(style.textFontSize||60)))+"em;font-weight:750;background:"+(style.referenceBackground||"#4f46e5")+";padding:.35em .75em;border-radius:999px\">"+escapeHtml(refText.join(" · "))+"</span></p>":"", verseText=escapeHtml(verse.text), highlights=Array.isArray(highlight)?highlight:(highlight?[highlight]:highlightsFor(index));highlights.forEach(function(value){if(value&&value.text&&value.color)verseText=verseText.replace(escapeHtml(value.text),"<mark style=\"background:"+value.color+";color:#111827;padding:.04em .12em;border-radius:.12em\">"+escapeHtml(value.text)+"</mark>");});var verseHtml="<p style=\"font-family:"+escapeHtml(style.textFontFamily||"Inter")+";color:"+(style.textColor||"#fff")+";text-transform:"+(uppercase?"uppercase":"none")+"\">"+verseText+"</p>";command("/api/remote/patch",{blackout:false,logo:false,presentation:{visible:false},lowerThird:{visible:false},text:{html:style.referencePosition==="before"?referenceHtml+verseHtml:verseHtml+referenceHtml,visible:true,kind:"biblia",fontSize:Number(style.textFontSize||60),fontFamily:style.textFontFamily||"Inter",align:"center",color:style.textColor||"#ffffff",backgroundColor:"rgba(0,0,0,0)",position:"center",borderRadius:0,template:"plain",shadowEnabled:style.textShadowEnabled!==false,shadowColor:style.textShadowColor||"#000000",shadowBlur:Number(style.textShadowBlur||14),title:"",titlePosition:"bottom",titleColor:"#ffffff",titleBackground:"#4f46e5",titleFontSize:30,titleStyle:"none"}});notify(reference+" en pantalla");}
   function showHighlightMenu(){var selection=window.getSelection(), text=(selection&&selection.toString()||"").replace(/\s+/g," ").trim(), range=selection&&selection.rangeCount?selection.getRangeAt(0):null, target=range&&range.commonAncestorContainer.nodeType===1?range.commonAncestorContainer:range&&range.commonAncestorContainer.parentElement, verseButton=target&&target.closest?target.closest(".verse"):null;if(!text||!verseButton||!versesElement.contains(verseButton))return;var index=Number(verseButton.dataset.index), verse=verses[index];if(!verse||verse.text.indexOf(text)<0)return;selectedHighlight={index:index,text:text};highlightMenu.hidden=false;}
   function clearHighlightMenu(){highlightMenu.hidden=true;selectedHighlight=null;window.getSelection&&window.getSelection().removeAllRanges();}
   versionSelect.onchange=function(){loadBooks();};bookSelect.onchange=function(){loadChapters();};chapterSelect.onchange=loadVerses;versesElement.onclick=function(event){if(selectedHighlight||(window.getSelection&&window.getSelection().toString().trim()))return;var button=event.target.closest(".verse");if(button)sendVerse(Number(button.dataset.index));};versesElement.addEventListener("mouseup",function(){setTimeout(showHighlightMenu,0);});versesElement.addEventListener("touchend",function(){setTimeout(showHighlightMenu,120);},{passive:true});versesElement.addEventListener("contextmenu",function(event){event.preventDefault();setTimeout(showHighlightMenu,0);});document.addEventListener("selectionchange",function(){var selection=window.getSelection();if(selection&&selection.toString().trim())setTimeout(showHighlightMenu,120);});highlightMenu.onclick=function(event){var button=event.target.closest("button");if(!button||!selectedHighlight)return;sendVerse(selectedHighlight.index,{text:selectedHighlight.text,color:button.dataset.highlight||""});clearHighlightMenu();};function connected(){localStorage.setItem("fl-remote-server",location.origin);status.textContent="Conectado";status.classList.add("online");}socket.on("connect",connected);socket.on("connect_error",function(){if(!projectionState){status.textContent="Buscando PC…";status.classList.remove("online");}});socket.on("disconnect",function(){if(!projectionState){status.textContent="Reconectando…";status.classList.remove("online");}});socket.on("projection:state",function(next){projectionState=next;connected();});request("/api/state").then(function(next){projectionState=next;connected();renderTransport();}).catch(function(){status.textContent="Sin conexión";});if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(function(){});
@@ -387,7 +393,7 @@ const remoteHtml = String.raw`<!doctype html>
   // A remote can remain open for hours. Refresh its chapter whenever the
   // operator changes the A/B rule, so it never keeps a stale split list.
   var remoteBibleLayoutKey="";
-  socket.on("projection:state",function(next){var style=next.bibleStyle||{},key=[style.longVerseMode,style.maxLinesPerSlide,style.textFontSize,style.horizontalMargin,style.verticalMargin].join("|");if(remoteBibleLayoutKey&&key!==remoteBibleLayoutKey&&document.body.dataset.view==="bible"&&versions.length)setTimeout(loadVerses,0);remoteBibleLayoutKey=key;});
+  socket.on("projection:state",function(next){var style=next.bibleStyle||{},viewport=next.outputViewport||{},key=[style.longVerseMode,style.maxLinesPerSlide,style.textFontSize,style.referenceFontSize,style.showReference,style.showVersion,style.horizontalMargin,style.verticalMargin,style.uppercase,viewport.width,viewport.height].join("|");if(remoteBibleLayoutKey&&key!==remoteBibleLayoutKey&&document.body.dataset.view==="bible"&&versions.length)setTimeout(loadVerses,0);remoteBibleLayoutKey=key;});
   var remoteViewWithFreshVerses=showView;showView=function(view){remoteViewWithFreshVerses(view);if(view==="bible"&&versions.length)loadVerses();};
   document.getElementById("clear-live").onclick=function(){command("/api/remote/clear").then(function(){selectedVerse=-1;renderVerses();notify("Versículo quitado del aire");});};
 </script></body></html>`;

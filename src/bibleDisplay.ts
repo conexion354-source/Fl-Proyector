@@ -1,5 +1,9 @@
 import type { BibleDisplaySettings } from "../shared/types";
-import { isLongBibleVerse } from "../shared/bibleLayout";
+import {
+  isLongBibleVerse,
+  splitBibleVerse,
+  type ProjectionDimensions,
+} from "../shared/bibleLayout";
 
 export type BibleSlide = { html: string; fontSize: number; label: string };
 
@@ -16,52 +20,20 @@ const escapeHtml = (value: string) =>
       })[char]!,
   );
 
-function splitByConfiguredLines(
-  text: string,
-  settings: BibleDisplaySettings,
-) {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length < 2) return [text];
-  const usableWidth = 1920 * (1 - (settings.horizontalMargin * 2) / 100);
-  const averageGlyphWidth = Math.max(8, settings.textFontSize * 0.53);
-  const charactersPerLine = Math.max(
-    16,
-    Math.floor(usableWidth / averageGlyphWidth),
-  );
-  // A small safety factor accounts for proportional glyphs and keeps the
-  // rendered slide at or below the operator-selected line count.
-  const characterBudget = Math.max(
-    24,
-    Math.floor(charactersPerLine * settings.maxLinesPerSlide * 0.9),
-  );
-  const pieces: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (current && candidate.length > characterBudget) {
-      pieces.push(current);
-      current = word;
-    } else {
-      current = candidate;
-    }
-  }
-  if (current) pieces.push(current);
-  return pieces.length > 1 ? pieces : [text];
-}
-
 export function buildBibleSlides(
   text: string,
   reference: string,
   version: string,
   settings: BibleDisplaySettings,
+  viewport?: ProjectionDimensions,
 ): BibleSlide[] {
   // A/B is used only for passages that cross the configured long-text limit.
   // Short verses remain a single, quick-to-select item for the operator.
   const pieces =
     settings.longVerseMode !== "auto-fit" &&
-    isLongBibleVerse(text, settings) &&
+    isLongBibleVerse(text, settings, viewport) &&
     text.trim().split(/\s+/).length > 1
-      ? splitByConfiguredLines(text, settings)
+      ? splitBibleVerse(text, settings, viewport)
       : [text];
   return pieces.map((piece, index) => {
     const overflow = Math.max(0, piece.length - 110);

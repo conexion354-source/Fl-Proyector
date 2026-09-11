@@ -109,6 +109,7 @@ export function BibleOperator({
               `${restoredVerse.book} ${restoredVerse.chapter}:${restoredVerse.verse}`,
               version,
               state.bibleStyle,
+              state.outputViewport,
             );
             const slide = Math.min(savedPosition.current.activeSlide, slides.length - 1);
             setActiveSlides(slides);
@@ -180,11 +181,39 @@ export function BibleOperator({
       reference,
       version,
       state.bibleStyle,
+      state.outputViewport,
     );
     setActiveVerse(verseKey(verse));
     setActiveSlides(slides);
     projectSlide(slides, 0);
   };
+  useEffect(() => {
+    if (!activeVerse) return;
+    const verse = verses.find((candidate) => verseKey(candidate) === activeVerse);
+    if (!verse) return;
+    const version = versions.find((value) => value.id === versionId)?.code || "";
+    const slides = buildBibleSlides(
+      verse.text,
+      `${verse.book} ${verse.chapter}:${verse.verse}`,
+      version,
+      state.bibleStyle,
+      state.outputViewport,
+    );
+    const nextSlide = Math.min(activeSlide, Math.max(0, slides.length - 1));
+    setActiveSlides(slides);
+    projectSlide(slides, nextSlide);
+  }, [
+    state.outputViewport.width,
+    state.outputViewport.height,
+    state.bibleStyle.textFontSize,
+    state.bibleStyle.referenceFontSize,
+    state.bibleStyle.showReference,
+    state.bibleStyle.showVersion,
+    state.bibleStyle.horizontalMargin,
+    state.bibleStyle.verticalMargin,
+    state.bibleStyle.maxLinesPerSlide,
+    state.bibleStyle.longVerseMode,
+  ]);
   const selectPhrase = (verse: BibleVerse, host: HTMLElement) => {
     const selection = window.getSelection();
     const text = selection?.toString().replace(/\s+/g, " ").trim() || "";
@@ -243,6 +272,7 @@ export function BibleOperator({
       `${selected.verse.book} ${selected.verse.chapter}:${selected.verse.verse}`,
       version,
       state.bibleStyle,
+      state.outputViewport,
     ).map((slide) => ({
       ...slide,
       html: slide.html.replace(

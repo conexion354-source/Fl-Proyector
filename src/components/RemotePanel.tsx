@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { Copy, QrCode, Smartphone } from "lucide-react";
+import { Copy, QrCode, ShieldCheck, Smartphone } from "lucide-react";
 import { withSaveNotification } from "./SaveNotification";
 
 export function RemotePanel({ urls }: { urls: string[] }) {
@@ -11,6 +11,8 @@ export function RemotePanel({ urls }: { urls: string[] }) {
   const [saved, setSaved] = useState(false);
   const [editingCode, setEditingCode] = useState(false);
   const [savedCode, setSavedCode] = useState("");
+  const [firewallBusy, setFirewallBusy] = useState(false);
+  const [firewallResult, setFirewallResult] = useState<"success" | "error" | null>(null);
   const collaboratorUrl = url ? `${url}/colaborador` : "";
   useEffect(() => {
     window.flProyector.getCollaboratorCode().then((code) => {
@@ -36,6 +38,13 @@ export function RemotePanel({ urls }: { urls: string[] }) {
       setSaved(true);
       window.setTimeout(() => setSaved(false), 1500);
     }, "El código de colaborador fue guardado.");
+  };
+  const enableWindowsAccess = async () => {
+    setFirewallBusy(true);
+    setFirewallResult(null);
+    const enabled = await window.flProyector.enableWindowsRemoteAccess();
+    setFirewallBusy(false);
+    setFirewallResult(enabled ? "success" : "error");
   };
   return (
     <section className="remote-panel-page">
@@ -68,6 +77,22 @@ export function RemotePanel({ urls }: { urls: string[] }) {
                 Abrila en el navegador y elegí <b>Instalar app</b> o <b>Agregar a pantalla de inicio</b>.
                 Después podés usar <b>Biblia</b> o <b>Multimedia</b> mientras ambos equipos estén en la misma red.
               </p>
+              {window.flProyector.platform === "win32" && (
+                <div className={`remote-firewall ${firewallResult ?? ""}`}>
+                  <div>
+                    <ShieldCheck size={18} />
+                    <span>
+                      <b>Acceso desde otros equipos</b>
+                      Si el enlace no abre, habilitá FL Proyector en el Firewall de Windows.
+                    </span>
+                  </div>
+                  <button type="button" disabled={firewallBusy} onClick={enableWindowsAccess}>
+                    {firewallBusy ? "Esperando permiso…" : "Habilitar acceso"}
+                  </button>
+                  {firewallResult === "success" && <small>Acceso habilitado. Probá nuevamente el enlace.</small>}
+                  {firewallResult === "error" && <small>No se pudo habilitar. Aceptá el permiso de administrador e intentá otra vez.</small>}
+                </div>
+              )}
             </>
           ) : (
             <p className="remote-unavailable">No se detectó una dirección de red. Verificá la conexión Wi-Fi.</p>

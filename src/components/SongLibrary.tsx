@@ -7,6 +7,7 @@ import Highlight from "@tiptap/extension-highlight";
 import { TextStyle } from "@tiptap/extension-text-style";
 import {
   CalendarPlus,
+  Check,
   FolderPlus,
   Music2,
   Palette,
@@ -17,7 +18,17 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { Song, SongCategory } from "../../shared/types";
+import type {
+  Song,
+  SongCategory,
+  SongSectionType,
+} from "../../shared/types";
+import {
+  normalizeSongSectionTypes,
+  songSectionLabel,
+  songSectionOptions,
+  splitSongStanzas,
+} from "../../shared/songSections";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import { RichTextToolbar } from "./RichTextToolbar";
 import { Win11ContextMenu } from "./Win11ContextMenu";
@@ -60,6 +71,7 @@ export function SongLibrary({
     title: "",
     categoryId: null,
     content: "<p>Escribí aquí la letra del canto…</p>",
+    sectionTypes: ["verse"],
     shadowEnabled: true,
     shadowColor: "#000000",
     shadowBlur: 14,
@@ -78,6 +90,12 @@ export function SongLibrary({
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editing, setEditing] = useState(false);
   const [addingToMeeting, setAddingToMeeting] = useState(false);
+  const [editorRevision, setEditorRevision] = useState(0);
+  const [sectionContextMenu, setSectionContextMenu] = useState<{
+    index: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const [categoriesWidth, setCategoriesWidth] = useState(() =>
     clampColumnWidth(
       storedColumnWidth("fl-layout-songs-categories", 170),
@@ -109,6 +127,7 @@ export function SongLibrary({
     ],
     content: selected.content,
     editable: false,
+    onUpdate: () => setEditorRevision((value) => value + 1),
   });
 
   const reload = async () => {
@@ -166,6 +185,7 @@ export function SongLibrary({
       title,
       categoryId,
       content: "<p>Escribí aquí la letra del canto…</p>",
+      sectionTypes: ["verse"] as SongSectionType[],
       color: "#8b5cf6",
       shadowEnabled: true,
       shadowColor: "#000000",
@@ -187,10 +207,16 @@ export function SongLibrary({
   };
   const save = async () => {
     await withSaveNotification(async () => {
+      const content = editor?.getHTML() ?? "";
+      const stanzaCount = splitSongStanzas(content).length;
       const id = await window.flProyector.saveSong({
         ...selected,
         title: selected.title?.trim() || "Sin título",
-        content: editor?.getHTML() ?? "",
+        content,
+        sectionTypes: normalizeSongSectionTypes(
+          selected.sectionTypes,
+          stanzaCount,
+        ),
       });
       const saved = (await window.flProyector.listSongs()).find(
         (song) => song.id === id,
@@ -209,6 +235,7 @@ export function SongLibrary({
         title: "",
         categoryId: null,
         content: "",
+        sectionTypes: [],
         shadowEnabled: true,
         shadowColor: "#000000",
         shadowBlur: 14,
@@ -224,6 +251,7 @@ export function SongLibrary({
         title: "",
         categoryId: null,
         content: "",
+        sectionTypes: [],
         color: "#8b5cf6",
         shadowEnabled: true,
         shadowColor: "#000000",
@@ -286,6 +314,25 @@ export function SongLibrary({
     notifySaved("La categoría de la canción fue guardada.");
     await reload();
   };
+  const changeSectionType = async (index: number, type: SongSectionType) => {
+    const content = editor?.getHTML() ?? selected.content ?? "";
+    const next = normalizeSongSectionTypes(
+      selected.sectionTypes,
+      splitSongStanzas(content).length,
+    );
+    next[index] = type;
+    const changed = { ...selected, content, sectionTypes: next };
+    setSelected(changed);
+    if (selected.id && !editing) {
+      await window.flProyector.saveSong({
+        ...changed,
+        title: changed.title?.trim() || "Sin título",
+        content,
+      });
+      notifySaved("La estructura de la canción fue guardada.");
+      await reload();
+    }
+  };
   const send = async () => {
     if (!selected.id) return;
     let targetMeetingId = meetingId;
@@ -311,6 +358,32 @@ export function SongLibrary({
       setAddingToMeeting(false);
     }
   };
+
+  const visibleStanzas = splitSongStanzas(
+    editor?.getHTML() ?? selected.content ?? "",
+  );
+  const visibleSectionTypes = normalizeSongSectionTypes(
+    selected.sectionTypes,
+    visibleStanzas.length,
+  );
+  useEffect(() => {
+    const root = editor?.view.dom as HTMLElement | undefined;
+    if (!root) return;
+    const paragraphs = Array.from(root.children).filter(
+      (element): element is HTMLParagraphElement =>
+        element instanceof HTMLParagraphElement &&
+        Boolean(element.textContent?.replace(/\u00a0/g, " ").trim()),
+    );
+    paragraphs.forEach((paragraph, index) => {
+      paragraph.dataset.songSectionLabel = songSectionLabel(
+        visibleSectionTypes,
+        index,
+      );
+      paragraph.dataset.songSectionType =
+        visibleSectionTypes[index] || "verse";
+      paragraph.title = "Clic derecho para cambiar el tipo de esta parte";
+    });
+  }, [editor, editorRevision, selected.content, selected.sectionTypes]);
 
   return (
     <section
@@ -471,6 +544,26 @@ export function SongLibrary({
         <EditorContent
           editor={editor}
           className="rich-editor song-rich-editor"
+          onContextMenuCapture={(event) => {
+            const root = editor?.view.dom as HTMLElement | undefined;
+            const target = event.target as HTMLElement;
+            const paragraph = target.closest("p");
+            if (!root || !paragraph || paragraph.parentElement !== root) return;
+            const paragraphs = Array.from(root.children).filter(
+              (element) =>
+                element instanceof HTMLParagraphElement &&
+                Boolean(element.textContent?.replace(/\u00a0/g, " ").trim()),
+            );
+            const index = paragraphs.indexOf(paragraph);
+            if (index < 0) return;
+            event.preventDefault();
+            event.stopPropagation();
+            setSectionContextMenu({
+              index,
+              x: event.clientX,
+              y: event.clientY,
+            });
+          }}
           onPasteCapture={(event) => {
             if (!editing || !editor) return;
             const plainText = event.clipboardData.getData("text/plain");
@@ -547,6 +640,25 @@ export function SongLibrary({
         </>
         )}
       </div>
+      {sectionContextMenu && (
+        <Win11ContextMenu
+          x={sectionContextMenu.x}
+          y={sectionContextMenu.y}
+          onClose={() => setSectionContextMenu(null)}
+          ariaLabel={`Tipo de ${songSectionLabel(visibleSectionTypes, sectionContextMenu.index)}`}
+          items={songSectionOptions.map((option) => ({
+            label: `Asignar como ${option.label}`,
+            icon:
+              visibleSectionTypes[sectionContextMenu.index] === option.value ? (
+                <Check />
+              ) : (
+                <Music2 />
+              ),
+            onClick: () =>
+              void changeSectionType(sectionContextMenu.index, option.value),
+          }))}
+        />
+      )}
       {songContextMenu && (
         <Win11ContextMenu
           x={songContextMenu.x}

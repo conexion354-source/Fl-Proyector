@@ -8,11 +8,13 @@ import type {
   SongDisplaySettings,
   ChurchSettings,
   DisplaySettings,
+  DisplayInfo,
   MediaItem,
   Meeting,
   MeetingItem,
   ProjectionPatch,
   ProjectionState,
+  ReleaseHistoryEntry,
   Song,
   SongCategory,
   UpdateStatus,
@@ -28,15 +30,10 @@ declare global {
       closeProjection(): Promise<void>;
       projectionStatus(): Promise<{
         open: boolean;
-        displays: Array<{
-          id: number;
-          label: string;
-          width: number;
-          height: number;
-          primary: boolean;
-        }>;
+        displays: DisplayInfo[];
         remoteUrls: string[];
       }>;
+      enableWindowsRemoteAccess(): Promise<boolean>;
       listMedia(): Promise<MediaItem[]>;
       importMedia(paths: string[]): Promise<MediaItem[]>;
       chooseMediaFiles(): Promise<MediaItem[]>;
@@ -104,6 +101,7 @@ declare global {
       openPresentation(path: string): Promise<string>;
       openExternal(url: string): Promise<boolean>;
       getUpdateStatus(): Promise<UpdateStatus>;
+      getReleaseHistory(): Promise<ReleaseHistoryEntry[]>;
       checkForUpdates(): Promise<UpdateStatus>;
       downloadUpdate(): Promise<UpdateStatus>;
       installUpdate(): Promise<boolean>;

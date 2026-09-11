@@ -9,6 +9,15 @@ export type MediaItem = {
 };
 
 export type SongCategory = { id: number; name: string; songCount: number };
+export type SongSectionType =
+  | "verse"
+  | "chorus"
+  | "prechorus"
+  | "bridge"
+  | "intro"
+  | "interlude"
+  | "ending"
+  | "other";
 export type Song = {
   id: number;
   title: string;
@@ -16,6 +25,7 @@ export type Song = {
   categoryId: number | null;
   categoryName: string | null;
   content: string;
+  sectionTypes: SongSectionType[];
   shadowEnabled: boolean;
   shadowColor: string;
   shadowBlur: number;
@@ -65,10 +75,13 @@ export type DisplayInfo = {
   label: string;
   width: number;
   height: number;
+  scaleFactor: number;
+  cssWidth: number;
+  cssHeight: number;
   primary: boolean;
 };
 export type DisplaySettings = {
-  aspectRatio: "16:9" | "16:10" | "4:3" | "custom";
+  aspectRatio: "auto" | "16:9" | "16:10" | "4:3" | "custom";
   backgroundColor: string;
   resolution: "display" | "1920x1080" | "1280x720" | "1024x768";
   mainDisplayId: number | null;
@@ -135,7 +148,7 @@ export type SongDisplaySettings = {
 };
 
 export const initialDisplaySettings: DisplaySettings = {
-  aspectRatio: "16:9",
+  aspectRatio: "auto",
   backgroundColor: "#000000",
   resolution: "display",
   mainDisplayId: null,
@@ -240,6 +253,11 @@ export type OverlayAlert = {
 };
 
 export type ProjectionState = {
+  outputViewport: {
+    width: number;
+    height: number;
+    scaleFactor: number;
+  };
   background: BackgroundState;
   text: {
     html: string;
@@ -277,6 +295,7 @@ export type ProjectionState = {
 };
 
 export const initialProjectionState: ProjectionState = {
+  outputViewport: { width: 1920, height: 1080, scaleFactor: 1 },
   background: {
     id: null,
     url: null,
@@ -342,6 +361,7 @@ export type ProjectionPatch = Partial<
     | "timer"
     | "clock"
     | "alert"
+    | "outputViewport"
   >
 > & {
   background?: Partial<BackgroundState>;
@@ -355,11 +375,13 @@ export type ProjectionPatch = Partial<
   timer?: Partial<OverlayTimer>;
   clock?: Partial<OverlayClock>;
   alert?: Partial<OverlayAlert>;
+  outputViewport?: Partial<ProjectionState["outputViewport"]>;
 };
 
 export type UpdateStatus = {
   state:
     | "idle"
+    | "current"
     | "checking"
     | "available"
     | "downloading"
@@ -371,4 +393,11 @@ export type UpdateStatus = {
   progress: number | null;
   message: string;
   packaged: boolean;
+};
+
+export type ReleaseHistoryEntry = {
+  version: string;
+  title: string;
+  publishedAt: string | null;
+  changes: string[];
 };

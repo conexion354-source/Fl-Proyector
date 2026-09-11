@@ -4,6 +4,7 @@ import {
   BookOpen,
   Building2,
   Download,
+  History,
   MonitorCog,
   Moon,
   Music2,
@@ -24,6 +25,7 @@ import {
   type DisplaySettings,
   type ProjectionPatch,
   type ProjectionState,
+  type ReleaseHistoryEntry,
   type SongDisplaySettings,
   type UpdateStatus,
 } from "../../shared/types";
@@ -191,6 +193,9 @@ export function SettingsPanel({
   );
   const [versions, setVersions] = useState<BibleVersion[]>([]);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
+  const [releaseHistory, setReleaseHistory] = useState<ReleaseHistoryEntry[]>([]);
+  const [releaseHistoryOpen, setReleaseHistoryOpen] = useState(false);
+  const [releaseHistoryLoading, setReleaseHistoryLoading] = useState(false);
   const [referenceDesignOpen, setReferenceDesignOpen] = useState(false);
   const reloadVersions = () =>
     window.flProyector.listBibleVersions().then(setVersions);
@@ -248,6 +253,7 @@ export function SettingsPanel({
     "Juan 3:16–18",
     "RV1909",
     bible,
+    state.outputViewport,
   )[0];
   const previewState: ProjectionState = {
     ...state,
@@ -324,16 +330,25 @@ export function SettingsPanel({
           ? "Comprobando…"
           : updateStatus?.state === "downloading"
             ? `Descargando ${updateStatus.progress ?? 0} %`
+            : updateStatus?.state === "development"
+              ? "No disponible en pruebas"
             : "Comprobar actualizaciones";
-  const updateStatusTitle = updateStatus?.availableVersion
-    ? `Nueva versión: ${updateStatus.availableVersion}`
-    : updateStatus?.state === "checking"
-      ? "Buscando una versión nueva"
-      : updateStatus?.state === "development"
-        ? "Disponible en la aplicación instalada"
-        : updateStatus?.state === "error"
-          ? "No se pudo comprobar"
-          : "Listo para comprobar";
+  const updateStatusTitle =
+    updateStatus?.state === "available"
+      ? `Versión ${updateStatus.availableVersion} disponible`
+      : updateStatus?.state === "downloaded"
+        ? "Lista para instalar"
+        : updateStatus?.state === "downloading"
+          ? "Descargando actualización"
+          : updateStatus?.state === "checking"
+            ? "Buscando actualizaciones"
+            : updateStatus?.state === "current"
+              ? "No hay actualizaciones"
+              : updateStatus?.state === "development"
+                ? "Modo de prueba"
+                : updateStatus?.state === "error"
+                  ? "No se pudo comprobar"
+                  : "Sin comprobar";
   const runUpdateAction = async () => {
     if (updateStatus?.state === "available") {
       setUpdateStatus(await window.flProyector.downloadUpdate());
@@ -344,6 +359,15 @@ export function SettingsPanel({
       return;
     }
     setUpdateStatus(await window.flProyector.checkForUpdates());
+  };
+  const openReleaseHistory = async () => {
+    setReleaseHistoryOpen(true);
+    setReleaseHistoryLoading(true);
+    try {
+      setReleaseHistory(await window.flProyector.getReleaseHistory());
+    } finally {
+      setReleaseHistoryLoading(false);
+    }
   };
 
   return (
@@ -411,6 +435,14 @@ export function SettingsPanel({
                     Versión instalada: <strong>{updateStatus?.currentVersion ?? "—"}</strong>
                   </p>
                 </div>
+                <button
+                  type="button"
+                  className="version-history-button"
+                  onClick={openReleaseHistory}
+                >
+                  <History />
+                  Ver novedades
+                </button>
               </div>
               <div className={`version-update-row ${updateStatus?.state ?? "idle"}`}>
                 <div className="version-update-copy">
@@ -421,7 +453,7 @@ export function SettingsPanel({
                 <button
                   type="button"
                   className="primary version-update-button"
-                  disabled={updateBusy || !updateStatus}
+                  disabled={updateBusy || !updateStatus || updateStatus.state === "development"}
                   onClick={runUpdateAction}
                 >
                   {updateBusy ? <RefreshCw className="version-update-spin" /> : <Download />}
@@ -434,8 +466,7 @@ export function SettingsPanel({
                 </div>
               )}
               <p className="version-update-note">
-                Las actualizaciones reemplazan únicamente la aplicación. Tus reuniones,
-                canciones, Biblias, fondos y configuraciones se conservan.
+                Al instalar una actualización, tus reuniones, canciones y configuraciones no se borran.
               </p>
             </div>
           </>
@@ -504,7 +535,7 @@ export function SettingsPanel({
                       </select>
                     </label>
                     <label>
-                      Tamaño
+                      Tamaño máximo
                       <input
                         className="song-font-size-input"
                         type="number"
@@ -814,6 +845,7 @@ export function SettingsPanel({
                       mainDisplayId: e.target.value
                         ? Number(e.target.value)
                         : null,
+                      aspectRatio: "auto",
                     }))
                   }
                 >
@@ -821,6 +853,9 @@ export function SettingsPanel({
                   {displays.map((display) => (
                     <option value={display.id} key={display.id}>
                       {display.label} · {display.width}×{display.height}
+                      {display.scaleFactor !== 1
+                        ? ` · ${Math.round(display.scaleFactor * 100)}%`
+                        : ""}
                       {display.primary ? " (principal)" : ""}
                     </option>
                   ))}
@@ -839,6 +874,7 @@ export function SettingsPanel({
                       }))
                     }
                   >
+                    <option value="auto">Automática según la pantalla</option>
                     <option>16:9</option>
                     <option>16:10</option>
                     <option>4:3</option>
@@ -1056,6 +1092,23 @@ export function SettingsPanel({
                 </div>
                 <div className="settings-card bible-typography">
                   <h3>Texto del versículo</h3>
+                  <label className="toggle-row">
+                    <input
+                      className="win11-toggle"
+                      type="checkbox"
+                      checked={bible.uppercase}
+                      onChange={(e) =>
+                        setBible((value) => ({
+                          ...value,
+                          uppercase: e.target.checked,
+                        }))
+                      }
+                    />
+                    <div>
+                      <strong>Todo en mayúsculas</strong>
+                      <span>Solo afecta el texto que se proyecta.</span>
+                    </div>
+                  </label>
                   <div className="settings-row two">
                     <label>
                       Tipo de letra
@@ -1099,10 +1152,6 @@ export function SettingsPanel({
                       setBible((v) => ({ ...v, textColor }))
                     }
                   />
-                  <label className="toggle-row">
-                    <input className="win11-toggle" type="checkbox" checked={bible.uppercase} onChange={(e) => setBible((v) => ({ ...v, uppercase: e.target.checked }))} />
-                    <div><strong>Todo en mayúsculas</strong><span>Solo afecta lo que se proyecta.</span></div>
-                  </label>
                 </div>
                 <ExpanderRow
                   className="bible-shadow-settings"
@@ -1242,8 +1291,9 @@ export function SettingsPanel({
                       </label>
                     </div>
                     <small className="setting-note">
-                      En “Dividir en A y B”, crea todas las partes necesarias
-                      sin cortar palabras ni superar las líneas elegidas.
+                      El cálculo usa la resolución real, los márgenes y el tamaño
+                      máximo. En “Dividir en A y B” crea las partes necesarias sin
+                      cortar palabras ni superar las líneas elegidas.
                     </small>
                   </div>
                   <button className="save-settings primary bible-save" onClick={saveBible}>
@@ -1292,6 +1342,74 @@ export function SettingsPanel({
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+        {releaseHistoryOpen && (
+          <div
+            className="modal-backdrop version-history-backdrop"
+            onMouseDown={() => setReleaseHistoryOpen(false)}
+          >
+            <div
+              className="version-history-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="version-history-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <header>
+                <span className="version-product-icon"><History /></span>
+                <div>
+                  <span className="eyebrow">HISTORIAL DE VERSIONES</span>
+                  <h2 id="version-history-title">Novedades de FL Proyector</h2>
+                </div>
+                <button
+                  type="button"
+                  className="dialog-close"
+                  aria-label="Cerrar"
+                  onClick={() => setReleaseHistoryOpen(false)}
+                >
+                  <X />
+                </button>
+              </header>
+              <div className="version-history-list">
+                {releaseHistoryLoading ? (
+                  <div className="version-history-empty">
+                    <RefreshCw className="version-update-spin" />
+                    Cargando versiones…
+                  </div>
+                ) : releaseHistory.length ? (
+                  releaseHistory.map((release, index) => (
+                    <article className="version-history-entry" key={release.version}>
+                      <div className="version-history-heading">
+                        <span>Versión {release.version}</span>
+                        {index === 0 && <em>Más reciente</em>}
+                        <time>
+                          {release.publishedAt
+                            ? new Intl.DateTimeFormat("es-AR", {
+                                day: "numeric",
+                                month: "long",
+                                year: "numeric",
+                              }).format(new Date(release.publishedAt))
+                            : "Fecha no disponible"}
+                        </time>
+                      </div>
+                      <h3>{release.title}</h3>
+                      <ul>
+                        {release.changes.map((change) => <li key={change}>{change}</li>)}
+                      </ul>
+                    </article>
+                  ))
+                ) : (
+                  <div className="version-history-empty">No se pudo cargar el historial.</div>
+                )}
+              </div>
+              <footer>
+                <span>Las novedades se leen de las versiones publicadas en GitHub.</span>
+                <button type="button" className="primary" onClick={() => setReleaseHistoryOpen(false)}>
+                  Cerrar
+                </button>
+              </footer>
             </div>
           </div>
         )}

@@ -28,6 +28,7 @@ import {
   type ProjectionState,
   type SongDisplaySettings,
   type MediaItem,
+  type ReleaseHistoryEntry,
   type UpdateStatus,
 } from "../shared/types.js";
 
@@ -97,6 +98,8 @@ let tagsDialogWindow: BrowserWindow | null = null;
 let state: ProjectionState = structuredClone(initialProjectionState);
 let database: AppDatabase;
 let remoteServer: ReturnType<typeof startRemoteServer>;
+let remoteActiveMediaItemId: number | null = null;
+let remoteReturnState: Pick<ProjectionState, "background" | "video"> | null = null;
 let mediaDir = "";
 let meetingMediaDir = "";
 let churchAssetsDir = "";
@@ -107,13 +110,56 @@ let updateStatus: UpdateStatus = {
   availableVersion: null,
   progress: null,
   message: app.isPackaged
-    ? "Comprobá si existe una versión nueva de Fl Proyector."
-    : "Las actualizaciones se comprueban desde la aplicación instalada.",
+    ? "Todavía no se buscaron actualizaciones."
+    : "La búsqueda está desactivada mientras se prueba el sistema.",
   packaged: app.isPackaged,
 };
+
+const bundledReleaseHistory: ReleaseHistoryEntry[] = [
+  {
+    version: "10.11.2",
+    title: "Proyección y trabajo en red más confiables",
+    publishedAt: "2026-09-11T14:26:08Z",
+    changes: [
+      "Se adaptaron los textos bíblicos y las canciones a la resolución real de la pantalla, sin cortar palabras.",
+      "Se mejoró la división inteligente de versículos largos y el uso de los márgenes seguros.",
+      "Se incorporó la clasificación de estrofas, coros, puentes y otras partes de las canciones.",
+      "Se corrigió la restauración del fondo al quitar videos desde el control remoto.",
+      "El instalador habilita el modo colaborador en el Firewall de Windows para la red local.",
+      "Se eliminó la barra File/Edit/View de Windows y se mejoró el historial de actualizaciones.",
+    ],
+  },
+  {
+    version: "10.11.1",
+    title: "Control remoto más confiable",
+    publishedAt: "2026-09-10T13:34:11Z",
+    changes: [
+      "Se corrigió el control de reproducción multimedia desde el teléfono.",
+      "Se mejoró la reconexión de la app móvil con FL Proyector.",
+    ],
+  },
+  {
+    version: "10.11.0",
+    title: "Primera versión pública",
+    publishedAt: "2026-09-09T20:33:22Z",
+    changes: [
+      "Se publicó el instalador de Windows en GitHub.",
+      "Se incorporó la comprobación y descarga de actualizaciones.",
+    ],
+  },
+];
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!hasSingleInstanceLock) app.quit();
+
+// No FL Proyector window uses Electron's default File/Edit/View menu. Applying
+// this to every BrowserWindow prevents the menu from returning after pressing
+// Alt or when a secondary window is created on Windows.
+app.on("browser-window-created", (_event, window) => {
+  window.setAutoHideMenuBar(true);
+  window.setMenuBarVisibility(false);
+  window.setMenu(null);
+});
 
 const rendererUrl = (route = "") =>
   process.env.VITE_DEV_SERVER_URL
@@ -153,6 +199,55 @@ async function githubUpdateRepository() {
   return match ? { owner: match[1], repo: match[2] } : null;
 }
 
+async function getReleaseHistory(): Promise<ReleaseHistoryEntry[]> {
+  const repository = await githubUpdateRepository();
+  if (!repository) return bundledReleaseHistory;
+  try {
+    const response = await net.fetch(
+      `https://api.github.com/repos/${repository.owner}/${repository.repo}/releases`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "User-Agent": "FL-Proyector",
+        },
+      },
+    );
+    if (!response.ok) return bundledReleaseHistory;
+    const releases = (await response.json()) as Array<{
+      tag_name?: string;
+      name?: string;
+      published_at?: string;
+      body?: string;
+      draft?: boolean;
+      prerelease?: boolean;
+    }>;
+    const history = releases
+      .filter((release) => !release.draft && !release.prerelease && release.tag_name)
+      .map((release): ReleaseHistoryEntry => {
+        const version = String(release.tag_name).replace(/^v/i, "");
+        const bundled = bundledReleaseHistory.find((item) => item.version === version);
+        const changes = String(release.body || "")
+          .split(/\r?\n/)
+          .map((line) => line.trim().replace(/^[-*]\s+/, ""))
+          .filter(
+            (line) =>
+              Boolean(line) &&
+              !/^#+\s/.test(line) &&
+              !/^\*\*Full Changelog\*\*/i.test(line),
+          );
+        return {
+          version,
+          title: bundled?.title || release.name || `Versión ${version}`,
+          publishedAt: release.published_at || bundled?.publishedAt || null,
+          changes: bundled?.changes || (changes.length ? changes : ["Mejoras generales del sistema."]),
+        };
+      });
+    return history.length ? history : bundledReleaseHistory;
+  } catch {
+    return bundledReleaseHistory;
+  }
+}
+
 async function configureAutoUpdater() {
   if (updaterConfigured) return true;
   const repository = await githubUpdateRepository();
@@ -177,10 +272,10 @@ function registerAutoUpdaterEvents() {
   });
   autoUpdater.on("update-not-available", () => {
     publishUpdateStatus({
-      state: "idle",
+      state: "current",
       availableVersion: null,
       progress: null,
-      message: "Ya tenés instalada la versión más reciente.",
+      message: "No hay una versión nueva para instalar.",
     });
   });
   autoUpdater.on("download-progress", (progress) => {
@@ -222,11 +317,33 @@ function mergeState(patch: ProjectionPatch) {
     timer: { ...state.timer, ...patch.timer },
     clock: { ...state.clock, ...patch.clock },
     alert: { ...state.alert, ...patch.alert },
+    outputViewport: { ...state.outputViewport, ...patch.outputViewport },
   };
   for (const win of [controlWindow, projectionWindow, thirdProjectionWindow])
     if (win && !win.isDestroyed())
       win.webContents.send("projection:state", state);
   remoteServer?.broadcast(state);
+}
+
+function projectionViewport(settings: DisplaySettings) {
+  const displays = screen.getAllDisplays();
+  const target =
+    displays.find((display) => display.id === settings.mainDisplayId) ??
+    displays.find((display) => display.id !== screen.getPrimaryDisplay().id) ??
+    screen.getPrimaryDisplay();
+  const requested =
+    settings.resolution === "display"
+      ? null
+      : settings.resolution.split("x").map(Number);
+  return {
+    width: requested
+      ? Math.min(requested[0], target.bounds.width)
+      : target.bounds.width,
+    height: requested
+      ? Math.min(requested[1], target.bounds.height)
+      : target.bounds.height,
+    scaleFactor: target.scaleFactor || 1,
+  };
 }
 
 async function createControlWindow() {
@@ -237,12 +354,16 @@ async function createControlWindow() {
     minHeight: 720,
     backgroundColor: "#090b10",
     title: "Fl Proyector",
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(app.getAppPath(), "electron/preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+  controlWindow.setMenu(null);
+  controlWindow.setMenuBarVisibility(false);
+  controlWindow.setAutoHideMenuBar(true);
   controlWindow.webContents.on("context-menu", (_event, params) => {
     if (!params.isEditable) return;
     Menu.buildFromTemplate([
@@ -295,20 +416,31 @@ async function createProjectionWindow(
       : settings.resolution.split("x").map(Number);
   const width = resolution?.[0] ?? target?.bounds.width ?? 960;
   const height = resolution?.[1] ?? target?.bounds.height ?? 540;
+  const safeWidth = target ? Math.min(width, target.bounds.width) : width;
+  const safeHeight = target ? Math.min(height, target.bounds.height) : height;
+  const nativeFullscreen = Boolean(target && !resolution);
+  const windowsKiosk = process.platform === "win32" && nativeFullscreen;
   const win = new BrowserWindow({
     // A preset resolution creates an exact, borderless raster on the selected
     // display. Native mode stays fullscreen and uses the display's own size.
     x: target
-      ? target.bounds.x + Math.round((target.bounds.width - width) / 2)
+      ? target.bounds.x + Math.round((target.bounds.width - safeWidth) / 2)
       : undefined,
     y: target
-      ? target.bounds.y + Math.round((target.bounds.height - height) / 2)
+      ? target.bounds.y + Math.round((target.bounds.height - safeHeight) / 2)
       : undefined,
-    width,
-    height,
+    width: safeWidth,
+    height: safeHeight,
     frame: false,
-    fullscreen: Boolean(target && !resolution),
+    // Windows kiosk mode is more reliable than ordinary fullscreen when the
+    // taskbar is configured to stay above borderless windows.
+    fullscreen: process.platform !== "win32" && nativeFullscreen,
+    kiosk: windowsKiosk,
     resizable: false,
+    movable: false,
+    minimizable: false,
+    skipTaskbar: true,
+    autoHideMenuBar: true,
     alwaysOnTop: false,
     backgroundColor: settings.backgroundColor,
     webPreferences: {
@@ -317,8 +449,15 @@ async function createProjectionWindow(
       nodeIntegration: false,
     },
   });
+  win.setMenu(null);
   win.setMenuBarVisibility(false);
+  win.setAutoHideMenuBar(true);
   await win.loadURL(rendererUrl("projection"));
+  if (windowsKiosk && target) {
+    win.setBounds(target.bounds, false);
+    win.setAlwaysOnTop(true, "screen-saver");
+    win.setKiosk(true);
+  }
   win.webContents.once("did-finish-load", () =>
     win.webContents.send("projection:state", state),
   );
@@ -335,20 +474,35 @@ function applyDisplaySettingsToOpenWindows(settings: DisplaySettings) {
     const target = screen.getDisplayMatching(win.getBounds());
     win.setBackgroundColor(settings.backgroundColor);
     if (resolution) {
-      const [width, height] = resolution;
+      const width = Math.min(resolution[0], target.bounds.width);
+      const height = Math.min(resolution[1], target.bounds.height);
+      if (win.isKiosk()) win.setKiosk(false);
       if (win.isFullScreen()) win.setFullScreen(false);
+      win.setAlwaysOnTop(false);
       win.setBounds({
         x: target.bounds.x + Math.round((target.bounds.width - width) / 2),
         y: target.bounds.y + Math.round((target.bounds.height - height) / 2),
         width,
         height,
       });
+    } else if (process.platform === "win32") {
+      // Kiosk plus screen-saver level guarantees that the secondary taskbar
+      // cannot cover the bottom edge of the projection.
+      win.setBounds(target.bounds, false);
+      win.setAlwaysOnTop(true, "screen-saver");
+      if (!win.isKiosk()) win.setKiosk(true);
     } else if (!win.isFullScreen()) {
-      win.setBounds(target.bounds);
+      win.setBounds(target.bounds, false);
       win.setFullScreen(true);
     }
     win.webContents.send("projection:display-settings", settings);
   }
+}
+
+function refreshProjectionGeometry() {
+  const settings = database.getDisplaySettings();
+  mergeState({ outputViewport: projectionViewport(settings) });
+  applyDisplaySettingsToOpenWindows(settings);
 }
 
 const imageExtensions = [
@@ -434,6 +588,40 @@ function localNetworkAddresses() {
     .sort((first, second) => priority(first) - priority(second));
 }
 
+function enableWindowsRemoteAccess() {
+  if (process.platform !== "win32") return Promise.resolve(true);
+  return new Promise<boolean>((resolve) => {
+    const ruleArguments = [
+      "advfirewall",
+      "firewall",
+      "add",
+      "rule",
+      "name=FL Proyector - Control remoto",
+      "dir=in",
+      "action=allow",
+      "protocol=TCP",
+      "localport=3001",
+      "remoteip=localsubnet",
+      "profile=any",
+      "enable=yes",
+    ];
+    const escapedArguments = ruleArguments
+      .map((value) => `'${value.replace(/'/g, "''")}'`)
+      .join(",");
+    const command = [
+      `$process = Start-Process -FilePath 'netsh.exe' -ArgumentList @(${escapedArguments}) -Verb RunAs -Wait -PassThru`,
+      "exit $process.ExitCode",
+    ].join("; ");
+    const child = spawn(
+      "powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-Command", command],
+      { windowsHide: true },
+    );
+    child.once("error", () => resolve(false));
+    child.once("exit", (code) => resolve(code === 0));
+  });
+}
+
 function remoteMultimediaItems(
   meetingId: number,
 ): Array<{
@@ -463,24 +651,59 @@ function remoteMultimediaItems(
   return result;
 }
 
+function beginRemoteMultimedia(itemId: number) {
+  if (remoteActiveMediaItemId === null)
+    remoteReturnState = {
+      background: { ...state.background },
+      video: { ...state.video },
+    };
+  remoteActiveMediaItemId = itemId;
+}
+
+function remoteBasePatch(): ProjectionPatch {
+  if (!remoteReturnState) return {};
+  return {
+    background: { ...remoteReturnState.background },
+    video: {
+      ...remoteReturnState.video,
+      commandId: state.video.commandId + 1,
+    },
+  };
+}
+
+function clearRemoteMultimedia() {
+  const restore = remoteBasePatch();
+  remoteActiveMediaItemId = null;
+  remoteReturnState = null;
+  mergeState({
+    ...restore,
+    blackout: false,
+    logo: false,
+    text: { visible: false },
+    lowerThird: { visible: false },
+    presentation: { visible: false },
+  });
+}
+
 function projectRemoteMultimedia(itemId: number) {
   const item = database
     .listMeetings()
     .flatMap((meeting) => database.listMeetingItems(meeting.id))
     .find((value) => value.id === itemId);
   if (!item) return;
+  beginRemoteMultimedia(itemId);
   const payload = item.payload as Record<string, unknown>;
   if (item.type === "presentation") {
     const slideCount = Number(payload.slideCount || (payload.previewSlides as unknown[] | undefined)?.length || 0);
     mergeState({
-      blackout: false, logo: false, text: { visible: false }, lowerThird: { visible: false }, video: { playing: false },
+      ...remoteBasePatch(), blackout: false, logo: false, text: { visible: false }, lowerThird: { visible: false },
       presentation: { path: String(payload.path || ""), url: String(payload.url || ""), name: String(payload.name || item.title), previewSlides: payload.previewSlides as string[] | undefined, slideIndex: 0, slideCount, visible: true },
     });
     return;
   }
   if (item.type === "announcement") {
     mergeState({
-      blackout: false, logo: false, presentation: { visible: false }, lowerThird: { visible: false }, video: { playing: false },
+      ...remoteBasePatch(), blackout: false, logo: false, presentation: { visible: false }, lowerThird: { visible: false },
       text: {
         html: String(payload.html || ""), kind: "anuncio", visible: true,
         position: (payload.position as ProjectionState["text"]["position"]) || "center",
@@ -498,7 +721,7 @@ function projectRemoteMultimedia(itemId: number) {
   if (!source) return;
   if (source.kind === "image") {
     mergeState({
-      blackout: false, logo: false, text: { visible: false }, lowerThird: { visible: false }, video: { playing: false },
+      ...remoteBasePatch(), blackout: false, logo: false, text: { visible: false }, lowerThird: { visible: false },
       presentation: { path: null, url: source.url, name: source.name, previewSlides: [source.url], slideIndex: 0, slideCount: 1, visible: true },
     });
     return;
@@ -570,6 +793,8 @@ async function importMediaFile(source: string) {
 
 if (hasSingleInstanceLock)
   app.whenReady().then(async () => {
+    // Keep only the native title bar controls (minimize, maximize and close).
+    Menu.setApplicationMenu(null);
     mediaDir = join(app.getPath("documents"), "IglesiaPro", "Fondos");
     meetingMediaDir = join(app.getPath("documents"), "IglesiaPro", "Reuniones", "Medios");
     churchAssetsDir = join(app.getPath("userData"), "church-assets");
@@ -583,6 +808,12 @@ if (hasSingleInstanceLock)
     state.church = hydrateChurch(database.getChurchSettings());
     state.bibleStyle = database.getBibleDisplaySettings();
     state.songStyle = database.getSongDisplaySettings();
+    state.outputViewport = projectionViewport(database.getDisplaySettings());
+    // Windows may report a new usable size after changing scaling, resolution,
+    // orientation or reconnecting HDMI. Recalculate the safe canvas immediately.
+    screen.on("display-added", refreshProjectionGeometry);
+    screen.on("display-removed", refreshProjectionGeometry);
+    screen.on("display-metrics-changed", refreshProjectionGeometry);
     const biblePath = join(app.getAppPath(), "assets", "bibles", "rv1909.json");
     const bibleData = JSON.parse(
       await readFile(biblePath, "utf8"),
@@ -620,6 +851,8 @@ if (hasSingleInstanceLock)
       listMeetings: () => database.listMeetings(),
       listItems: remoteMultimediaItems,
       project: projectRemoteMultimedia,
+      clear: clearRemoteMultimedia,
+      activeItemId: () => remoteActiveMediaItemId,
     }, {
       getCode: () => database.getCollaboratorCode(),
       listSongs: () => database.listSongs(""),
@@ -636,6 +869,7 @@ if (hasSingleInstanceLock)
 
     registerAutoUpdaterEvents();
     ipcMain.handle("updates:get-status", () => updateStatus);
+    ipcMain.handle("updates:release-history", () => getReleaseHistory());
     ipcMain.handle("updates:check", async () => {
       if (!app.isPackaged)
         return publishUpdateStatus({
@@ -644,7 +878,7 @@ if (hasSingleInstanceLock)
           availableVersion: null,
           progress: null,
           message:
-            "La comprobación real estará disponible en el ejecutable instalado.",
+            "La búsqueda está desactivada mientras se prueba el sistema.",
         });
       if (!(await configureAutoUpdater()))
         return publishUpdateStatus({
@@ -658,7 +892,7 @@ if (hasSingleInstanceLock)
         state: "checking",
         availableVersion: null,
         progress: null,
-        message: "Buscando actualizaciones en GitHub…",
+        message: "Consultando las versiones publicadas…",
       });
       try {
         await autoUpdater.checkForUpdates();
@@ -725,13 +959,17 @@ if (hasSingleInstanceLock)
         displays: screen.getAllDisplays().map((display) => ({
           id: display.id,
           label: display.label || `Pantalla ${display.id}`,
-          width: display.bounds.width,
-          height: display.bounds.height,
+          width: Math.round(display.bounds.width * display.scaleFactor),
+          height: Math.round(display.bounds.height * display.scaleFactor),
+          cssWidth: display.bounds.width,
+          cssHeight: display.bounds.height,
+          scaleFactor: display.scaleFactor,
           primary: display.id === screen.getPrimaryDisplay().id,
         })),
         remoteUrls: addresses.map((address) => `http://${address}:3001`),
       };
     });
+    ipcMain.handle("remote:enable-windows-access", enableWindowsRemoteAccess);
     ipcMain.handle("media:list", () => database.listMedia(mediaUrl));
     ipcMain.handle("media:import", async (_event, paths: string[]) => {
       for (const source of paths.filter(validMedia))
@@ -810,12 +1048,16 @@ if (hasSingleInstanceLock)
             height: 190,
             resizable: false,
             title: "Editar etiquetas",
+            autoHideMenuBar: true,
             webPreferences: {
               preload: join(app.getAppPath(), "electron", "preload.cjs"),
               contextIsolation: true,
               nodeIntegration: false,
             },
           });
+          win.setMenu(null);
+          win.setMenuBarVisibility(false);
+          win.setAutoHideMenuBar(true);
           tagsDialogWindow = win;
           let finished = false;
           const finish = (value: string[] | null) => {
@@ -914,6 +1156,7 @@ if (hasSingleInstanceLock)
       "settings:display:set",
       (_event, settings: DisplaySettings) => {
         database.saveDisplaySettings(settings);
+        mergeState({ outputViewport: projectionViewport(settings) });
         applyDisplaySettingsToOpenWindows(settings);
         // The operator preview uses the same display setting as the actual
         // projector. Notify it too, not only the projection windows.
