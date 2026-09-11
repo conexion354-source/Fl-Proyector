@@ -110,6 +110,7 @@ export type BibleDisplaySettings = {
   referenceFontFamily: string;
   textFontSize: number;
   minimumFontSize: number;
+  autoFit: boolean;
   referenceFontSize: number;
   textColor: string;
   textShadowEnabled: boolean;
@@ -175,6 +176,7 @@ export const initialBibleDisplaySettings: BibleDisplaySettings = {
   referenceFontFamily: "Inter",
   textFontSize: 60,
   minimumFontSize: 38,
+  autoFit: true,
   referenceFontSize: 24,
   textColor: "#ffffff",
   textShadowEnabled: true,
@@ -187,7 +189,7 @@ export const initialBibleDisplaySettings: BibleDisplaySettings = {
   fillScreen: false,
   horizontalMargin: 8,
   verticalMargin: 10,
-  longVerseMode: "auto-fit",
+  longVerseMode: "split-halves",
   maxLinesPerSlide: 3,
 };
 export const initialSongDisplaySettings: SongDisplaySettings = {

@@ -540,15 +540,12 @@ export function SettingsPanel({
                         className="song-font-size-input"
                         type="number"
                         min="24"
-                        max={songStyle.autoFit ? 80 : 200}
+                        max="200"
                         value={songStyle.fontSize}
                         onChange={(e) =>
                           setSongStyle((value) => ({
                             ...value,
-                            fontSize: Math.max(
-                              24,
-                              Math.min(value.autoFit ? 80 : 200, Number(e.target.value)),
-                            ),
+                            fontSize: Math.max(24, Math.min(200, Number(e.target.value) || 24)),
                           }))
                         }
                       />
@@ -563,13 +560,12 @@ export function SettingsPanel({
                         setSongStyle((value) => ({
                           ...value,
                           autoFit: e.target.checked,
-                          fontSize: e.target.checked ? Math.min(80, value.fontSize) : value.fontSize,
                         }))
                       }
                     />
                     <div>
                       <strong>Ajuste automático de seguridad</strong>
-                      <span>Usa el tamaño máximo que entra en pantalla.</span>
+                      <span>Conserva el tamaño elegido y solo lo reduce si el texto se saldría de la pantalla.</span>
                     </div>
                   </label>
                   <label className="toggle-row">
@@ -1129,21 +1125,38 @@ export function SettingsPanel({
                       </select>
                     </label>
                     <label>
-                      Tamaño
+                      Tamaño preferido
                       <input
                         type="number"
-                        min="32"
-                        max="110"
+                        min="24"
+                        max="200"
                         value={bible.textFontSize}
                         onChange={(e) =>
                           setBible((v) => ({
                             ...v,
-                            textFontSize: Number(e.target.value),
+                            textFontSize: Math.max(24, Math.min(200, Number(e.target.value) || 24)),
                           }))
                         }
                       />
                     </label>
                   </div>
+                  <label className="toggle-row bible-fit-toggle">
+                    <input
+                      className="win11-toggle"
+                      type="checkbox"
+                      checked={bible.autoFit}
+                      onChange={(e) =>
+                        setBible((value) => ({
+                          ...value,
+                          autoFit: e.target.checked,
+                        }))
+                      }
+                    />
+                    <div>
+                      <strong>Protección automática de pantalla</strong>
+                      <span>Usa el tamaño elegido mientras entre; si desborda, lo reduce solo lo necesario.</span>
+                    </div>
+                  </label>
                   <ColorDots
                     label="Color del versículo"
                     value={bible.textColor}
@@ -1279,21 +1292,17 @@ export function SettingsPanel({
                 </ExpanderRow>
                   <div className="settings-card long-verse-settings">
                     <h3>Versículos largos</h3>
-                    <div className="long-verse-controls">
+                    <div className="long-verse-controls single">
                       <label>Comportamiento
                         <select value={bible.longVerseMode === "split" ? "split-halves" : bible.longVerseMode} onChange={(e) => setBible((value) => ({ ...value, longVerseMode: e.target.value as BibleDisplaySettings["longVerseMode"] }))}>
                           <option value="auto-fit">Mantener en una pantalla</option>
-                          <option value="split-halves">Dividir solo si excede el límite</option>
+                          <option value="split-halves">Dividir en A y B solo si no entra</option>
                         </select>
-                      </label>
-                      <label>Líneas antes de dividir
-                        <input type="number" min="2" max="8" disabled={bible.longVerseMode === "auto-fit"} value={bible.maxLinesPerSlide} onChange={(event) => setBible((value) => ({ ...value, maxLinesPerSlide: Math.max(2, Math.min(8, Number(event.target.value) || 3)) }))} />
                       </label>
                     </div>
                     <small className="setting-note">
-                      Si el texto entra en las líneas elegidas, se proyecta completo.
-                      Solo crea A, B o más partes cuando aparece una línea adicional,
-                      sin cortar palabras y usando el tamaño configurado.
+                      Se calcula con la resolución real, los márgenes, el zócalo y el tamaño elegido.
+                      Si el texto entra, se proyecta completo; si desborda, se divide una sola vez en A y B sin cortar palabras.
                     </small>
                   </div>
                   <button className="save-settings primary bible-save" onClick={saveBible}>

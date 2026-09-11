@@ -27,8 +27,8 @@ export function buildBibleSlides(
   settings: BibleDisplaySettings,
   viewport?: ProjectionDimensions,
 ): BibleSlide[] {
-  // A/B is used only for passages that cross the configured long-text limit.
-  // Short verses remain a single, quick-to-select item for the operator.
+  // A/B is used only when the passage cannot physically fit at the configured
+  // size. It is divided once; the renderer handles any final safety reduction.
   const pieces =
     settings.longVerseMode !== "auto-fit" &&
     isLongBibleVerse(text, settings, viewport) &&
@@ -36,14 +36,7 @@ export function buildBibleSlides(
       ? splitBibleVerse(text, settings, viewport)
       : [text];
   return pieces.map((piece, index) => {
-    const overflow = Math.max(0, piece.length - 110);
-    const fontSize =
-      settings.longVerseMode === "auto-fit"
-        ? Math.max(
-            settings.minimumFontSize,
-            settings.textFontSize - Math.ceil(overflow / 24) * 3,
-          )
-        : settings.textFontSize;
+    const fontSize = settings.textFontSize;
     const partSuffix =
       pieces.length > 1 ? String.fromCharCode(97 + Math.min(index, 25)) : "";
     const displayedReference = settings.showReference

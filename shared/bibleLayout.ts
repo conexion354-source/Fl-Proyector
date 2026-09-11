@@ -20,7 +20,8 @@ const wordWidth = (word: string, fontSize: number) =>
 /**
  * Wraps exactly as the projector is expected to wrap: one word at a time,
  * using the configured font size and the real usable screen width. Keeping
- * the resulting lines lets splitting happen only after maxLinesPerSlide.
+ * the resulting lines lets splitting happen only when the text would exceed
+ * the real usable height of the output.
  */
 export function bibleTextLines(
   text: string,
@@ -83,14 +84,14 @@ export function bibleTextCapacity(
   return {
     charactersPerLine,
     lineWidth: Math.max(120, usableWidth * 0.98),
-    lines: Math.max(1, Math.min(settings.maxLinesPerSlide, linesByHeight)),
+    lines: linesByHeight,
   };
 }
 
 /**
- * Estimates the wrapping used by the 16:9 projection area without ever
- * splitting a word. It gives the operator a stable definition of "long":
- * more than the operator-selected number of rendered lines.
+ * Estimates the wrapping used by the real projection area without ever
+ * splitting a word. A verse is long only when the configured type size would
+ * physically exceed the available screen height.
  */
 export function isLongBibleVerse(
   text: string,
@@ -111,9 +112,12 @@ export function splitBibleVerse(
   const maximumLines = bibleTextCapacity(settings, viewport).lines;
   const renderedLines = bibleTextLines(text, settings, viewport);
   if (renderedLines.length <= maximumLines) return [text];
-  const pieces: string[] = [];
-  for (let index = 0; index < renderedLines.length; index += maximumLines) {
-    pieces.push(renderedLines.slice(index, index + maximumLines).join(" "));
-  }
-  return pieces.length > 1 ? pieces : [text];
+  // Long passages are divided once, into two balanced screens. If either half
+  // remains unusually long, ProjectionStage's safety fit reduces its type just
+  // enough to keep it inside the safe area; it must never create C or D.
+  const splitAfterLine = Math.ceil(renderedLines.length / 2);
+  return [
+    renderedLines.slice(0, splitAfterLine).join(" "),
+    renderedLines.slice(splitAfterLine).join(" "),
+  ].filter(Boolean);
 }

@@ -362,13 +362,25 @@ if (!window.flProyector) {
     },
     getUpdateStatus: async () => ({
       state: "development",
-      currentVersion: "10.11.3",
+      currentVersion: "10.11.4",
       availableVersion: null,
       progress: null,
       message: "La búsqueda está desactivada mientras se prueba el sistema.",
       packaged: false,
     }),
     getReleaseHistory: async () => [
+      {
+        version: "10.11.4",
+        title: "Versículos completos y división A/B inteligente",
+        publishedAt: "2026-09-11T16:55:00Z",
+        changes: [
+          "Los versículos permanecen completos mientras entren físicamente en la pantalla al tamaño elegido.",
+          "Los textos que desbordan se dividen una sola vez en dos partes equilibradas: A y B, nunca C o D.",
+          "El cálculo considera la resolución real, los márgenes seguros y el espacio reservado para la referencia.",
+          "El tamaño preferido de Biblia y canciones ahora admite valores de hasta 200.",
+          "Biblia incorpora una protección automática que reduce el texto solo lo indispensable para evitar cortes.",
+        ],
+      },
       {
         version: "10.11.3",
         title: "Lectura bíblica más clara y estable",

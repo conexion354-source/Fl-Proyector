@@ -137,10 +137,12 @@ export function ProjectionStage({
     state.bibleStyle.horizontalMargin,
     state.bibleStyle.verticalMargin,
     state.bibleStyle.fillScreen,
+    state.bibleStyle.autoFit,
     state.bibleStyle.referenceFontSize,
     state.bibleStyle.referencePosition,
     state.bibleStyle.referenceStyle,
     state.songStyle.uppercase,
+    state.songStyle.autoFit,
     outputViewport.width,
     outputViewport.height,
     preview,
@@ -150,9 +152,9 @@ export function ProjectionStage({
   const songSafeArea = state.text.kind === "canto";
   const projectionSafeArea = bibleSafeArea || songSafeArea;
   const bibleFill = bibleSafeArea && state.bibleStyle.fillScreen;
-  // Both Bible and songs always shrink as a last safety measure. autoFit can
-  // still govern authoring behaviour, but never permits output clipping.
-  const fitText = projectionSafeArea;
+  const fitText =
+    (bibleSafeArea && (state.bibleStyle.autoFit || bibleFill)) ||
+    (songSafeArea && state.songStyle.autoFit);
   const uppercase =
     (state.text.kind === "biblia" && state.bibleStyle.uppercase) ||
     (state.text.kind === "canto" && state.songStyle.uppercase);
