@@ -2,6 +2,60 @@ import type { BibleDisplaySettings } from "./types.js";
 
 export type ProjectionDimensions = { width: number; height: number };
 
+const glyphWidth = (character: string, fontSize: number) => {
+  if (/\s/.test(character)) return fontSize * 0.32;
+  if (/[ilI1|.,:;'!]/.test(character)) return fontSize * 0.29;
+  if (/[mwMW@#%&]/.test(character)) return fontSize * 0.86;
+  if (/[A-ZÁÉÍÓÚÑ]/.test(character)) return fontSize * 0.64;
+  if (/[0-9]/.test(character)) return fontSize * 0.56;
+  return fontSize * 0.52;
+};
+
+const wordWidth = (word: string, fontSize: number) =>
+  Array.from(word).reduce(
+    (width, character) => width + glyphWidth(character, fontSize),
+    0,
+  ) * 1.04;
+
+/**
+ * Wraps exactly as the projector is expected to wrap: one word at a time,
+ * using the configured font size and the real usable screen width. Keeping
+ * the resulting lines lets splitting happen only after maxLinesPerSlide.
+ */
+export function bibleTextLines(
+  text: string,
+  settings: BibleDisplaySettings,
+  viewport: ProjectionDimensions = { width: 1920, height: 1080 },
+) {
+  const { lineWidth } = bibleTextCapacity(settings, viewport);
+  const source = settings.uppercase ? text.toLocaleUpperCase("es-AR") : text;
+  const words = source.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const lines: string[][] = [[]];
+  let usedWidth = 0;
+  const spaceWidth = glyphWidth(" ", settings.textFontSize);
+  for (let index = 0; index < words.length; index += 1) {
+    const measuredWidth = wordWidth(words[index], settings.textFontSize);
+    const nextWidth = usedWidth + (lines.at(-1)!.length ? spaceWidth : 0) + measuredWidth;
+    if (lines.at(-1)!.length && nextWidth > lineWidth) {
+      lines.push([words[index]]);
+      usedWidth = measuredWidth;
+    } else {
+      lines.at(-1)!.push(words[index]);
+      usedWidth = nextWidth;
+    }
+  }
+  // Return word ranges from the original spelling; uppercase only affects the
+  // width calculation and remains a projection preference.
+  let consumed = 0;
+  const originalWords = text.trim().split(/\s+/).filter(Boolean);
+  return lines.map((line) => {
+    const originalLine = originalWords.slice(consumed, consumed + line.length);
+    consumed += line.length;
+    return originalLine.join(" ");
+  });
+}
+
 export function bibleTextCapacity(
   settings: BibleDisplaySettings,
   viewport: ProjectionDimensions = { width: 1920, height: 1080 },
@@ -28,6 +82,7 @@ export function bibleTextCapacity(
   );
   return {
     charactersPerLine,
+    lineWidth: Math.max(120, usableWidth * 0.98),
     lines: Math.max(1, Math.min(settings.maxLinesPerSlide, linesByHeight)),
   };
 }
@@ -44,22 +99,8 @@ export function isLongBibleVerse(
 ) {
   const trimmed = text.trim();
   if (!trimmed) return false;
-  const { charactersPerLine, lines: maximumLines } = bibleTextCapacity(
-    settings,
-    viewport,
-  );
-  let lines = 1;
-  let lineLength = 0;
-  for (const word of trimmed.split(/\s+/)) {
-    const nextLength = lineLength ? lineLength + word.length + 1 : word.length;
-    if (lineLength && nextLength > charactersPerLine) {
-      lines += 1;
-      lineLength = word.length;
-    } else {
-      lineLength = nextLength;
-    }
-  }
-  return lines > maximumLines;
+  const { lines: maximumLines } = bibleTextCapacity(settings, viewport);
+  return bibleTextLines(trimmed, settings, viewport).length > maximumLines;
 }
 
 export function splitBibleVerse(
@@ -67,49 +108,12 @@ export function splitBibleVerse(
   settings: BibleDisplaySettings,
   viewport?: ProjectionDimensions,
 ) {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length < 2) return [text];
-  const { charactersPerLine, lines } = bibleTextCapacity(settings, viewport);
-  // The safety factor absorbs differences between proportional fonts. The
-  // projection renderer performs the final pixel-perfect fit afterwards.
-  const characterBudget = Math.max(
-    18,
-    Math.floor(charactersPerLine * lines * 0.86),
-  );
-  const totalCharacters = words.reduce(
-    (total, word, index) => total + word.length + (index ? 1 : 0),
-    0,
-  );
-  const partCount = Math.max(1, Math.ceil(totalCharacters / characterBudget));
-  if (partCount === 1) return [text];
+  const maximumLines = bibleTextCapacity(settings, viewport).lines;
+  const renderedLines = bibleTextLines(text, settings, viewport);
+  if (renderedLines.length <= maximumLines) return [text];
   const pieces: string[] = [];
-  let wordIndex = 0;
-  for (let part = 0; part < partCount; part += 1) {
-    const remainingParts = partCount - part;
-    const remainingText = words.slice(wordIndex).join(" ");
-    const target = Math.min(
-      characterBudget,
-      Math.ceil(remainingText.length / remainingParts),
-    );
-    let current = "";
-    while (wordIndex < words.length) {
-      const word = words[wordIndex];
-      const candidate = current ? `${current} ${word}` : word;
-      const wordsStillNeeded = words.length - (wordIndex + 1);
-      if (current && wordsStillNeeded >= remainingParts - 1) {
-        const currentDistance = Math.abs(target - current.length);
-        const candidateDistance = Math.abs(target - candidate.length);
-        if (
-          candidate.length > characterBudget ||
-          (candidate.length > target && currentDistance <= candidateDistance)
-        )
-          break;
-      }
-      current = candidate;
-      wordIndex += 1;
-      if (words.length - wordIndex === remainingParts - 1) break;
-    }
-    if (current) pieces.push(current);
+  for (let index = 0; index < renderedLines.length; index += maximumLines) {
+    pieces.push(renderedLines.slice(index, index + maximumLines).join(" "));
   }
   return pieces.length > 1 ? pieces : [text];
 }

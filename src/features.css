@@ -2298,6 +2298,84 @@
 .projection-text.projection-safe-area.position-lower {
   justify-content: flex-end;
 }
+.projection-text.bible-safe-area {
+  padding: 0;
+}
+.projection-text.bible-safe-area .bible-slide {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+.projection-text.bible-safe-area .bible-verse-slot {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  overflow: hidden;
+}
+.projection-text.bible-safe-area.position-top .bible-verse-slot {
+  align-items: flex-start;
+}
+.projection-text.bible-safe-area.position-bottom .bible-verse-slot,
+.projection-text.bible-safe-area.position-lower .bible-verse-slot {
+  align-items: flex-end;
+}
+.projection-text.bible-safe-area .bible-verse-text {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+.projection-text.bible-safe-area .bible-reference-slot {
+  display: flex;
+  width: 100%;
+  height: var(--bible-reference-height);
+  min-height: var(--bible-reference-height);
+  flex: 0 0 var(--bible-reference-height);
+  align-items: center;
+  overflow: hidden;
+  line-height: 1;
+}
+.projection-text.bible-safe-area .bible-reference-slot.reference-before {
+  margin-bottom: var(--bible-reference-gap);
+}
+.projection-text.bible-safe-area .bible-reference-slot.reference-after {
+  margin-top: var(--bible-reference-gap);
+}
+.projection-text.bible-safe-area .bible-reference-label {
+  display: inline-flex;
+  box-sizing: border-box;
+  max-width: 100%;
+  max-height: 100%;
+  align-items: center;
+  margin-inline: auto;
+  overflow: hidden;
+  padding: 0 .75em;
+  font-size: var(--bible-reference-size);
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.projection-text.bible-safe-area .bible-reference-label:not(.reference-style-minimal):not(.reference-style-underline) {
+  height: 100%;
+}
+.projection-text.bible-safe-area .bible-reference-label.reference-style-minimal {
+  padding-inline: 0;
+}
+.projection-text.bible-safe-area .bible-reference-label.reference-style-bar {
+  width: 100%;
+}
+.projection-text.bible-safe-area .bible-reference-label.reference-style-underline {
+  padding: 0 .05em .16em;
+}
+.projection-text.bible-safe-area .bible-reference-label.reference-style-ribbon {
+  padding-inline: .72em 1em;
+}
 .preview-stage .projection-text.bible-fill {
   font-size: var(--fit-text-size) !important;
 }

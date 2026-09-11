@@ -38,6 +38,7 @@ export function ProjectionStage({
   const oldUrl = useRef(state.background.url);
   const textRef = useRef<HTMLDivElement>(null);
   const [fitTextSize, setFitTextSize] = useState(state.text.fontSize);
+  const [contentScale, setContentScale] = useState(preview ? 0.2 : 1);
   const fontFamily =
     state.text.fontFamily === "Inter"
       ? "Inter, ui-sans-serif, system-ui, sans-serif"
@@ -78,6 +79,9 @@ export function ProjectionStage({
           )
         : 1;
       const requestedSize = Math.max(4 * scale, state.text.fontSize * scale);
+      setContentScale((current) =>
+        Math.abs(current - scale) > 0.002 ? scale : current,
+      );
       const shouldFillBible =
         state.text.kind === "biblia" && state.bibleStyle.fillScreen;
       // In fill mode the configured size is the starting point, not a ceiling.
@@ -96,9 +100,13 @@ export function ProjectionStage({
         const middle = (low + high) / 2;
         element.style.fontSize = `${middle}px`;
         element.style.setProperty("--fit-text-size", `${middle}px`);
+        const measuredElement =
+          state.text.kind === "biblia"
+            ? element.querySelector<HTMLElement>(".bible-verse-slot") || element
+            : element;
         if (
-          element.scrollHeight <= element.clientHeight + 1 &&
-          element.scrollWidth <= element.clientWidth + 1
+          measuredElement.scrollHeight <= measuredElement.clientHeight + 1 &&
+          measuredElement.scrollWidth <= measuredElement.clientWidth + 1
         ) {
           best = middle;
           low = middle;
@@ -129,6 +137,9 @@ export function ProjectionStage({
     state.bibleStyle.horizontalMargin,
     state.bibleStyle.verticalMargin,
     state.bibleStyle.fillScreen,
+    state.bibleStyle.referenceFontSize,
+    state.bibleStyle.referencePosition,
+    state.bibleStyle.referenceStyle,
     state.songStyle.uppercase,
     outputViewport.width,
     outputViewport.height,
@@ -189,6 +200,13 @@ export function ProjectionStage({
           height: "auto",
           overflow: "hidden",
           "--fit-text-size": fitTextSize + "px",
+        }
+      : {}),
+    ...(bibleSafeArea
+      ? {
+          "--bible-reference-size": `${Math.max(8, state.bibleStyle.referenceFontSize * contentScale)}px`,
+          "--bible-reference-height": `${Math.max(14, state.bibleStyle.referenceFontSize * 1.65 * contentScale)}px`,
+          "--bible-reference-gap": `${Math.max(4, state.bibleStyle.referenceFontSize * 0.45 * contentScale)}px`,
         }
       : {}),
   } as CSSProperties;

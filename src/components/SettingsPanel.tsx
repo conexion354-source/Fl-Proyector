@@ -1054,7 +1054,7 @@ export function SettingsPanel({
                       </select>
                     </label>
                     <label>
-                      Tamaño
+                      Tamaño fijo
                       <input
                         type="number"
                         min="10"
@@ -1282,18 +1282,18 @@ export function SettingsPanel({
                     <div className="long-verse-controls">
                       <label>Comportamiento
                         <select value={bible.longVerseMode === "split" ? "split-halves" : bible.longVerseMode} onChange={(e) => setBible((value) => ({ ...value, longVerseMode: e.target.value as BibleDisplaySettings["longVerseMode"] }))}>
-                          <option value="auto-fit">Reducir automáticamente</option>
-                          <option value="split-halves">Dividir en A y B</option>
+                          <option value="auto-fit">Mantener en una pantalla</option>
+                          <option value="split-halves">Dividir solo si excede el límite</option>
                         </select>
                       </label>
-                      <label>Líneas máximas
+                      <label>Líneas antes de dividir
                         <input type="number" min="2" max="8" disabled={bible.longVerseMode === "auto-fit"} value={bible.maxLinesPerSlide} onChange={(event) => setBible((value) => ({ ...value, maxLinesPerSlide: Math.max(2, Math.min(8, Number(event.target.value) || 3)) }))} />
                       </label>
                     </div>
                     <small className="setting-note">
-                      El cálculo usa la resolución real, los márgenes y el tamaño
-                      máximo. En “Dividir en A y B” crea las partes necesarias sin
-                      cortar palabras ni superar las líneas elegidas.
+                      Si el texto entra en las líneas elegidas, se proyecta completo.
+                      Solo crea A, B o más partes cuando aparece una línea adicional,
+                      sin cortar palabras y usando el tamaño configurado.
                     </small>
                   </div>
                   <button className="save-settings primary bible-save" onClick={saveBible}>

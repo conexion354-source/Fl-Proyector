@@ -117,6 +117,17 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.3",
+    title: "Lectura bíblica más clara y estable",
+    publishedAt: "2026-09-11T16:33:24Z",
+    changes: [
+      "El zócalo de referencia mantiene el tamaño configurado aunque cambie la longitud del pasaje.",
+      "El texto bíblico utiliza un área independiente y ya no se superpone con la referencia.",
+      "Los versículos se dividen solamente cuando superan la cantidad de líneas configurada.",
+      "La división llena cada pantalla antes de crear las partes A, B o siguientes, sin cortar palabras.",
+    ],
+  },
+  {
     version: "10.11.2",
     title: "Proyección y trabajo en red más confiables",
     publishedAt: "2026-09-11T14:26:08Z",

@@ -55,32 +55,30 @@ export function buildBibleSlides(
     ]
       .filter(Boolean)
       .join(" · ");
-    const refRatio = Math.max(
-      0.2,
-      Math.min(1.5, settings.referenceFontSize / fontSize),
-    );
-    const referenceBase = `color:${settings.referenceColor};font-family:${settings.referenceFontFamily};font-size:${refRatio}em;font-weight:750`;
+    // The reference uses its own configured size. It must never inherit the
+    // verse's automatic font reduction, otherwise its background grows and
+    // shrinks every time a passage changes length.
+    const referenceBase = `color:${settings.referenceColor};font-family:${settings.referenceFontFamily};font-weight:750`;
     const referenceStyle =
       settings.referenceStyle === "minimal"
         ? `${referenceBase};letter-spacing:.03em;font-weight:650`
         : settings.referenceStyle === "bar"
-          ? `display:block;${referenceBase};background:${settings.referenceBackground};padding:.45em .8em;border-left:.22em solid ${settings.referenceColor}`
+          ? `${referenceBase};background:${settings.referenceBackground};border-left:.22em solid ${settings.referenceColor}`
           : settings.referenceStyle === "glass"
-            ? `display:inline-block;${referenceBase};background:${settings.referenceBackground}bb;padding:.38em .78em;border:1px solid ${settings.referenceColor}88;border-radius:.35em;box-shadow:0 .25em .9em #0008;backdrop-filter:blur(8px)`
+            ? `${referenceBase};background:${settings.referenceBackground}bb;border:1px solid ${settings.referenceColor}88;border-radius:.35em;box-shadow:0 .25em .9em #0008;backdrop-filter:blur(8px)`
             : settings.referenceStyle === "underline"
-              ? `display:inline-block;${referenceBase};padding:0 .05em .16em;border-bottom:.14em solid ${settings.referenceBackground};letter-spacing:.025em`
+              ? `${referenceBase};border-bottom:.14em solid ${settings.referenceBackground};letter-spacing:.025em`
               : settings.referenceStyle === "ribbon"
-                ? `display:inline-block;${referenceBase};background:${settings.referenceBackground};padding:.42em 1em .42em .72em;clip-path:polygon(0 0,100% 0,92% 50%,100% 100%,0 100%,.3em 50%)`
-                : `display:inline-block;${referenceBase};background:${settings.referenceBackground};padding:.35em .75em;border-radius:999px`;
+                ? `${referenceBase};background:${settings.referenceBackground};clip-path:polygon(0 0,100% 0,92% 50%,100% 100%,0 100%,.3em 50%)`
+                : `${referenceBase};background:${settings.referenceBackground};border-radius:999px`;
     const ref = referenceText
-      ? `<p style="margin:${settings.referencePosition === "before" ? "0 0 .7em" : ".7em 0 0"};text-shadow:none"><span style="${referenceStyle}">${escapeHtml(referenceText)}</span></p>`
+      ? `<div class="bible-reference-slot reference-${settings.referencePosition}" style="text-shadow:none"><span class="bible-reference-label reference-style-${settings.referenceStyle}" style="${referenceStyle}">${escapeHtml(referenceText)}</span></div>`
       : "";
-    const verse = `<p style="font-family:${escapeHtml(settings.textFontFamily)};color:${settings.textColor}">${escapeHtml(piece)}</p>`;
+    const verse = `<div class="bible-verse-slot"><p class="bible-verse-text" style="font-family:${escapeHtml(settings.textFontFamily)};color:${settings.textColor}">${escapeHtml(piece)}</p></div>`;
     return {
-      html:
-        settings.referencePosition === "before"
-          ? `${ref}${verse}`
-          : `${verse}${ref}`,
+      html: `<div class="bible-slide bible-reference-${settings.referencePosition}">${
+        settings.referencePosition === "before" ? `${ref}${verse}` : `${verse}${ref}`
+      }</div>`,
       fontSize,
       label: `${reference}${partSuffix}`,
     };
