@@ -37,7 +37,15 @@ export function ProjectionStage({
   const [currentUrl, setCurrentUrl] = useState<string | null>(
     state.background.url,
   );
+  const requestedMediaFit =
+    state.background.kind === "video" && !state.video.loop
+      ? "contain"
+      : "cover";
+  const [previousMediaFit, setPreviousMediaFit] = useState<
+    "cover" | "contain"
+  >("cover");
   const oldUrl = useRef(state.background.url);
+  const oldMediaFit = useRef<"cover" | "contain">(requestedMediaFit);
   const textRef = useRef<HTMLDivElement>(null);
   const [fitTextSize, setFitTextSize] = useState(state.text.fontSize);
   const [contentScale, setContentScale] = useState(preview ? 0.2 : 1);
@@ -55,11 +63,13 @@ export function ProjectionStage({
   useEffect(() => {
     if (state.background.url === oldUrl.current) return;
     setPreviousUrl(oldUrl.current);
+    setPreviousMediaFit(oldMediaFit.current);
     setCurrentUrl(state.background.url);
     oldUrl.current = state.background.url;
+    oldMediaFit.current = requestedMediaFit;
     const timer = window.setTimeout(() => setPreviousUrl(null), 550);
     return () => window.clearTimeout(timer);
-  }, [state.background.url]);
+  }, [state.background.url, requestedMediaFit]);
 
   useEffect(() => {
     const element = textRef.current;
@@ -244,6 +254,7 @@ export function ProjectionStage({
             className="fade-out"
             playback={state.video}
             preview={preview}
+            fit={previousMediaFit}
           />
         )}
         {currentUrl && (
@@ -254,6 +265,7 @@ export function ProjectionStage({
             className="fade-in"
             playback={state.video}
             preview={preview}
+            fit={requestedMediaFit}
             onMetadata={onVideoMetadata}
             onTime={onVideoTime}
             onEnded={onVideoEnded}
@@ -453,6 +465,7 @@ function MediaLayer({
   className,
   playback,
   preview,
+  fit,
   onMetadata,
   onTime,
   onEnded,
@@ -462,6 +475,7 @@ function MediaLayer({
   className: string;
   playback: ProjectionState["video"];
   preview: boolean;
+  fit: "cover" | "contain";
   onMetadata?: (duration: number) => void;
   onTime?: (time: number) => void;
   onEnded?: () => void;
@@ -470,7 +484,7 @@ function MediaLayer({
     url.startsWith("data:image/") ||
     /\.(png|jpe?g|webp|gif|avif|bmp)(?:$|%)/i.test(decodeURIComponent(url))
   )
-    return <img className={className} src={url} />;
+    return <img className={className} src={url} style={{ objectFit: fit }} />;
   return (
     <VideoLayer
       url={url}
@@ -478,6 +492,7 @@ function MediaLayer({
       className={className}
       playback={playback}
       preview={preview}
+      fit={fit}
       onMetadata={onMetadata}
       onTime={onTime}
       onEnded={onEnded}
@@ -491,6 +506,7 @@ function VideoLayer({
   className,
   playback,
   preview,
+  fit,
   onMetadata,
   onTime,
   onEnded,
@@ -500,6 +516,7 @@ function VideoLayer({
   className: string;
   playback: ProjectionState["video"];
   preview: boolean;
+  fit: "cover" | "contain";
   onMetadata?: (duration: number) => void;
   onTime?: (time: number) => void;
   onEnded?: () => void;
@@ -565,6 +582,7 @@ function VideoLayer({
       ref={ref}
       className={className}
       src={url}
+      style={{ objectFit: fit }}
       autoPlay
       loop={playback.loop}
       preload="auto"
