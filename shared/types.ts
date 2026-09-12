@@ -401,6 +401,12 @@ export type ProjectionPatch = Partial<
   outputViewport?: Partial<ProjectionState["outputViewport"]>;
 };
 
+export type LiveAudienceStatus = {
+  active: boolean;
+  code: string | null;
+  viewers: number;
+};
+
 export type UpdateStatus = {
   state:
     | "idle"

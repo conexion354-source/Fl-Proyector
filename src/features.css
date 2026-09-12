@@ -3151,3 +3151,20 @@
   font: 700 11px inherit;
 }
 .alert-control-row .alert-action svg { width: 15px; }
+
+.live-audience-projection {
+  display:grid;
+  justify-items:center;
+  gap:.34em;
+  width:min(86vw,980px);
+  margin:auto;
+  padding:.6em .75em;
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:.35em;
+  background:rgba(9,12,20,.88);
+  box-shadow:0 24px 80px rgba(0,0,0,.48);
+}
+.live-audience-projection > span { color:#9f91ff; font-size:.42em; font-weight:800; letter-spacing:.16em; }
+.live-audience-projection > strong { font-size:.72em; line-height:1.15; }
+.live-audience-projection > img { display:block; width:min(52vh,46vw); max-width:620px; aspect-ratio:1; padding:.16em; border-radius:.22em; background:#fff; }
+.live-audience-projection > small { max-width:100%; overflow:hidden; color:#c8cfdb; font-size:.32em; text-overflow:ellipsis; white-space:nowrap; }

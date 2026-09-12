@@ -1,7 +1,7 @@
 import express from "express";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
-import { randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,7 +18,31 @@ import type {
   ProjectionPatch,
   ProjectionState,
   Song,
+  LiveAudienceStatus,
 } from "../shared/types.js";
+
+type LiveAudiencePayload =
+  | {
+      type: "waiting";
+      hash: string;
+      message: string;
+    }
+  | {
+      type: "text";
+      hash: string;
+      kind: ProjectionState["text"]["kind"];
+      html: string;
+      title: string;
+      fontFamily: string;
+      color: string;
+      align: ProjectionState["text"]["align"];
+      alert: string;
+    }
+  | {
+      type: "image";
+      hash: string;
+      url: string;
+    };
 
 type BibleRemoteSource = {
   listVersions: () => BibleVersion[];
@@ -65,6 +89,94 @@ export function startRemoteServer(
   const app = express();
   const server = createServer(app);
   const io = new Server(server, { cors: { origin: "*" } });
+  let liveCode: string | null = null;
+  let livePayload: LiveAudiencePayload | null = null;
+  let liveFrame: { hash: string; jpeg: Buffer } | null = null;
+  let liveViewerAnnouncementTimer: ReturnType<typeof setTimeout> | null = null;
+  const liveRoom = () => (liveCode ? `live:${liveCode}` : null);
+  const liveViewerCount = () => {
+    const room = liveRoom();
+    return room ? io.sockets.adapter.rooms.get(room)?.size ?? 0 : 0;
+  };
+  const liveStatus = (): LiveAudienceStatus => ({
+    active: Boolean(liveCode),
+    code: liveCode,
+    viewers: liveViewerCount(),
+  });
+  const announceLiveViewerCount = (room: string) => {
+    if (liveViewerAnnouncementTimer) clearTimeout(liveViewerAnnouncementTimer);
+    liveViewerAnnouncementTimer = setTimeout(() => {
+      liveViewerAnnouncementTimer = null;
+      const viewers = io.sockets.adapter.rooms.get(room)?.size ?? 0;
+      io.to(room).emit("live:viewers", viewers);
+      console.info(`Live: ${viewers} viewers conectados`);
+    }, 60);
+  };
+  const contentHash = (value: string | Buffer) =>
+    createHash("sha256").update(value).digest("hex").slice(0, 20);
+  const waitingPayload = (message = "Esperando contenido…"): LiveAudiencePayload => ({
+    type: "waiting",
+    hash: contentHash(`waiting:${message}`),
+    message,
+  });
+  const audiencePayloadForState = (
+    state: ProjectionState,
+  ): LiveAudiencePayload | null => {
+    if (state.blackout) return waitingPayload("La proyección está momentáneamente en pausa.");
+    if (state.logo) return waitingPayload("La transmisión continúa en breve.");
+    if (state.text.visible && !state.text.html.includes("data-live-audience-qr")) {
+      const source = {
+        kind: state.text.kind,
+        html: state.text.html,
+        title: state.text.title,
+        fontFamily: state.text.fontFamily,
+        color: state.text.color,
+        align: state.text.align,
+        alert: state.alert.visible ? state.alert.message : "",
+      };
+      return { type: "text", hash: contentHash(JSON.stringify(source)), ...source };
+    }
+    if (state.lowerThird.visible) {
+      const source = {
+        kind: "anuncio" as const,
+        html: `<p>${escapeAudienceHtml(state.lowerThird.subtitle)}</p>`,
+        title: state.lowerThird.title,
+        fontFamily: "Inter",
+        color: "#ffffff",
+        align: "center" as const,
+        alert: state.alert.visible ? state.alert.message : "",
+      };
+      return { type: "text", hash: contentHash(JSON.stringify(source)), ...source };
+    }
+    // Images and PowerPoint slides are supplied by capturePage after the
+    // projector has rendered the final frame. Videos are deliberately not
+    // streamed over Wi-Fi to keep audience mode lightweight.
+    if (
+      state.presentation.visible ||
+      (state.background.kind === "image" && Boolean(state.background.url))
+    )
+      return null;
+    if (state.background.kind === "video" && state.background.url)
+      return waitingPayload("Video en reproducción en la pantalla principal.");
+    if (state.alert.visible) {
+      const source = {
+        kind: "anuncio" as const,
+        html: `<p>${escapeAudienceHtml(state.alert.message)}</p>`,
+        title: "Alerta",
+        fontFamily: "Inter",
+        color: state.alert.color,
+        align: "center" as const,
+        alert: "",
+      };
+      return { type: "text", hash: contentHash(JSON.stringify(source)), ...source };
+    }
+    return waitingPayload();
+  };
+  const emitLivePayload = (payload: LiveAudiencePayload) => {
+    if (!liveCode || payload.hash === livePayload?.hash) return;
+    livePayload = payload;
+    io.to(`live:${liveCode}`).emit("live:update", payload);
+  };
   const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
   const remoteApkPath = path.resolve(
     moduleDirectory,
@@ -89,6 +201,22 @@ export function startRemoteServer(
       .json({ service: "fl-proyector", name: "FL Proyector", port: 3001 }),
   );
   app.get("/colaborador", (_req, res) => res.type("html").send(collaboratorHtml));
+  app.get("/live/:code", (_req, res) => res.type("html").send(liveAudienceHtml));
+  app.get("/live-assets/:code/:hash.jpg", (req, res) => {
+    if (
+      !liveCode ||
+      req.params.code !== liveCode ||
+      !liveFrame ||
+      req.params.hash !== liveFrame.hash
+    )
+      return res.status(404).end();
+    res.set({
+      "Cache-Control": "public, max-age=31536000, immutable",
+      "Content-Type": "image/jpeg",
+      ETag: `"${liveFrame.hash}"`,
+    });
+    return res.send(liveFrame.jpeg);
+  });
   app.get("/manifest.webmanifest", (_req, res) =>
     res.type("application/manifest+json").send({
       name: "FL Proyector Remoto",
@@ -277,23 +405,48 @@ export function startRemoteServer(
   });
 
   io.on("connection", (socket) => {
-    socket.emit("projection:state", getState());
-    socket.on("projection:patch", (patch: ProjectionPatch) => applyPatch(patch));
-    socket.on("remote:project-multimedia", (itemId: number) => {
-      if (Number.isInteger(itemId)) multimedia.project(itemId);
+    const audienceOnly = socket.handshake.query.role === "live";
+    if (!audienceOnly) {
+      socket.join("projection-controllers");
+      socket.emit("projection:state", getState());
+      socket.on("projection:patch", (patch: ProjectionPatch) => applyPatch(patch));
+      socket.on("remote:project-multimedia", (itemId: number) => {
+        if (Number.isInteger(itemId)) multimedia.project(itemId);
+      });
+      socket.on("remote:video", (video: Partial<ProjectionState["video"]>) =>
+        applyPatch({ video }),
+      );
+      socket.on("remote:presentation", (direction: -1 | 1) => {
+        const current = getState().presentation;
+        if (!current.visible || ![-1, 1].includes(direction)) return;
+        const slideIndex = Math.max(0, Math.min(current.slideIndex + direction, Math.max(0, current.slideCount - 1)));
+        applyPatch({ presentation: { slideIndex } });
+      });
+    }
+    socket.on("live:join", (code: string) => {
+      if (!liveCode || String(code) !== liveCode) {
+        socket.emit("live:error", "La transmisión no está disponible o el código venció.");
+        return;
+      }
+      const room = `live:${liveCode}`;
+      socket.join(room);
+      socket.data.liveRoom = room;
+      if (livePayload) socket.emit("live:update", livePayload);
+      announceLiveViewerCount(room);
     });
-    socket.on("remote:video", (video: Partial<ProjectionState["video"]>) =>
-      applyPatch({ video }),
-    );
-    socket.on("remote:presentation", (direction: -1 | 1) => {
-      const current = getState().presentation;
-      if (!current.visible || ![-1, 1].includes(direction)) return;
-      const slideIndex = Math.max(0, Math.min(current.slideIndex + direction, Math.max(0, current.slideCount - 1)));
-      applyPatch({ presentation: { slideIndex } });
+    socket.on("disconnect", () => {
+      const room = socket.data.liveRoom as string | undefined;
+      if (!room) return;
+      announceLiveViewerCount(room);
     });
   });
 
-  const broadcast = (state: ProjectionState) => io.emit("projection:state", state);
+  const broadcast = (state: ProjectionState) => {
+    io.to("projection-controllers").emit("projection:state", state);
+    if (!liveCode) return;
+    const payload = audiencePayloadForState(state);
+    if (payload) emitLivePayload(payload);
+  };
   let available = false;
   server.once("listening", () => {
     available = true;
@@ -310,9 +463,67 @@ export function startRemoteServer(
       server.close();
     },
     broadcast,
+    startLiveAudience: (state: ProjectionState) => {
+      if (liveCode) io.to(`live:${liveCode}`).emit("live:ended");
+      liveCode = String(randomInt(100000, 1000000));
+      livePayload = null;
+      liveFrame = null;
+      const payload = audiencePayloadForState(state);
+      if (payload) emitLivePayload(payload);
+      return liveStatus();
+    },
+    stopLiveAudience: () => {
+      if (liveCode) io.to(`live:${liveCode}`).emit("live:ended");
+      if (liveViewerAnnouncementTimer) clearTimeout(liveViewerAnnouncementTimer);
+      liveViewerAnnouncementTimer = null;
+      liveCode = null;
+      livePayload = null;
+      liveFrame = null;
+      return liveStatus();
+    },
+    getLiveAudienceStatus: liveStatus,
+    needsLiveFrame: (state: ProjectionState) =>
+      Boolean(
+        liveCode &&
+          !state.blackout &&
+          !state.logo &&
+          !state.text.visible &&
+          (state.presentation.visible ||
+            (state.background.kind === "image" && state.background.url)),
+      ),
+    broadcastLiveFrame: (jpeg: Buffer) => {
+      if (!liveCode) return;
+      const hash = contentHash(jpeg);
+      if (hash === liveFrame?.hash) return;
+      liveFrame = { hash, jpeg };
+      emitLivePayload({
+        type: "image",
+        hash,
+        url: `/live-assets/${liveCode}/${hash}.jpg`,
+      });
+    },
     isAvailable: () => available,
   };
 }
+
+function escapeAudienceHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  })[character] || character);
+}
+
+const liveAudienceHtml = String.raw`<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>FL Proyector · En vivo</title><style>
+*{box-sizing:border-box}[hidden]{display:none!important}html,body{margin:0;min-height:100%;background:#090b12;color:#fff;font-family:Inter,"Segoe UI",Arial,sans-serif}body{min-height:100dvh;display:grid;grid-template-rows:auto 1fr;background:radial-gradient(circle at top,#211b52 0,#0c101b 38%,#080a10 100%)}header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:max(14px,env(safe-area-inset-top)) 18px 12px;border-bottom:1px solid #ffffff18;background:#0d111dcc;backdrop-filter:blur(16px);position:sticky;top:0;z-index:2}.brand{display:flex;align-items:center;gap:10px;font-weight:800}.brand i{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#5b42ea;font-style:normal}.status{display:flex;align-items:center;gap:7px;color:#aeb8cb;font-size:13px}.status:before{content:"";width:8px;height:8px;border-radius:50%;background:#f59e0b}.status.online:before{background:#22c55e}.viewer-count{font-size:12px;color:#8f9aaf}main{display:grid;place-items:center;min-height:0;padding:clamp(20px,5vw,64px)}.stage{width:min(100%,1100px);text-align:center}.waiting{display:grid;place-items:center;gap:18px;min-height:50dvh;color:#abb4c5}.waiting .pulse{width:64px;height:64px;border-radius:20px;background:#5b42ea;box-shadow:0 0 0 0 #7865ff66;animation:pulse 1.8s infinite}.content{font-size:clamp(30px,6.5vw,78px);font-weight:700;line-height:1.16;text-wrap:balance}.content p{margin:.18em 0}.content .bible-slide{display:flex;flex-direction:column;gap:.5em}.content .bible-reference-label{display:inline-block;font-size:.34em;padding:.28em .65em}.title{margin-top:26px;color:#a997ff;font-size:clamp(18px,3vw,32px);font-weight:800}.alert{display:none;margin:24px auto 0;width:max-content;max-width:100%;padding:10px 18px;border-radius:999px;background:#b91c1c;font-size:clamp(17px,2.5vw,26px);font-weight:800}.alert.visible{display:block}.slide{display:block;width:100%;max-height:76dvh;object-fit:contain;border-radius:12px;box-shadow:0 18px 60px #0008}.ended{color:#fca5a5}@keyframes pulse{70%{box-shadow:0 0 0 28px #7865ff00}100%{box-shadow:0 0 0 0 #7865ff00}}@media(max-width:600px){header{align-items:flex-start}.viewer-count{display:none}main{padding:24px 18px}.content{font-size:clamp(28px,9vw,52px)}}
+</style></head><body><header><div class="brand"><i>FL</i><span>Lectura en vivo</span></div><div><div id="status" class="status">Conectando…</div><div id="viewers" class="viewer-count"></div></div></header><main><section class="stage"><div id="waiting" class="waiting"><div class="pulse"></div><strong>Esperando contenido…</strong></div><div id="text-wrap" hidden><div id="content" class="content"></div><div id="title" class="title"></div><div id="alert" class="alert"></div></div><img id="slide" class="slide" hidden alt="Contenido proyectado"></section></main><script src="/socket.io/socket.io.js"></script><script>
+var code=location.pathname.split('/').filter(Boolean).pop(),socket=io({query:{role:'live'},timeout:5000,reconnection:true,reconnectionDelay:500,reconnectionDelayMax:3000}),lastHash='',statusEl=document.getElementById('status'),waiting=document.getElementById('waiting'),textWrap=document.getElementById('text-wrap'),content=document.getElementById('content'),title=document.getElementById('title'),alertEl=document.getElementById('alert'),slide=document.getElementById('slide'),viewers=document.getElementById('viewers');
+function showOnly(target){waiting.hidden=target!=='waiting';textWrap.hidden=target!=='text';slide.hidden=target!=='image'}
+socket.on('connect',function(){statusEl.textContent='Conectado';statusEl.classList.add('online');socket.emit('live:join',code)});socket.on('disconnect',function(){statusEl.textContent='Reconectando…';statusEl.classList.remove('online')});socket.on('live:error',function(message){showOnly('waiting');waiting.classList.add('ended');waiting.querySelector('strong').textContent=message});socket.on('live:ended',function(){showOnly('waiting');waiting.classList.add('ended');waiting.querySelector('strong').textContent='La transmisión finalizó.';statusEl.textContent='Finalizada';statusEl.classList.remove('online')});socket.on('live:viewers',function(count){viewers.textContent=count+' dispositivo'+(count===1?'':'s')+' conectado'+(count===1?'':'s')});socket.on('live:update',function(data){if(!data||data.hash===lastHash)return;lastHash=data.hash;waiting.classList.remove('ended');if(data.type==='waiting'){showOnly('waiting');waiting.querySelector('strong').textContent=data.message;return}if(data.type==='image'){if(slide.dataset.hash===data.hash)return;slide.onload=function(){slide.dataset.hash=data.hash;showOnly('image')};slide.src=data.url;return}content.innerHTML=data.html||'';content.style.fontFamily=data.fontFamily||'Inter';content.style.color=data.color||'#fff';content.style.textAlign=data.align||'center';title.textContent=data.title||'';title.hidden=!data.title;alertEl.textContent=data.alert||'';alertEl.classList.toggle('visible',Boolean(data.alert));showOnly('text')});
+</script></body></html>`;
 
 const collaboratorHtml = String.raw`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FL Proyector · Colaborador</title><style>
 :root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#edf0f8;background:#f3f5f9}*{box-sizing:border-box}body{margin:0}.top{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:#171a22;color:#fff;border-bottom:1px solid #303746}.brand{font-weight:800;letter-spacing:.04em}.brand i{display:inline-grid;place-items:center;width:28px;height:28px;margin-right:8px;border-radius:8px;background:#6046ec;font-style:normal}.mode{font-size:12px;color:#b9c2d6}.shell{display:grid;grid-template-columns:235px minmax(0,1fr);min-height:calc(100vh - 58px)}aside{padding:18px 12px;background:#20242e;color:#dbe0ec;border-right:1px solid #dce1ea}aside h3{font-size:11px;letter-spacing:.1em;color:#9da7ba;margin:8px 10px 10px}nav button{display:block;width:100%;border:0;border-radius:8px;padding:11px 12px;text-align:left;background:transparent;color:inherit;font:650 14px inherit}nav button.active{background:#e9e5ff;color:#432cb7}main{padding:28px;max-width:1200px;width:100%;margin:auto}.page-title{display:flex;align-items:start;justify-content:space-between;gap:16px;margin-bottom:20px}.page-title h1{margin:0;font-size:25px;color:#202532}.page-title p{margin:5px 0 0;color:#667188;font-size:14px}.panel{background:#fff;border:1px solid #dce1ea;border-radius:12px;box-shadow:0 3px 16px #2630480a}.toolbar{display:flex;gap:9px;align-items:center;padding:12px;border-bottom:1px solid #e7eaf0}.toolbar input{flex:1}.list{display:grid;gap:1px}.song,.meeting{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border-bottom:1px solid #edf0f4}.song:last-child,.meeting:last-child{border-bottom:0}.song b,.meeting b{display:block;color:#202532}.song span,.meeting span{color:#717b90;font-size:12px}.button,button{border:1px solid #c9d0df;border-radius:8px;padding:9px 12px;background:#fff;color:#252b38;font:700 13px inherit;cursor:pointer}.button.primary,button.primary{background:#5b42ea;border-color:#5b42ea;color:#fff}.button:disabled,button:disabled{opacity:.5;cursor:default}.edit{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}.form{padding:17px}.form label{display:grid;gap:6px;margin-bottom:14px;color:#586379;font-size:12px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd2df;border-radius:8px;padding:10px;font:15px inherit;color:#202532;background:#fff}textarea{min-height:330px;resize:vertical;line-height:1.5}.side-panel{padding:17px}.side-panel h3{margin:0 0 12px;font-size:15px}.item{padding:9px 0;border-bottom:1px solid #edf0f4;font-size:13px}.item:last-child{border:0}.row-actions{display:flex;gap:8px;flex-wrap:wrap}.empty{padding:30px;color:#788297;text-align:center}.login{display:grid;place-items:center;min-height:100vh;background:linear-gradient(135deg,#17182d,#0d1018)}.login-card{width:min(400px,calc(100% - 32px));padding:28px;background:#fff;border-radius:16px;box-shadow:0 20px 60px #0005}.login-card h1{margin:0 0 7px;color:#202532}.login-card p{margin:0 0 20px;color:#687389}.error{min-height:18px;color:#c5303f;font-size:13px;margin:8px 0}.hidden{display:none!important}@media(max-width:760px){.shell{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid #dce1ea;padding:8px;overflow:auto}aside h3{display:none}nav{display:flex;gap:5px}nav button{white-space:nowrap;width:auto}.edit{grid-template-columns:1fr}main{padding:16px}.top{padding:0 15px}}

@@ -104,6 +104,7 @@ let mediaDir = "";
 let meetingMediaDir = "";
 let churchAssetsDir = "";
 let updaterConfigured = false;
+let liveAudienceCaptureTimer: ReturnType<typeof setTimeout> | null = null;
 let updateStatus: UpdateStatus = {
   state: app.isPackaged ? "idle" : "development",
   currentVersion: app.getVersion(),
@@ -358,6 +359,38 @@ function mergeState(patch: ProjectionPatch) {
     if (win && !win.isDestroyed())
       win.webContents.send("projection:state", state);
   remoteServer?.broadcast(state);
+  scheduleLiveAudienceFrame();
+}
+
+function scheduleLiveAudienceFrame() {
+  if (!remoteServer?.needsLiveFrame(state)) {
+    if (liveAudienceCaptureTimer) clearTimeout(liveAudienceCaptureTimer);
+    liveAudienceCaptureTimer = null;
+    return;
+  }
+  if (liveAudienceCaptureTimer) clearTimeout(liveAudienceCaptureTimer);
+  // Trailing throttle: several rapid slide changes produce one capture of the
+  // final frame, never a queue of obsolete JPEGs.
+  liveAudienceCaptureTimer = setTimeout(async () => {
+    liveAudienceCaptureTimer = null;
+    const source = projectionWindow && !projectionWindow.isDestroyed()
+      ? projectionWindow
+      : thirdProjectionWindow && !thirdProjectionWindow.isDestroyed()
+        ? thirdProjectionWindow
+        : null;
+    if (!source || !remoteServer?.needsLiveFrame(state)) return;
+    try {
+      const captured = await source.webContents.capturePage();
+      const size = captured.getSize();
+      const resized = size.width > 960
+        ? captured.resize({ width: 960, quality: "good" })
+        : captured;
+      const quality = remoteServer.getLiveAudienceStatus().viewers > 50 ? 40 : 50;
+      remoteServer.broadcastLiveFrame(resized.toJPEG(quality));
+    } catch (error) {
+      console.error("[live-audience] no se pudo capturar la salida", error);
+    }
+  }, 500);
 }
 
 function projectionViewport(settings: DisplaySettings) {
@@ -1064,6 +1097,19 @@ if (hasSingleInstanceLock)
       };
     });
     ipcMain.handle("remote:enable-windows-access", enableWindowsRemoteAccess);
+    ipcMain.handle("live-audience:status", () =>
+      remoteServer.getLiveAudienceStatus(),
+    );
+    ipcMain.handle("live-audience:start", () => {
+      const result = remoteServer.startLiveAudience(state);
+      scheduleLiveAudienceFrame();
+      return result;
+    });
+    ipcMain.handle("live-audience:stop", () => {
+      if (liveAudienceCaptureTimer) clearTimeout(liveAudienceCaptureTimer);
+      liveAudienceCaptureTimer = null;
+      return remoteServer.stopLiveAudience();
+    });
     ipcMain.handle("media:list", () => database.listMedia(mediaUrl));
     ipcMain.handle("media:import", async (_event, paths: string[]) => {
       for (const source of paths.filter(validMedia))

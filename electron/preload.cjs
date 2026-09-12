@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld("flProyector", {
   projectionStatus: () => ipcRenderer.invoke("projection:status"),
   enableWindowsRemoteAccess: () =>
     ipcRenderer.invoke("remote:enable-windows-access"),
+  getLiveAudienceStatus: () => ipcRenderer.invoke("live-audience:status"),
+  startLiveAudience: () => ipcRenderer.invoke("live-audience:start"),
+  stopLiveAudience: () => ipcRenderer.invoke("live-audience:stop"),
   listMedia: () => ipcRenderer.invoke("media:list"),
   importMedia: (paths) => ipcRenderer.invoke("media:import", paths),
   chooseMediaFiles: () => ipcRenderer.invoke("media:choose"),

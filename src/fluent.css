@@ -1632,6 +1632,40 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
 .app-shell .remote-feature-grid article { padding:12px 14px; }
 .app-shell .remote-feature-grid article b { color:var(--fl-text); font-size:13px; }
 .app-shell .remote-feature-grid article span { margin-top:3px; font-size:12px; }
+.app-shell .live-audience-section { margin-top:22px; }
+.app-shell .live-audience-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; margin-bottom:10px; }
+.app-shell .live-audience-heading h3 { margin:3px 0 2px; font-size:19px; }
+.app-shell .live-audience-heading p { margin:0; color:var(--fl-muted); font-size:12px; }
+.app-shell .live-audience-state { display:inline-flex; align-items:center; gap:7px; min-height:30px; padding:0 10px; border:1px solid var(--fl-border); border-radius:999px; color:var(--fl-muted); background:var(--fl-surface); font-size:11px; font-weight:700; }
+.app-shell .live-audience-state.active { border-color:#16a34a66; color:#15803d; background:#16a34a12; }
+.app-shell .live-audience-start-card,.app-shell .live-audience-card { border:1px solid var(--fl-border); border-radius:10px; background:var(--fl-surface); box-shadow:var(--fl-shadow); }
+.app-shell .live-audience-start-card { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:14px; padding:15px 16px; }
+.app-shell .live-audience-start-card b,.app-shell .live-audience-start-card span { display:block; }
+.app-shell .live-audience-start-card span { margin-top:3px; color:var(--fl-muted); font-size:12px; }
+.app-shell .live-audience-symbol { display:grid; place-items:center; width:42px; height:42px; border-radius:10px; color:var(--fl-accent); background:color-mix(in srgb,var(--fl-accent) 12%,var(--fl-surface)); }
+.app-shell .live-audience-start-card button,.app-shell .live-audience-actions button,.app-shell .live-audience-url button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:34px; padding:0 13px; border:1px solid transparent; border-radius:7px; font-weight:700; white-space:nowrap; }
+.app-shell .live-audience-card { display:grid; grid-template-columns:190px minmax(0,1fr); gap:18px; padding:17px; }
+.app-shell .live-audience-qr { display:grid; place-items:center; aspect-ratio:1; padding:9px; border:1px solid var(--fl-border); border-radius:9px; background:#fff; }
+.app-shell .live-audience-qr img { display:block; width:100%; height:100%; }
+.app-shell .live-audience-details { display:grid; align-content:center; gap:10px; min-width:0; }
+.app-shell .live-audience-code { display:flex; align-items:baseline; gap:12px; }
+.app-shell .live-audience-code span { color:var(--fl-muted); font-size:11px; }
+.app-shell .live-audience-code strong { color:var(--fl-text); font-size:25px; letter-spacing:.14em; }
+.app-shell .live-audience-viewers { display:flex; align-items:center; gap:8px; color:var(--fl-muted); font-size:12px; }
+.app-shell .live-audience-viewers svg { width:17px; color:#16a34a; }
+.app-shell .live-audience-url { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; }
+.app-shell .live-audience-url code { min-width:0; overflow:hidden; padding:8px 10px; border:1px solid var(--fl-border); border-radius:7px; color:var(--fl-text); background:var(--fl-input); text-overflow:ellipsis; white-space:nowrap; }
+.app-shell .live-audience-details > p { margin:0; color:var(--fl-muted); font-size:12px; }
+.app-shell .live-audience-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.app-shell .live-audience-actions .danger-secondary { border-color:color-mix(in srgb,var(--fl-danger) 45%,var(--fl-border)); color:var(--fl-danger); background:transparent; }
+.app-shell .live-audience-actions .danger-secondary:hover { background:color-mix(in srgb,var(--fl-danger) 10%,transparent); }
+@media (max-width:760px) {
+  .app-shell .live-audience-heading { align-items:flex-start; flex-direction:column; }
+  .app-shell .live-audience-start-card { grid-template-columns:auto 1fr; }
+  .app-shell .live-audience-start-card button { grid-column:1 / -1; width:100%; }
+  .app-shell .live-audience-card { grid-template-columns:1fr; }
+  .app-shell .live-audience-qr { width:min(220px,100%); margin:auto; }
+}
 .app-shell .collaborator-section { margin-top:20px; }
 .app-shell .collaborator-heading { margin-bottom:8px; }
 .app-shell .collaborator-heading h3 { font-size:18px; }

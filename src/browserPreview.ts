@@ -17,6 +17,7 @@ if (!window.flProyector) {
   let songs: Song[] = [];
   let media: MediaItem[] = [];
   let items: MeetingItem[] = [];
+  let liveAudience = { active: false, code: null as string | null, viewers: 0 };
   let nextId = 10;
   const selectBrowserFiles = (accept: string, multiple = false) =>
     new Promise<File[]>((resolve) => {
@@ -128,6 +129,19 @@ if (!window.flProyector) {
           : [],
     }),
     enableWindowsRemoteAccess: async () => true,
+    getLiveAudienceStatus: async () => liveAudience,
+    startLiveAudience: async () => {
+      liveAudience = {
+        active: true,
+        code: String(Math.floor(100000 + Math.random() * 900000)),
+        viewers: 0,
+      };
+      return liveAudience;
+    },
+    stopLiveAudience: async () => {
+      liveAudience = { active: false, code: null, viewers: 0 };
+      return liveAudience;
+    },
     listMedia: async () => media,
     importMedia: async () => media,
     chooseMediaFiles: async () => {

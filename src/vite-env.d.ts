@@ -12,6 +12,7 @@ import type {
   MediaItem,
   Meeting,
   MeetingItem,
+  LiveAudienceStatus,
   ProjectionPatch,
   ProjectionState,
   ReleaseHistoryEntry,
@@ -34,6 +35,9 @@ declare global {
         remoteUrls: string[];
       }>;
       enableWindowsRemoteAccess(): Promise<boolean>;
+      getLiveAudienceStatus(): Promise<LiveAudienceStatus>;
+      startLiveAudience(): Promise<LiveAudienceStatus>;
+      stopLiveAudience(): Promise<LiveAudienceStatus>;
       listMedia(): Promise<MediaItem[]>;
       importMedia(paths: string[]): Promise<MediaItem[]>;
       chooseMediaFiles(): Promise<MediaItem[]>;

@@ -302,7 +302,9 @@ export function App() {
           )}{" "}
           {tab === "fondos" && <MediaLibrary state={state} update={update} />}{" "}
           {tab === "biblia" && <BibleOperator state={state} update={update} />}{" "}
-          {tab === "remoto" && <RemotePanel urls={status.remoteUrls} />}{" "}
+          {tab === "remoto" && (
+            <RemotePanel urls={status.remoteUrls} state={state} update={update} />
+          )}{" "}
           {tab === "ajustes" && (
             <SettingsPanel
               state={state}
