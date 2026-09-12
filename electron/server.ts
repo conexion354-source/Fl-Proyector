@@ -5,6 +5,7 @@ import { createHash, randomInt, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { collaboratorHtml } from "./collaboratorPage.js";
 import {
   isLongBibleVerse,
   splitBibleVerse,
@@ -75,8 +76,13 @@ type CollaboratorSource = {
   saveSong: (song: Partial<Song> & { title: string; content: string }) => number;
   listMeetings: () => Meeting[];
   createMeeting: (name: string, date?: string | null) => number;
+  updateMeeting: (id: number, patch: Partial<Pick<Meeting, "name" | "color">>) => void;
+  deleteMeeting: (id: number) => void;
   listMeetingItems: (meetingId: number) => MeetingItem[];
   saveMeetingItem: (item: Partial<MeetingItem> & { meetingId: number; type: string; title: string; color: string; payload: Record<string, unknown> }) => number;
+  deleteMeetingItem: (id: number) => void;
+  reorderMeetingItems: (meetingId: number, ids: number[]) => void;
+  notifyChanged: (scope: "songs" | "meetings") => void;
 };
 
 export function startRemoteServer(
@@ -185,6 +191,10 @@ export function startRemoteServer(
   app.use(express.json({ limit: "256kb" }));
 
   const collaboratorTokens = new Set<string>();
+  const collaboratorChanged = (scope: "songs" | "meetings") => {
+    collaborator.notifyChanged(scope);
+    io.emit("collaborator:changed", scope);
+  };
   const collaboratorSession = (request: express.Request) => {
     const match = request.headers.cookie?.match(/(?:^|;\s*)fl_collaborator=([^;]+)/);
     return Boolean(match?.[1] && collaboratorTokens.has(match[1]));
@@ -287,13 +297,30 @@ export function startRemoteServer(
       categoryId: existing?.categoryId ?? null,
       sectionTypes: existing?.sectionTypes || [],
     });
+    collaboratorChanged("songs");
     return response.json({ id });
   });
   app.get("/api/collaborator/meetings", collaboratorOnly, (_request, response) => response.json(collaborator.listMeetings()));
   app.post("/api/collaborator/meetings", collaboratorOnly, (request, response) => {
     const name = String(request.body?.name ?? "").trim();
     if (!name) return response.status(400).json({ error: "Indicá el nombre de la reunión." });
-    return response.json({ id: collaborator.createMeeting(name, typeof request.body?.date === "string" ? request.body.date : null) });
+    const id = collaborator.createMeeting(name, typeof request.body?.date === "string" ? request.body.date : null);
+    collaboratorChanged("meetings");
+    return response.json({ id });
+  });
+  app.patch("/api/collaborator/meetings/:meetingId", collaboratorOnly, (request, response) => {
+    const id = Number(request.params.meetingId), name = String(request.body?.name ?? "").trim();
+    if (!Number.isInteger(id) || !name) return response.status(400).json({ error: "Indicá un nombre válido." });
+    collaborator.updateMeeting(id, { name, color: typeof request.body?.color === "string" ? request.body.color : undefined });
+    collaboratorChanged("meetings");
+    return response.status(204).end();
+  });
+  app.delete("/api/collaborator/meetings/:meetingId", collaboratorOnly, (request, response) => {
+    const id = Number(request.params.meetingId);
+    if (!Number.isInteger(id)) return response.status(400).json({ error: "Reunión inválida." });
+    collaborator.deleteMeeting(id);
+    collaboratorChanged("meetings");
+    return response.status(204).end();
   });
   app.get("/api/collaborator/meetings/:meetingId/items", collaboratorOnly, (request, response) => {
     const id = Number(request.params.meetingId);
@@ -305,8 +332,24 @@ export function startRemoteServer(
     const type = ["announcement", "bible", "media", "presentation", "song"].includes(String(item.type))
       ? (String(item.type) as MeetingItem["type"])
       : "announcement";
-    const id = collaborator.saveMeetingItem({ meetingId, type, title: String(item.title).trim(), color: typeof item.color === "string" ? item.color : "#665cff", payload: typeof item.payload === "object" && item.payload ? item.payload : {} });
+    const id = collaborator.saveMeetingItem({ id: Number.isInteger(item.id) ? item.id : undefined, meetingId, type, title: String(item.title).trim(), color: typeof item.color === "string" ? item.color : "#665cff", payload: typeof item.payload === "object" && item.payload ? item.payload : {} });
+    collaboratorChanged("meetings");
     return response.json({ id });
+  });
+  app.delete("/api/collaborator/meeting-items/:itemId", collaboratorOnly, (request, response) => {
+    const id = Number(request.params.itemId);
+    if (!Number.isInteger(id)) return response.status(400).json({ error: "Elemento inválido." });
+    collaborator.deleteMeetingItem(id);
+    collaboratorChanged("meetings");
+    return response.status(204).end();
+  });
+  app.post("/api/collaborator/meetings/:meetingId/reorder", collaboratorOnly, (request, response) => {
+    const meetingId = Number(request.params.meetingId);
+    const ids = Array.isArray(request.body?.ids) ? request.body.ids.map(Number).filter(Number.isInteger) : [];
+    if (!Number.isInteger(meetingId) || !ids.length) return response.status(400).json({ error: "Orden inválido." });
+    collaborator.reorderMeetingItems(meetingId, ids);
+    collaboratorChanged("meetings");
+    return response.status(204).end();
   });
   app.get("/api/bible/versions", (_req, res) => res.json(bible.listVersions()));
   app.get("/api/bible/books/:versionId", (req, res) => {
@@ -405,8 +448,9 @@ export function startRemoteServer(
   });
 
   io.on("connection", (socket) => {
-    const audienceOnly = socket.handshake.query.role === "live";
-    if (!audienceOnly) {
+    const role = socket.handshake.query.role;
+    const controller = role !== "live" && role !== "collaborator";
+    if (controller) {
       socket.join("projection-controllers");
       socket.emit("projection:state", getState());
       socket.on("projection:patch", (patch: ProjectionPatch) => applyPatch(patch));
@@ -523,12 +567,6 @@ const liveAudienceHtml = String.raw`<!doctype html>
 var code=location.pathname.split('/').filter(Boolean).pop(),socket=io({query:{role:'live'},timeout:5000,reconnection:true,reconnectionDelay:500,reconnectionDelayMax:3000}),lastHash='',statusEl=document.getElementById('status'),waiting=document.getElementById('waiting'),textWrap=document.getElementById('text-wrap'),content=document.getElementById('content'),title=document.getElementById('title'),alertEl=document.getElementById('alert'),slide=document.getElementById('slide'),viewers=document.getElementById('viewers');
 function showOnly(target){waiting.hidden=target!=='waiting';textWrap.hidden=target!=='text';slide.hidden=target!=='image'}
 socket.on('connect',function(){statusEl.textContent='Conectado';statusEl.classList.add('online');socket.emit('live:join',code)});socket.on('disconnect',function(){statusEl.textContent='Reconectando…';statusEl.classList.remove('online')});socket.on('live:error',function(message){showOnly('waiting');waiting.classList.add('ended');waiting.querySelector('strong').textContent=message});socket.on('live:ended',function(){showOnly('waiting');waiting.classList.add('ended');waiting.querySelector('strong').textContent='La transmisión finalizó.';statusEl.textContent='Finalizada';statusEl.classList.remove('online')});socket.on('live:viewers',function(count){viewers.textContent=count+' dispositivo'+(count===1?'':'s')+' conectado'+(count===1?'':'s')});socket.on('live:update',function(data){if(!data||data.hash===lastHash)return;lastHash=data.hash;waiting.classList.remove('ended');if(data.type==='waiting'){showOnly('waiting');waiting.querySelector('strong').textContent=data.message;return}if(data.type==='image'){if(slide.dataset.hash===data.hash)return;slide.onload=function(){slide.dataset.hash=data.hash;showOnly('image')};slide.src=data.url;return}content.innerHTML=data.html||'';content.style.fontFamily=data.fontFamily||'Inter';content.style.color=data.color||'#fff';content.style.textAlign=data.align||'center';title.textContent=data.title||'';title.hidden=!data.title;alertEl.textContent=data.alert||'';alertEl.classList.toggle('visible',Boolean(data.alert));showOnly('text')});
-</script></body></html>`;
-
-const collaboratorHtml = String.raw`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FL Proyector · Colaborador</title><style>
-:root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#edf0f8;background:#f3f5f9}*{box-sizing:border-box}body{margin:0}.top{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:#171a22;color:#fff;border-bottom:1px solid #303746}.brand{font-weight:800;letter-spacing:.04em}.brand i{display:inline-grid;place-items:center;width:28px;height:28px;margin-right:8px;border-radius:8px;background:#6046ec;font-style:normal}.mode{font-size:12px;color:#b9c2d6}.shell{display:grid;grid-template-columns:235px minmax(0,1fr);min-height:calc(100vh - 58px)}aside{padding:18px 12px;background:#20242e;color:#dbe0ec;border-right:1px solid #dce1ea}aside h3{font-size:11px;letter-spacing:.1em;color:#9da7ba;margin:8px 10px 10px}nav button{display:block;width:100%;border:0;border-radius:8px;padding:11px 12px;text-align:left;background:transparent;color:inherit;font:650 14px inherit}nav button.active{background:#e9e5ff;color:#432cb7}main{padding:28px;max-width:1200px;width:100%;margin:auto}.page-title{display:flex;align-items:start;justify-content:space-between;gap:16px;margin-bottom:20px}.page-title h1{margin:0;font-size:25px;color:#202532}.page-title p{margin:5px 0 0;color:#667188;font-size:14px}.panel{background:#fff;border:1px solid #dce1ea;border-radius:12px;box-shadow:0 3px 16px #2630480a}.toolbar{display:flex;gap:9px;align-items:center;padding:12px;border-bottom:1px solid #e7eaf0}.toolbar input{flex:1}.list{display:grid;gap:1px}.song,.meeting{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border-bottom:1px solid #edf0f4}.song:last-child,.meeting:last-child{border-bottom:0}.song b,.meeting b{display:block;color:#202532}.song span,.meeting span{color:#717b90;font-size:12px}.button,button{border:1px solid #c9d0df;border-radius:8px;padding:9px 12px;background:#fff;color:#252b38;font:700 13px inherit;cursor:pointer}.button.primary,button.primary{background:#5b42ea;border-color:#5b42ea;color:#fff}.button:disabled,button:disabled{opacity:.5;cursor:default}.edit{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}.form{padding:17px}.form label{display:grid;gap:6px;margin-bottom:14px;color:#586379;font-size:12px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd2df;border-radius:8px;padding:10px;font:15px inherit;color:#202532;background:#fff}textarea{min-height:330px;resize:vertical;line-height:1.5}.side-panel{padding:17px}.side-panel h3{margin:0 0 12px;font-size:15px}.item{padding:9px 0;border-bottom:1px solid #edf0f4;font-size:13px}.item:last-child{border:0}.row-actions{display:flex;gap:8px;flex-wrap:wrap}.empty{padding:30px;color:#788297;text-align:center}.login{display:grid;place-items:center;min-height:100vh;background:linear-gradient(135deg,#17182d,#0d1018)}.login-card{width:min(400px,calc(100% - 32px));padding:28px;background:#fff;border-radius:16px;box-shadow:0 20px 60px #0005}.login-card h1{margin:0 0 7px;color:#202532}.login-card p{margin:0 0 20px;color:#687389}.error{min-height:18px;color:#c5303f;font-size:13px;margin:8px 0}.hidden{display:none!important}@media(max-width:760px){.shell{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid #dce1ea;padding:8px;overflow:auto}aside h3{display:none}nav{display:flex;gap:5px}nav button{white-space:nowrap;width:auto}.edit{grid-template-columns:1fr}main{padding:16px}.top{padding:0 15px}}
-</style></head><body><section id="login" class="login"><form id="login-form" class="login-card"><h1>FL Proyector</h1><p>Acceso de colaborador. Podés preparar reuniones y editar canciones, sin controlar la pantalla de proyección.</p><label>Código de acceso<input id="access-code" type="password" autocomplete="current-password" required autofocus></label><div id="login-error" class="error"></div><button class="primary" type="submit">Ingresar</button></form></section><section id="app" class="hidden"><header class="top"><div class="brand"><i>▤</i>FL PROYECTOR</div><div class="mode">MODO COLABORADOR · sin acceso al proyector</div><button id="logout">Salir</button></header><div class="shell"><aside><h3>PREPARACIÓN</h3><nav><button class="active" data-page="songs">Canciones</button><button data-page="meetings">Reuniones</button></nav></aside><main><section id="songs-page"><div class="page-title"><div><h1>Canciones</h1><p>Creá y corregí los cánticos de la biblioteca.</p></div><button id="new-song" class="primary">+ Nueva canción</button></div><div class="edit"><div class="panel"><div class="toolbar"><input id="song-search" placeholder="Buscar canción"></div><div id="song-list" class="list"></div></div><form id="song-form" class="panel form"><input id="song-id" type="hidden"><label>Título<input id="song-title" required placeholder="Título de la canción"></label><label>Letra<textarea id="song-content" placeholder="Pegá la letra aquí. Cada párrafo es una estrofa."></textarea></label><div class="row-actions"><button class="primary" type="submit">Guardar canción</button></div></form></div></section><section id="meetings-page" class="hidden"><div class="page-title"><div><h1>Reuniones</h1><p>Armá el orden del culto mientras otro operador proyecta.</p></div><button id="new-meeting" class="primary">+ Nueva reunión</button></div><div class="edit"><div class="panel"><div id="meeting-list" class="list"></div></div><div class="panel side-panel"><h3 id="meeting-title">Elegí una reunión</h3><div id="meeting-items" class="empty">Seleccioná una reunión para ver su orden.</div><div id="add-song-row" class="hidden"><h3>Agregar canción</h3><select id="add-song-select"></select><button id="add-song" class="primary">Agregar al culto</button></div></div></div></section></main></div></section><script>
-var selectedSong=null,selectedMeeting=null,songs=[];function api(path,options){return fetch(path,options).then(function(r){if(r.status===401){showLogin();throw new Error("Sesión vencida");}if(!r.ok)return r.json().catch(function(){return {error:"No se pudo guardar"};}).then(function(x){throw new Error(x.error);});return r.status===204?null:r.json();});}function showLogin(){document.getElementById('app').classList.add('hidden');document.getElementById('login').classList.remove('hidden')}function showApp(){document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden');loadSongs();loadMeetings()}function esc(v){return String(v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]})}function loadSongs(){api('/api/collaborator/songs').then(function(data){songs=data;renderSongs();document.getElementById('add-song-select').innerHTML=songs.map(function(s){return '<option value="'+s.id+'">'+esc(s.title)+'</option>'}).join('');});}function renderSongs(){var query=document.getElementById('song-search').value.toLowerCase();var filtered=songs.filter(function(s){return (s.title+' '+s.content).toLowerCase().includes(query)});document.getElementById('song-list').innerHTML=filtered.length?filtered.map(function(s){return '<button class="song" data-id="'+s.id+'"><span><b>'+esc(s.title)+'</b><span>'+esc(s.categoryName||'Sin categoría')+'</span></span><span>Editar</span></button>'}).join(''):'<div class="empty">No se encontraron canciones.</div>';document.querySelectorAll('.song').forEach(function(b){b.onclick=function(){var song=songs.find(function(s){return s.id===Number(b.dataset.id)});selectSong(song)}})}function selectSong(song){selectedSong=song;document.getElementById('song-id').value=song.id;document.getElementById('song-title').value=song.title;document.getElementById('song-content').value=(song.content||'').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ')}function newSong(){selectedSong=null;document.getElementById('song-form').reset();document.getElementById('song-id').value='';document.getElementById('song-title').focus()}function loadMeetings(){api('/api/collaborator/meetings').then(function(data){document.getElementById('meeting-list').innerHTML=data.length?data.map(function(m){return '<button class="meeting" data-id="'+m.id+'"><span><b>'+esc(m.name)+'</b><span>'+m.itemCount+' ítems</span></span><span>›</span></button>'}).join(''):'<div class="empty">Todavía no hay reuniones.</div>';document.querySelectorAll('.meeting').forEach(function(b){b.onclick=function(){selectMeeting(Number(b.dataset.id),data)}});});}function selectMeeting(id,meetings){selectedMeeting=meetings.find(function(m){return m.id===id});document.getElementById('meeting-title').textContent=selectedMeeting.name;document.getElementById('add-song-row').classList.remove('hidden');loadItems();}function loadItems(){if(!selectedMeeting)return;api('/api/collaborator/meetings/'+selectedMeeting.id+'/items').then(function(items){document.getElementById('meeting-items').innerHTML=items.length?items.map(function(i){return '<div class="item"><b>'+esc(i.title)+'</b><br><span>'+esc(i.type)+'</span></div>'}).join(''):'<div class="empty">Sin ítems todavía.</div>';});}document.getElementById('login-form').onsubmit=function(e){e.preventDefault();var error=document.getElementById('login-error');error.textContent='';api('/api/collaborator/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:document.getElementById('access-code').value})}).then(showApp).catch(function(e){error.textContent=e.message})};document.getElementById('logout').onclick=function(){api('/api/collaborator/logout',{method:'POST'}).finally(showLogin)};document.querySelectorAll('nav button').forEach(function(b){b.onclick=function(){document.querySelectorAll('nav button').forEach(function(x){x.classList.remove('active')});b.classList.add('active');document.getElementById('songs-page').classList.toggle('hidden',b.dataset.page!=='songs');document.getElementById('meetings-page').classList.toggle('hidden',b.dataset.page!=='meetings')}});document.getElementById('new-song').onclick=newSong;document.getElementById('song-search').oninput=renderSongs;document.getElementById('song-form').onsubmit=function(e){e.preventDefault();var id=Number(document.getElementById('song-id').value)||undefined;api('/api/collaborator/songs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,title:document.getElementById('song-title').value,content:document.getElementById('song-content').value})}).then(function(){newSong();loadSongs();})};document.getElementById('new-meeting').onclick=function(){var name=prompt('Nombre de la reunión');if(name)api('/api/collaborator/meetings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})}).then(loadMeetings)};document.getElementById('add-song').onclick=function(){if(!selectedMeeting)return;var song=songs.find(function(s){return s.id===Number(document.getElementById('add-song-select').value)});if(!song)return;api('/api/collaborator/meetings/'+selectedMeeting.id+'/items',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'song',title:song.title,color:song.color,payload:{songId:song.id,content:song.content}})}).then(function(){loadItems();loadMeetings();})};api('/api/collaborator/session').then(function(s){if(s.authenticated)showApp();else showLogin()});
 </script></body></html>`;
 
 const remoteIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="118" fill="#5b42ea"/><path fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round" d="M136 206h240M136 306h160M365 303h12"/><rect x="112" y="153" width="288" height="206" rx="30" fill="none" stroke="#fff" stroke-width="25"/></svg>`;

@@ -82,6 +82,11 @@ contextBridge.exposeInMainWorld("flProyector", {
   deleteMeetingItem: (id) => ipcRenderer.invoke("meeting-items:delete", id),
   reorderMeetingItems: (meetingId, ids) =>
     ipcRenderer.invoke("meeting-items:reorder", meetingId, ids),
+  onLibraryChanged: (callback) => {
+    const listener = (_event, scope) => callback(scope);
+    ipcRenderer.on("library:changed", listener);
+    return () => ipcRenderer.removeListener("library:changed", listener);
+  },
   importPresentation: () => ipcRenderer.invoke("presentation:import"),
   openPresentation: (path) => ipcRenderer.invoke("presentation:open", path),
   openExternal: (url) => ipcRenderer.invoke("app:open-external", url),

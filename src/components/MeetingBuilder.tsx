@@ -304,6 +304,16 @@ export function MeetingBuilder({
   useEffect(() => {
     reloadItems();
   }, [meetingId, focusedItemId]);
+  useEffect(
+    () => window.flProyector.onLibraryChanged((scope) => {
+      if (scope === "songs") window.flProyector.listSongs().then(setSongs);
+      if (scope === "meetings") {
+        reloadMeetings();
+        reloadItems();
+      }
+    }),
+    [meetingId, focusedItemId, selected?.id],
+  );
   useEffect(() => {
     setActiveStanza(0);
   }, [selected?.id]);

@@ -986,8 +986,16 @@ if (hasSingleInstanceLock)
       saveSong: (song) => database.saveSong(song),
       listMeetings: () => database.listMeetings(),
       createMeeting: (name, date) => database.createMeeting(name, date),
+      updateMeeting: (id, patch) => database.updateMeeting(id, patch),
+      deleteMeeting: (id) => database.deleteMeeting(id),
       listMeetingItems: (meetingId) => database.listMeetingItems(meetingId),
       saveMeetingItem: (item) => database.saveMeetingItem(item),
+      deleteMeetingItem: (id) => database.deleteMeetingItem(id),
+      reorderMeetingItems: (meetingId, ids) => database.reorderMeetingItems(meetingId, ids),
+      notifyChanged: (scope) => {
+        if (controlWindow && !controlWindow.isDestroyed())
+          controlWindow.webContents.send("library:changed", scope);
+      },
     });
     await syncMedia();
     chokidar

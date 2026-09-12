@@ -143,6 +143,12 @@ export function SongLibrary({
   useEffect(() => {
     reload();
   }, [query, categoryId]);
+  useEffect(
+    () => window.flProyector.onLibraryChanged((scope) => {
+      if (scope === "songs") reload();
+    }),
+    [query, categoryId],
+  );
   useEffect(() => {
     editor?.setEditable(editing);
   }, [editor, editing]);

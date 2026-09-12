@@ -96,6 +96,7 @@ declare global {
       ): Promise<number>;
       deleteMeetingItem(id: number): Promise<void>;
       reorderMeetingItems(meetingId: number, ids: number[]): Promise<void>;
+      onLibraryChanged(callback: (scope: "songs" | "meetings") => void): () => void;
       importPresentation(): Promise<{
         path: string;
         url: string;
