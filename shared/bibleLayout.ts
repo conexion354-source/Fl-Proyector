@@ -2,20 +2,50 @@ import type { BibleDisplaySettings } from "./types.js";
 
 export type ProjectionDimensions = { width: number; height: number };
 
-const glyphWidth = (character: string, fontSize: number) => {
-  if (/\s/.test(character)) return fontSize * 0.32;
-  if (/[ilI1|.,:;'!]/.test(character)) return fontSize * 0.29;
-  if (/[mwMW@#%&]/.test(character)) return fontSize * 0.86;
-  if (/[A-ZÁÉÍÓÚÑ]/.test(character)) return fontSize * 0.64;
-  if (/[0-9]/.test(character)) return fontSize * 0.56;
-  return fontSize * 0.52;
+const fontWidthScale = (fontFamily: string) => {
+  const family = fontFamily.toLocaleLowerCase("en-US");
+  if (family.includes("bebas")) return 0.68;
+  if (family.includes("courier")) return 1.12;
+  if (family.includes("verdana")) return 1.06;
+  if (family.includes("trebuchet")) return 0.98;
+  if (family.includes("raleway")) return 0.94;
+  return 1;
 };
 
-const wordWidth = (word: string, fontSize: number) =>
-  Array.from(word).reduce(
-    (width, character) => width + glyphWidth(character, fontSize),
+const glyphWidth = (
+  character: string,
+  fontSize: number,
+  fontFamily: string,
+) => {
+  const scale = fontWidthScale(fontFamily);
+  if (/\s/.test(character)) return fontSize * 0.32 * scale;
+  if (/[ilI1|.,:;'!]/.test(character)) return fontSize * 0.29 * scale;
+  if (/[mwMW@#%&]/.test(character)) return fontSize * 0.86 * scale;
+  if (/[A-ZÁÉÍÓÚÑ]/.test(character)) return fontSize * 0.64 * scale;
+  if (/[0-9]/.test(character)) return fontSize * 0.56 * scale;
+  return fontSize * 0.52 * scale;
+};
+
+let measureContext: CanvasRenderingContext2D | null | undefined;
+
+const measuredWidth = (
+  text: string,
+  settings: BibleDisplaySettings,
+) => {
+  if (typeof document !== "undefined") {
+    if (measureContext === undefined)
+      measureContext = document.createElement("canvas").getContext("2d");
+    if (measureContext) {
+      measureContext.font = `700 ${settings.textFontSize}px ${settings.textFontFamily}`;
+      return measureContext.measureText(text).width;
+    }
+  }
+  return Array.from(text).reduce(
+    (width, character) =>
+      width + glyphWidth(character, settings.textFontSize, settings.textFontFamily),
     0,
   ) * 1.04;
+};
 
 /**
  * Wraps exactly as the projector is expected to wrap: one word at a time,
@@ -34,13 +64,13 @@ export function bibleTextLines(
   if (!words.length) return [];
   const lines: string[][] = [[]];
   let usedWidth = 0;
-  const spaceWidth = glyphWidth(" ", settings.textFontSize);
+  const spaceWidth = measuredWidth(" ", settings);
   for (let index = 0; index < words.length; index += 1) {
-    const measuredWidth = wordWidth(words[index], settings.textFontSize);
-    const nextWidth = usedWidth + (lines.at(-1)!.length ? spaceWidth : 0) + measuredWidth;
+    const currentWordWidth = measuredWidth(words[index], settings);
+    const nextWidth = usedWidth + (lines.at(-1)!.length ? spaceWidth : 0) + currentWordWidth;
     if (lines.at(-1)!.length && nextWidth > lineWidth) {
       lines.push([words[index]]);
-      usedWidth = measuredWidth;
+      usedWidth = currentWordWidth;
     } else {
       lines.at(-1)!.push(words[index]);
       usedWidth = nextWidth;
@@ -65,7 +95,10 @@ export function bibleTextCapacity(
   const height = Math.max(240, viewport.height || 1080);
   const usableWidth = width * (1 - (settings.horizontalMargin * 2) / 100);
   const usableHeight = height * (1 - (settings.verticalMargin * 2) / 100);
-  const averageGlyphWidth = Math.max(5, settings.textFontSize * 0.53);
+  const averageGlyphWidth = Math.max(
+    5,
+    settings.textFontSize * 0.53 * fontWidthScale(settings.textFontFamily),
+  );
   const charactersPerLine = Math.max(
     10,
     Math.floor(usableWidth / averageGlyphWidth),

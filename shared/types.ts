@@ -118,7 +118,16 @@ export type BibleDisplaySettings = {
   textShadowBlur: number;
   referenceColor: string;
   referenceBackground: string;
-  referenceStyle: "minimal" | "pill" | "bar" | "glass" | "underline" | "ribbon";
+  referenceStyle:
+    | "minimal"
+    | "pill"
+    | "bar"
+    | "glass"
+    | "underline"
+    | "ribbon"
+    | "lower-third"
+    | "broadcast";
+  referenceAnimation: "none" | "fade" | "slide-left" | "slide-up" | "zoom";
   referencePosition: "before" | "after";
   fillScreen: boolean;
   horizontalMargin: number;
@@ -138,7 +147,16 @@ export type SongDisplaySettings = {
   position: "top" | "center" | "bottom" | "lower";
   align: "left" | "center" | "right";
   borderRadius: number;
-  template: "plain" | "classic" | "accent" | "glass" | "solid" | "gradient";
+  template:
+    | "plain"
+    | "classic"
+    | "accent"
+    | "glass"
+    | "solid"
+    | "gradient"
+    | "lower-third"
+    | "broadcast"
+    | "glass-accent";
   showTitle: boolean;
   titleColor: string;
   titleBackground: string;
@@ -185,6 +203,7 @@ export const initialBibleDisplaySettings: BibleDisplaySettings = {
   referenceColor: "#ffffff",
   referenceBackground: "#4f46e5",
   referenceStyle: "pill",
+  referenceAnimation: "fade",
   referencePosition: "after",
   fillScreen: false,
   horizontalMargin: 8,
@@ -272,7 +291,8 @@ export type ProjectionState = {
     backgroundColor: string;
     position: "top" | "center" | "bottom" | "lower";
     borderRadius: number;
-    template: "plain" | "classic" | "accent" | "glass" | "solid" | "gradient";
+    template: SongDisplaySettings["template"];
+    animation: "none" | "fade" | "slide-left" | "slide-up" | "zoom";
     shadowEnabled: boolean;
     shadowColor: string;
     shadowBlur: number;
@@ -319,6 +339,7 @@ export const initialProjectionState: ProjectionState = {
     position: "center",
     borderRadius: 12,
     template: "plain",
+    animation: "fade",
     shadowEnabled: true,
     shadowColor: "#000000",
     shadowBlur: 14,

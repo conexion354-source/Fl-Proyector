@@ -991,7 +991,7 @@ html[data-theme="light"] .about-dialog > small {
 .projection-stage {
   position: absolute;
   inset: 0;
-  background: #000;
+  background: transparent;
   overflow: hidden;
 }
 .projection-background,

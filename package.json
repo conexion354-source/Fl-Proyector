@@ -1,6 +1,6 @@
 {
   "name": "fl-proyector",
-  "version": "10.11.4",
+  "version": "10.11.5",
   "description": "Software de proyeccion profesional para iglesias",
   "repository": {
     "type": "git",
@@ -23,7 +23,9 @@
   "dependencies": {
     "@ai-sdk/react": "^4.0.96",
     "@fontsource/bebas-neue": "^5.3.0",
+    "@fontsource/montserrat": "^5.3.0",
     "@fontsource/noto-sans": "^5.3.0",
+    "@fontsource/oswald": "^5.3.0",
     "@fontsource/raleway": "^5.3.0",
     "@tiptap/extension-color": "latest",
     "@tiptap/extension-font-family": "latest",

@@ -362,7 +362,7 @@ if (!window.flProyector) {
     },
     getUpdateStatus: async () => ({
       state: "development",
-      currentVersion: "10.11.4",
+      currentVersion: "10.11.5",
       availableVersion: null,
       progress: null,
       message: "La búsqueda está desactivada mientras se prueba el sistema.",
@@ -370,7 +370,7 @@ if (!window.flProyector) {
     }),
     getReleaseHistory: async () => [
       {
-        version: "10.11.4",
+        version: "10.11.5",
         title: "Versículos completos y división A/B inteligente",
         publishedAt: "2026-09-11T16:55:00Z",
         changes: [

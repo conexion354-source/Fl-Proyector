@@ -205,7 +205,7 @@ export function App() {
           <i className={status.open ? "live" : ""} />
           {status.open ? "Proyección activa" : "Salida cerrada"} ·{" "}
           {status.displays.length} monitor
-          {status.displays.length !== 1 ? "ES" : ""}
+          {status.displays.length !== 1 ? "es" : ""}
         </div>
         <button
           className={status.open ? "project-button active" : "project-button"}

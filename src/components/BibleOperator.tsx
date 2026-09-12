@@ -206,9 +206,12 @@ export function BibleOperator({
     state.outputViewport.width,
     state.outputViewport.height,
     state.bibleStyle.textFontSize,
+    state.bibleStyle.textFontFamily,
+    state.bibleStyle.uppercase,
     state.bibleStyle.referenceFontSize,
     state.bibleStyle.showReference,
     state.bibleStyle.showVersion,
+    state.bibleStyle.referencePosition,
     state.bibleStyle.horizontalMargin,
     state.bibleStyle.verticalMargin,
     state.bibleStyle.maxLinesPerSlide,
@@ -256,7 +259,11 @@ export function BibleOperator({
     if (selected.source === "slide" && selected.slideIndex !== undefined) {
       const slides = activeSlides.map((slide, index) =>
         index === selected.slideIndex
-          ? { ...slide, html: slide.html.replace(escapedText, markedText) }
+          ? {
+              ...slide,
+              html: slide.html.replace(escapedText, markedText),
+              contentHtml: slide.contentHtml.replace(escapedText, markedText),
+            }
           : slide,
       );
       setActiveSlides(slides);
@@ -275,10 +282,8 @@ export function BibleOperator({
       state.outputViewport,
     ).map((slide) => ({
       ...slide,
-      html: slide.html.replace(
-        escapedText,
-        markedText,
-      ),
+      html: slide.html.replace(escapedText, markedText),
+      contentHtml: slide.contentHtml.replace(escapedText, markedText),
     }));
     setActiveVerse(verseKey(selected.verse));
     setActiveSlides(slides);
@@ -483,7 +488,7 @@ export function BibleOperator({
                       0,
                     )
                   }
-                  dangerouslySetInnerHTML={{ __html: slide.html }}
+                  dangerouslySetInnerHTML={{ __html: slide.contentHtml }}
                 />
               </button>
             ))}

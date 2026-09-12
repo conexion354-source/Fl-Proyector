@@ -730,6 +730,7 @@ export function SongLibrary({
             <button
               type="button"
               className="dialog-close"
+              aria-label="Cerrar"
               onClick={() => setRenamingSong(null)}
             >
               <X />
@@ -781,6 +782,7 @@ export function SongLibrary({
             <button
               type="button"
               className="dialog-close"
+              aria-label="Cerrar"
               onClick={() => setNewSongDialog(false)}
             >
               <X />
@@ -822,6 +824,7 @@ export function SongLibrary({
             <button
               type="button"
               className="dialog-close"
+              aria-label="Cerrar"
               onClick={() => setNewCategoryDialog(false)}
             >
               <X />

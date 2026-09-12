@@ -514,6 +514,33 @@
   backdrop-filter: blur(3px);
   background: #ffffff33;
 }
+.design-lower-third:after {
+  left: 5px;
+  right: 12px;
+  height: 12px;
+  bottom: 4px;
+  border-left: 4px solid #60aee8;
+  background: linear-gradient(90deg, #5f6879, transparent);
+}
+.design-broadcast:after {
+  left: 5px;
+  right: 8px;
+  height: 12px;
+  bottom: 4px;
+  border-left: 4px solid #ef4444;
+  border-bottom: 2px solid #ef4444;
+  clip-path: polygon(0 0, 88% 0, 100% 100%, 0 100%);
+}
+.design-glass-accent:after {
+  left: 6px;
+  right: 6px;
+  height: 14px;
+  bottom: 4px;
+  border: 1px solid #ffffff55;
+  border-left: 4px solid #8b7cff;
+  border-radius: 5px;
+  background: #ffffff2b;
+}
 .design-top:after {
   left: 0;
   right: 0;
@@ -530,6 +557,20 @@
   display: grid;
   grid-template-columns: 1fr 140px;
   gap: 8px;
+}
+.announcement-animation-field,
+.reference-animation-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 10px;
+  color: #747c8c;
+  font-size: 9px;
+}
+.announcement-animation-field select,
+.reference-animation-field select {
+  width: 100%;
 }
 .design-fields label {
   display: flex;
@@ -622,6 +663,135 @@
     #4338cacc 65%,
     transparent 100%
   );
+}
+
+/* Professional announcement lower thirds. They use the existing background
+   and text color controls, so every design remains fully customizable. */
+.projection-text.template-lower-third.position-lower,
+.projection-text.template-broadcast.position-lower,
+.projection-text.template-glass-accent.position-lower {
+  left: 6%;
+  right: auto;
+  bottom: 8%;
+  width: max-content;
+  min-width: 38%;
+  max-width: 82%;
+  padding: 0.34em 0.78em;
+  overflow: hidden;
+  text-align: left !important;
+}
+.projection-text.template-lower-third {
+  border-left: 0.18em solid currentColor;
+  background-color: transparent !important;
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--projection-panel-color) 88%, #080c16),
+    color-mix(in srgb, var(--projection-panel-color) 74%, transparent) 78%,
+    transparent
+  );
+  box-shadow: 0 0.22em 0.7em rgb(0 0 0 / 42%);
+}
+.projection-text.template-broadcast {
+  border-left: 0.2em solid currentColor;
+  border-bottom: 0.08em solid currentColor;
+  clip-path: polygon(0 0, 94% 0, 100% 100%, 0 100%);
+  background-color: transparent !important;
+  background-image: linear-gradient(
+    105deg,
+    color-mix(in srgb, var(--projection-panel-color) 90%, #080c16),
+    color-mix(in srgb, var(--projection-panel-color) 82%, transparent) 72%,
+    transparent 72%
+  );
+  box-shadow: 0 0.22em 0.8em rgb(0 0 0 / 46%);
+}
+.projection-text.template-glass-accent {
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-left: 0.18em solid currentColor;
+  background-color: color-mix(
+    in srgb,
+    var(--projection-panel-color) 58%,
+    transparent
+  ) !important;
+  backdrop-filter: blur(16px) saturate(135%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 7%),
+    0 0.24em 0.9em rgb(0 0 0 / 38%);
+}
+
+.projection-text.layer-visible.projection-animation-fade {
+  animation: projection-text-fade 0.42s ease-out both;
+}
+.projection-text.layer-visible.projection-animation-slide-left {
+  animation: projection-text-slide-left 0.48s cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+.projection-text.layer-visible.projection-animation-slide-up {
+  animation: projection-text-slide-up 0.46s cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+.projection-text.layer-visible.projection-animation-zoom {
+  animation: projection-text-zoom 0.4s ease-out both;
+}
+@keyframes projection-text-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes projection-text-slide-left {
+  from { opacity: 0; translate: -6vw 0; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes projection-text-slide-up {
+  from { opacity: 0; translate: 0 5vh; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes projection-text-zoom {
+  from { opacity: 0; scale: 0.94; }
+  to { opacity: 1; scale: 1; }
+}
+
+.bible-reference-label.reference-style-lower-third,
+.bible-reference-label.reference-style-broadcast {
+  min-width: 34%;
+  margin-inline: 0 auto;
+  justify-content: flex-start;
+}
+.bible-reference-label.reference-style-lower-third {
+  padding-inline: 0.72em 2.2em;
+}
+.bible-reference-label.reference-style-broadcast {
+  padding-inline: 0.72em 1.7em;
+}
+.bible-reference-label.reference-animation-fade {
+  animation: reference-fade 0.4s ease-out both;
+}
+.bible-reference-label.reference-animation-slide-left {
+  animation: reference-slide-left 0.48s cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+.bible-reference-label.reference-animation-slide-up {
+  animation: reference-slide-up 0.44s cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+.bible-reference-label.reference-animation-zoom {
+  animation: reference-zoom 0.38s ease-out both;
+}
+@keyframes reference-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes reference-slide-left {
+  from { opacity: 0; translate: -5vw 0; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes reference-slide-up {
+  from { opacity: 0; translate: 0 3vh; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes reference-zoom {
+  from { opacity: 0; scale: 0.92; }
+  to { opacity: 1; scale: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .projection-text[class*="projection-animation-"],
+  .bible-reference-label[class*="reference-animation-"] {
+    animation: none !important;
+  }
 }
 
 /* Editor visual de anuncios y textos */

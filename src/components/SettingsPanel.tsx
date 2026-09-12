@@ -65,6 +65,8 @@ const referenceDesigns: Array<{
   { value: "glass", label: "Cristal", detail: "Transparente" },
   { value: "underline", label: "Subrayado", detail: "Acento sutil" },
   { value: "ribbon", label: "Cinta", detail: "Etiqueta gráfica" },
+  { value: "lower-third", label: "Lower third", detail: "Franja profesional" },
+  { value: "broadcast", label: "TV en vivo", detail: "Doble acento" },
 ];
 const longBiblePreviewPassage =
   "Porque de tal manera amó Dios al mundo, que ha dado á su Hijo unigénito, para que todo aquel que en él cree, no se pierda, mas tenga vida eterna. Porque no envió Dios á su Hijo al mundo, para que condene al mundo, mas para que el mundo sea salvo por él. El que en él cree, no es condenado; mas el que no cree, ya es condenado, porque no creyó en el nombre del unigénito Hijo de Dios.";
@@ -200,7 +202,9 @@ export function SettingsPanel({
   const reloadVersions = () =>
     window.flProyector.listBibleVersions().then(setVersions);
   useEffect(() => {
-    window.flProyector.getDisplaySettings().then(setSettings);
+    window.flProyector.getDisplaySettings().then((saved) =>
+      setSettings(saved.aspectRatio === "custom" ? { ...saved, aspectRatio: "auto" } : saved),
+    );
     window.flProyector.getChurchSettings().then(setChurch);
     window.flProyector.getBibleDisplaySettings().then(setBible);
     window.flProyector.getSongDisplaySettings().then(setSongStyle);
@@ -212,9 +216,47 @@ export function SettingsPanel({
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("fl-interface-theme", theme);
   }, [theme]);
+  const effectiveMainDisplay =
+    displays.find((display) => display.id === settings.mainDisplayId) ??
+    displays.find((display) => !display.primary) ??
+    displays.find((display) => display.primary);
+  const availableThirdDisplays = displays.filter(
+    (display) =>
+      !display.primary && display.id !== effectiveMainDisplay?.id,
+  );
+  useEffect(() => {
+    if (
+      !settings.thirdDisplayEnabled ||
+      availableThirdDisplays.some(
+        (display) => display.id === settings.thirdDisplayId,
+      )
+    )
+      return;
+    setSettings((value) => ({
+      ...value,
+      thirdDisplayEnabled: false,
+      thirdDisplayId: null,
+    }));
+  }, [
+    settings.mainDisplayId,
+    settings.thirdDisplayEnabled,
+    settings.thirdDisplayId,
+    displays,
+  ]);
   const saveDisplay = async () => {
     await withSaveNotification(
-      () => window.flProyector.saveDisplaySettings(settings),
+      () => {
+        if (
+          settings.thirdDisplayEnabled &&
+          !availableThirdDisplays.some(
+            (display) => display.id === settings.thirdDisplayId,
+          )
+        )
+          throw new Error(
+            "Elegí una tercera pantalla externa distinta de la salida principal.",
+          );
+        return window.flProyector.saveDisplaySettings(settings);
+      },
       "La configuración de pantallas fue guardada.",
     );
   };
@@ -874,7 +916,6 @@ export function SettingsPanel({
                     <option>16:9</option>
                     <option>16:10</option>
                     <option>4:3</option>
-                    <option>custom</option>
                   </select>
                 </label>
                 <label>
@@ -908,10 +949,21 @@ export function SettingsPanel({
             <ExpanderRow
               className="third-display-expander"
               title="Habilitar tercera pantalla"
-              description="Duplica la salida de proyección en otro monitor conectado."
+              description={
+                availableThirdDisplays.length
+                  ? "Duplica la salida en otro monitor externo conectado."
+                  : "Conectá dos pantallas externas para habilitar esta salida."
+              }
               checked={settings.thirdDisplayEnabled}
+              disabled={!availableThirdDisplays.length}
               onCheckedChange={(thirdDisplayEnabled) =>
-                setSettings((value) => ({ ...value, thirdDisplayEnabled }))
+                setSettings((value) => ({
+                  ...value,
+                  thirdDisplayEnabled,
+                  thirdDisplayId: thirdDisplayEnabled
+                    ? value.thirdDisplayId ?? availableThirdDisplays[0]?.id ?? null
+                    : value.thirdDisplayId,
+                }))
               }
             >
               <div className="win11-expander-grid single-column">
@@ -929,7 +981,7 @@ export function SettingsPanel({
                     }
                   >
                     <option value="">Seleccionar pantalla</option>
-                    {displays.map((display) => (
+                    {availableThirdDisplays.map((display) => (
                       <option value={display.id} key={display.id}>
                         {display.label} · {display.width}×{display.height}
                       </option>
@@ -1085,6 +1137,25 @@ export function SettingsPanel({
                       }
                     />
                   </div>
+                  <label className="reference-animation-field">
+                    Aparición del zócalo
+                    <select
+                      value={bible.referenceAnimation}
+                      onChange={(event) =>
+                        setBible((value) => ({
+                          ...value,
+                          referenceAnimation: event.target
+                            .value as BibleDisplaySettings["referenceAnimation"],
+                        }))
+                      }
+                    >
+                      <option value="none">Sin movimiento</option>
+                      <option value="fade">Aparecer suavemente</option>
+                      <option value="slide-left">Entrar desde la izquierda</option>
+                      <option value="slide-up">Subir desde abajo</option>
+                      <option value="zoom">Zoom suave</option>
+                    </select>
+                  </label>
                 </div>
                 <div className="settings-card bible-typography">
                   <h3>Texto del versículo</h3>
@@ -1317,7 +1388,9 @@ export function SettingsPanel({
           <div className="modal-backdrop">
             <div className="reference-design-dialog">
               <button
+                type="button"
                 className="dialog-close"
+                aria-label="Cerrar"
                 onClick={() => setReferenceDesignOpen(false)}
               >
                 <X />

@@ -167,6 +167,7 @@ export function ProjectionStage({
     textAlign: state.text.align,
     color: state.text.color,
     backgroundColor: state.text.backgroundColor,
+    "--projection-panel-color": state.text.backgroundColor,
     borderRadius: `${state.text.borderRadius}px`,
     textShadow: state.text.shadowEnabled
       ? `0 3px ${state.text.shadowBlur}px ${state.text.shadowColor}`
@@ -257,8 +258,9 @@ export function ProjectionStage({
       </div>
 
       <div
+        key={`${state.text.kind}-${state.text.visible}-${state.text.html}-${state.text.animation}`}
         ref={textRef}
-        className={`projection-text position-${state.text.position} template-${state.text.template} ${projectionSafeArea ? "projection-safe-area" : ""} ${bibleSafeArea ? "bible-safe-area" : ""} ${bibleFill ? "bible-fill" : ""} ${fitText ? "auto-fit-text" : ""} ${state.text.visible ? "layer-visible" : "layer-hidden"}`}
+        className={`projection-text position-${state.text.position} template-${state.text.template} projection-animation-${state.text.kind === "anuncio" ? state.text.animation : "none"} ${projectionSafeArea ? "projection-safe-area" : ""} ${bibleSafeArea ? "bible-safe-area" : ""} ${bibleFill ? "bible-fill" : ""} ${fitText ? "auto-fit-text" : ""} ${state.text.visible ? "layer-visible" : "layer-hidden"}`}
         style={textStyle}
         dangerouslySetInnerHTML={{ __html: projectedHtml }}
       />
@@ -274,6 +276,9 @@ export function ProjectionStage({
                 : state.text.titleBackground,
             fontSize: `${state.text.titleFontSize * (preview ? 0.28 : 1)}px`,
             textTransform: state.songStyle.uppercase ? "uppercase" : "none",
+            textShadow: state.text.shadowEnabled
+              ? `0 3px ${state.text.shadowBlur}px ${state.text.shadowColor}`
+              : "none",
           }}
         >
           {state.text.title}

@@ -440,6 +440,8 @@ export function MeetingBuilder({
             backgroundColor: "#00000099",
             align: "center",
             borderRadius: 12,
+            template: "lower-third",
+            animation: "slide-left",
             shadowEnabled: true,
             shadowColor: "#000000",
             shadowBlur: 14,
@@ -927,6 +929,11 @@ export function MeetingBuilder({
         align: payload.align || "center",
         borderRadius: Number(payload.borderRadius || 0),
         template: payload.template || "plain",
+        animation: payload.animation || "fade",
+        fontFamily: payload.fontFamily || "Inter",
+        shadowEnabled: payload.shadowEnabled !== false,
+        shadowColor: payload.shadowColor || "#000000",
+        shadowBlur: Number(payload.shadowBlur ?? 14),
       },
     });
   };
@@ -1191,6 +1198,7 @@ export function MeetingBuilder({
             <button
               type="button"
               className="dialog-close"
+              aria-label="Cerrar"
               onClick={() => setNewMeeting(null)}
             >
               <X />
@@ -1353,6 +1361,7 @@ export function MeetingBuilder({
             <button
               type="button"
               className="dialog-close"
+              aria-label="Cerrar"
               onClick={() => setRenamingMeeting(null)}
             >
               <X />
@@ -1393,7 +1402,7 @@ export function MeetingBuilder({
           <div
             className={`item-edit-dialog ${["announcement", "bible"].includes(selected.type) ? "visual-dialog" : ""} ${selected.type === "announcement" ? "announcement-visual-dialog" : ""} ${selected.type === "song" ? "song-edit-dialog" : ""}`}
           >
-            <button className="dialog-close" onClick={closeEditor}>
+            <button type="button" className="dialog-close" aria-label="Cerrar" onClick={closeEditor}>
               <X />
             </button>
             <ItemEditor
@@ -1436,7 +1445,9 @@ export function MeetingBuilder({
         <div className="modal-backdrop">
           <div className="background-assignment-dialog">
             <button
+              type="button"
               className="dialog-close"
+              aria-label="Cerrar"
               onClick={() => setBackgroundTarget(null)}
             >
               <X />
@@ -1724,7 +1735,7 @@ function LibraryPicker({
   return (
     <div className="modal-backdrop">
       <div className="library-picker">
-        <button className="dialog-close" onClick={onClose}>
+        <button type="button" className="dialog-close" aria-label="Cerrar" onClick={onClose}>
           <X />
         </button>
         <span className="eyebrow">AGREGAR A LA REUNIÓN</span>
@@ -1870,7 +1881,7 @@ function BiblePicker({
   return (
     <div className="modal-backdrop">
       <div className="bible-picker">
-        <button className="dialog-close" onClick={onClose}>
+        <button type="button" className="dialog-close" aria-label="Cerrar" onClick={onClose}>
           <X />
         </button>
         <span className="eyebrow">AGREGAR CITA A LA REUNIÓN</span>
@@ -2218,7 +2229,15 @@ function RichAnnouncementEditor({
         shadow={shadow}
         onShadowChange={onShadowChange}
       />
-      <EditorContent editor={editor} className="announcement-editor" />
+      <EditorContent
+        editor={editor}
+        className="announcement-editor"
+        style={{
+          textShadow: shadow.enabled
+            ? `0 3px ${shadow.blur}px ${shadow.color}`
+            : "none",
+        }}
+      />
       <small>
         Seleccioná una palabra o frase antes de aplicarle formato. El tamaño
         modifica todo el anuncio.
@@ -2365,6 +2384,24 @@ function DesignControls({
       icon: "design-gradient",
       radius: 10,
     },
+    {
+      value: "lower-third",
+      label: "Lower third",
+      icon: "design-lower-third",
+      radius: 6,
+    },
+    {
+      value: "broadcast",
+      label: "TV en vivo",
+      icon: "design-broadcast",
+      radius: 2,
+    },
+    {
+      value: "glass-accent",
+      label: "Cristal animado",
+      icon: "design-glass-accent",
+      radius: 12,
+    },
   ];
   return (
     <>
@@ -2392,6 +2429,11 @@ function DesignControls({
               setPayload({
                 template: option.value,
                 borderRadius: option.radius,
+                ...(["lower-third", "broadcast", "glass-accent"].includes(
+                  option.value,
+                )
+                  ? { position: "lower" }
+                  : {}),
               })
             }
             key={option.value}
@@ -2401,6 +2443,19 @@ function DesignControls({
           </button>
         ))}
       </div>
+      <label className="announcement-animation-field">
+        Movimiento de entrada
+        <select
+          value={p.animation || "fade"}
+          onChange={(event) => setPayload({ animation: event.target.value })}
+        >
+          <option value="none">Sin movimiento</option>
+          <option value="fade">Aparecer suavemente</option>
+          <option value="slide-left">Entrar desde la izquierda</option>
+          <option value="slide-up">Subir desde abajo</option>
+          <option value="zoom">Zoom suave</option>
+        </select>
+      </label>
       <div className={`design-fields ${showSize ? "" : "single"}`}>
         <label>
           Alineación
@@ -2552,11 +2607,13 @@ function AnnouncementPreview({
       kind: item.type === "bible" ? "biblia" : "anuncio",
       position: p.position || "center",
       fontSize: Number(p.fontSize || 64),
+      fontFamily: p.fontFamily || "Inter",
       color: p.color || "#ffffff",
       backgroundColor: p.backgroundColor || "rgba(0,0,0,0)",
       align: p.align || "center",
       borderRadius: Number(p.borderRadius || 0),
       template: p.template || "plain",
+      animation: p.animation || "fade",
       shadowEnabled: p.shadowEnabled !== false,
       shadowColor: p.shadowColor || "#000000",
       shadowBlur: Number(p.shadowBlur ?? 14),

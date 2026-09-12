@@ -804,6 +804,12 @@ html[data-theme="dark"] .app-shell input.win11-toggle:checked {
   background:var(--fl-surface);
   box-shadow:var(--fl-shadow);
 }
+.settings-content .win11-expander.disabled {
+  opacity: .62;
+}
+.settings-content .win11-expander.disabled .win11-expander-toggle {
+  cursor: not-allowed;
+}
 .settings-content .win11-expander-header {
   display:flex!important;
   box-sizing:border-box;
@@ -2164,4 +2170,53 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   color-scheme:light dark;
   border-color:var(--fl-border-strong)!important;
   background:var(--fl-surface-alt)!important;
+}
+
+/* One close control for every application dialog.  These declarations live at
+   the end of the theme so older dialog-specific rules cannot stretch the
+   button or leave its hover background permanently visible. */
+.app-shell :is(.dialog-close,.win11-settings-close,.help-dialog-close) {
+  box-sizing:border-box!important;
+  display:grid!important;
+  flex:0 0 32px!important;
+  width:32px!important;
+  min-width:32px!important;
+  max-width:32px!important;
+  height:32px!important;
+  min-height:32px!important;
+  max-height:32px!important;
+  padding:0!important;
+  place-items:center!important;
+  color:rgb(255 255 255 / 68%)!important;
+  border:0!important;
+  border-radius:999px!important;
+  background:#3a3a3a!important;
+  line-height:1!important;
+  overflow:hidden!important;
+  cursor:pointer;
+  transition:background-color .15s ease,color .15s ease,transform .15s ease!important;
+}
+.app-shell :is(.dialog-close,.win11-settings-close,.help-dialog-close):hover,
+.app-shell :is(.dialog-close,.win11-settings-close,.help-dialog-close):focus-visible {
+  color:#fff!important;
+  background:#e81123!important;
+}
+.app-shell :is(.dialog-close,.win11-settings-close,.help-dialog-close):active {
+  transform:scale(.94);
+}
+.app-shell :is(.dialog-close,.win11-settings-close,.help-dialog-close) svg {
+  display:block;
+  width:12px!important;
+  min-width:12px!important;
+  height:12px!important;
+  stroke-width:1.5!important;
+  pointer-events:none;
+}
+
+/* Absolutely positioned closes stay inset from the dialog border. Header
+   closes (settings, help and version history) retain their flex position. */
+.app-shell .dialog-close {
+  top:12px!important;
+  right:12px!important;
+  margin:0!important;
 }

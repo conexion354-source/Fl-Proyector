@@ -9,6 +9,7 @@ type ExpanderRowProps = {
   children: ReactNode;
   defaultExpanded?: boolean;
   className?: string;
+  disabled?: boolean;
 };
 
 export function ExpanderRow({
@@ -19,6 +20,7 @@ export function ExpanderRow({
   children,
   defaultExpanded = false,
   className = "",
+  disabled = false,
 }: ExpanderRowProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const contentId = useId();
@@ -26,7 +28,7 @@ export function ExpanderRow({
 
   return (
     <section
-      className={`win11-expander ${expanded ? "expanded" : "collapsed"} ${className}`.trim()}
+      className={`win11-expander ${expanded ? "expanded" : "collapsed"} ${disabled ? "disabled" : ""} ${className}`.trim()}
     >
       {/* The header deliberately has no click handler. */}
       <div className="win11-expander-header">
@@ -58,6 +60,7 @@ export function ExpanderRow({
               type="checkbox"
               aria-label={checked ? `Desactivar ${title}` : `Activar ${title}`}
               checked={checked}
+              disabled={disabled}
               onChange={(event) => onCheckedChange(event.target.checked)}
             />
           </label>

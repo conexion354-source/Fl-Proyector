@@ -5,7 +5,12 @@ import {
   type ProjectionDimensions,
 } from "../shared/bibleLayout";
 
-export type BibleSlide = { html: string; fontSize: number; label: string };
+export type BibleSlide = {
+  html: string;
+  contentHtml: string;
+  fontSize: number;
+  label: string;
+};
 
 const escapeHtml = (value: string) =>
   value.replace(
@@ -63,15 +68,23 @@ export function buildBibleSlides(
               ? `${referenceBase};border-bottom:.14em solid ${settings.referenceBackground};letter-spacing:.025em`
               : settings.referenceStyle === "ribbon"
                 ? `${referenceBase};background:${settings.referenceBackground};clip-path:polygon(0 0,100% 0,92% 50%,100% 100%,0 100%,.3em 50%)`
+                : settings.referenceStyle === "lower-third"
+                  ? `${referenceBase};background:linear-gradient(90deg,${settings.referenceBackground},${settings.referenceBackground}d9 72%,transparent);border-left:.28em solid ${settings.referenceColor};border-radius:.12em`
+                  : settings.referenceStyle === "broadcast"
+                    ? `${referenceBase};background:${settings.referenceBackground};border-left:.28em solid ${settings.referenceColor};border-bottom:.12em solid ${settings.referenceColor};clip-path:polygon(0 0,94% 0,100% 100%,0 100%)`
                 : `${referenceBase};background:${settings.referenceBackground};border-radius:999px`;
     const ref = referenceText
-      ? `<div class="bible-reference-slot reference-${settings.referencePosition}" style="text-shadow:none"><span class="bible-reference-label reference-style-${settings.referenceStyle}" style="${referenceStyle}">${escapeHtml(referenceText)}</span></div>`
+      ? `<div class="bible-reference-slot reference-${settings.referencePosition}" style="text-shadow:none"><span class="bible-reference-label reference-style-${settings.referenceStyle} reference-animation-${settings.referenceAnimation}" style="${referenceStyle}">${escapeHtml(referenceText)}</span></div>`
       : "";
     const verse = `<div class="bible-verse-slot"><p class="bible-verse-text" style="font-family:${escapeHtml(settings.textFontFamily)};color:${settings.textColor}">${escapeHtml(piece)}</p></div>`;
     return {
       html: `<div class="bible-slide bible-reference-${settings.referencePosition}">${
         settings.referencePosition === "before" ? `${ref}${verse}` : `${verse}${ref}`
       }</div>`,
+      // Operator cards deliberately contain only the passage. The configured
+      // projection typeface, size and reference lower-third belong exclusively
+      // to the preview and the physical output.
+      contentHtml: escapeHtml(piece),
       fontSize,
       label: `${reference}${partSuffix}`,
     };

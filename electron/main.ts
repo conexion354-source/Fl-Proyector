@@ -117,6 +117,18 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.5",
+    title: "Pantallas, diseño y proyección más confiables",
+    publishedAt: "2026-09-12T18:00:00Z",
+    changes: [
+      "Los cambios de monitor principal y tercera pantalla se aplican en vivo, creando, moviendo o cerrando cada salida correctamente.",
+      "La relación 16:9, 16:10 o 4:3 y la resolución elegida ahora se respetan en la salida real, manteniendo la ventana de Windows en pantalla completa.",
+      "El color sin contenido se muestra también en la pantalla de proyección y se reforzó el uso de márgenes seguros.",
+      "Anuncios y referencias incorporan nuevos zócalos, movimientos, fuentes Montserrat y Oswald y sombras consistentes.",
+      "Se completó la transmisión de estilos y controles desde el sistema principal y el control remoto.",
+    ],
+  },
+  {
     version: "10.11.4",
     title: "Versículos completos y división A/B inteligente",
     publishedAt: "2026-09-11T16:55:00Z",
@@ -349,24 +361,63 @@ function mergeState(patch: ProjectionPatch) {
 }
 
 function projectionViewport(settings: DisplaySettings) {
-  const displays = screen.getAllDisplays();
-  const target =
-    displays.find((display) => display.id === settings.mainDisplayId) ??
-    displays.find((display) => display.id !== screen.getPrimaryDisplay().id) ??
-    screen.getPrimaryDisplay();
+  const { mainTarget } = projectionTargets(settings);
+  const target = mainTarget ?? screen.getPrimaryDisplay();
+  const floatingPreview = !mainTarget;
   const requested =
     settings.resolution === "display"
       ? null
       : settings.resolution.split("x").map(Number);
+  let width = requested
+    ? Math.min(requested[0], target.bounds.width)
+    : floatingPreview
+      ? Math.min(960, target.bounds.width)
+      : target.bounds.width;
+  let height = requested
+    ? Math.min(requested[1], target.bounds.height)
+    : floatingPreview
+      ? Math.min(540, target.bounds.height)
+      : target.bounds.height;
+  const ratio =
+    settings.aspectRatio === "16:9"
+      ? 16 / 9
+      : settings.aspectRatio === "16:10"
+        ? 16 / 10
+        : settings.aspectRatio === "4:3"
+          ? 4 / 3
+          : settings.aspectRatio === "custom"
+            ? 16 / 9
+            : null;
+  if (ratio) {
+    if (width / height > ratio) width = height * ratio;
+    else height = width / ratio;
+  }
   return {
-    width: requested
-      ? Math.min(requested[0], target.bounds.width)
-      : target.bounds.width,
-    height: requested
-      ? Math.min(requested[1], target.bounds.height)
-      : target.bounds.height,
+    width: Math.max(1, Math.round(width)),
+    height: Math.max(1, Math.round(height)),
     scaleFactor: target.scaleFactor || 1,
   };
+}
+
+function projectionTargets(settings: DisplaySettings) {
+  const displays = screen.getAllDisplays();
+  const primary = screen.getPrimaryDisplay();
+  const mainTarget =
+    displays.find((display) => display.id === settings.mainDisplayId) ??
+    displays.find((display) => display.id !== primary.id);
+  // With no external monitor, automatic mode opens a floating preview on the
+  // primary display. That display is still occupied and cannot be reused as a
+  // third projection output.
+  const occupiedMainId = mainTarget?.id ?? primary.id;
+  const thirdTarget = settings.thirdDisplayEnabled
+    ? displays.find(
+        (display) =>
+          display.id === settings.thirdDisplayId &&
+          display.id !== primary.id &&
+          display.id !== occupiedMainId,
+      )
+    : undefined;
+  return { mainTarget, thirdTarget };
 }
 
 async function createControlWindow() {
@@ -401,32 +452,22 @@ async function createControlWindow() {
 }
 
 async function openProjection() {
+  const settings = database.getDisplaySettings();
   if (projectionWindow && !projectionWindow.isDestroyed()) {
+    await synchronizeProjectionWindows(settings);
     projectionWindow.focus();
     return;
   }
-  const displays = screen.getAllDisplays();
-  const settings = database.getDisplaySettings();
-  const external =
-    displays.find((display) => display.id === settings.mainDisplayId) ??
-    displays.find((display) => display.id !== screen.getPrimaryDisplay().id);
-  projectionWindow = await createProjectionWindow(external, settings);
-  projectionWindow.on("closed", () => {
-    projectionWindow = null;
+  const { mainTarget } = projectionTargets(settings);
+  const mainWindow = await createProjectionWindow(mainTarget, settings);
+  projectionWindow = mainWindow;
+  mainWindow.on("closed", () => {
+    if (projectionWindow === mainWindow) projectionWindow = null;
+    if (thirdProjectionWindow && !thirdProjectionWindow.isDestroyed())
+      thirdProjectionWindow.close();
     controlWindow?.webContents.send("projection:status-changed", false);
   });
-  if (settings.thirdDisplayEnabled) {
-    const third = displays.find(
-      (display) =>
-        display.id === settings.thirdDisplayId && display.id !== external?.id,
-    );
-    if (third) {
-      thirdProjectionWindow = await createProjectionWindow(third, settings);
-      thirdProjectionWindow.on("closed", () => {
-        thirdProjectionWindow = null;
-      });
-    }
-  }
+  await synchronizeProjectionWindows(settings);
 }
 
 async function createProjectionWindow(
@@ -437,11 +478,11 @@ async function createProjectionWindow(
     settings.resolution === "display"
       ? null
       : settings.resolution.split("x").map(Number);
-  const width = resolution?.[0] ?? target?.bounds.width ?? 960;
-  const height = resolution?.[1] ?? target?.bounds.height ?? 540;
+  const width = target?.bounds.width ?? resolution?.[0] ?? 960;
+  const height = target?.bounds.height ?? resolution?.[1] ?? 540;
   const safeWidth = target ? Math.min(width, target.bounds.width) : width;
   const safeHeight = target ? Math.min(height, target.bounds.height) : height;
-  const nativeFullscreen = Boolean(target && !resolution);
+  const nativeFullscreen = Boolean(target);
   const windowsKiosk = process.platform === "win32" && nativeFullscreen;
   const win = new BrowserWindow({
     // A preset resolution creates an exact, borderless raster on the selected
@@ -487,45 +528,70 @@ async function createProjectionWindow(
   return win;
 }
 
-function applyDisplaySettingsToOpenWindows(settings: DisplaySettings) {
+function applyDisplaySettingsToWindow(
+  win: BrowserWindow,
+  target: Electron.Display | undefined,
+  settings: DisplaySettings,
+) {
   const resolution =
     settings.resolution === "display"
       ? null
       : settings.resolution.split("x").map(Number);
-  for (const win of [projectionWindow, thirdProjectionWindow]) {
-    if (!win || win.isDestroyed()) continue;
-    const target = screen.getDisplayMatching(win.getBounds());
-    win.setBackgroundColor(settings.backgroundColor);
-    if (resolution) {
-      const width = Math.min(resolution[0], target.bounds.width);
-      const height = Math.min(resolution[1], target.bounds.height);
-      if (win.isKiosk()) win.setKiosk(false);
-      if (win.isFullScreen()) win.setFullScreen(false);
-      win.setAlwaysOnTop(false);
-      win.setBounds({
-        x: target.bounds.x + Math.round((target.bounds.width - width) / 2),
-        y: target.bounds.y + Math.round((target.bounds.height - height) / 2),
-        width,
-        height,
-      });
-    } else if (process.platform === "win32") {
-      // Kiosk plus screen-saver level guarantees that the secondary taskbar
-      // cannot cover the bottom edge of the projection.
-      win.setBounds(target.bounds, false);
-      win.setAlwaysOnTop(true, "screen-saver");
-      if (!win.isKiosk()) win.setKiosk(true);
-    } else if (!win.isFullScreen()) {
-      win.setBounds(target.bounds, false);
-      win.setFullScreen(true);
-    }
-    win.webContents.send("projection:display-settings", settings);
+  const host = target ?? screen.getPrimaryDisplay();
+  win.setBackgroundColor(settings.backgroundColor);
+  if (!target) {
+    const requestedWidth = resolution?.[0] ?? 960;
+    const requestedHeight = resolution?.[1] ?? 540;
+    const width = Math.min(requestedWidth, host.bounds.width);
+    const height = Math.min(requestedHeight, host.bounds.height);
+    if (win.isKiosk()) win.setKiosk(false);
+    if (win.isFullScreen()) win.setFullScreen(false);
+    win.setAlwaysOnTop(false);
+    win.setBounds({
+      x: host.bounds.x + Math.round((host.bounds.width - width) / 2),
+      y: host.bounds.y + Math.round((host.bounds.height - height) / 2),
+      width,
+      height,
+    });
+  } else if (process.platform === "win32") {
+    // Kiosk plus screen-saver level guarantees that the secondary taskbar
+    // cannot cover the bottom edge of the projection.
+    win.setBounds(target.bounds, false);
+    win.setAlwaysOnTop(true, "screen-saver");
+    if (!win.isKiosk()) win.setKiosk(true);
+  } else {
+    win.setAlwaysOnTop(false);
+    win.setBounds(target.bounds, false);
+    if (!win.isFullScreen()) win.setFullScreen(true);
   }
+  win.webContents.send("projection:display-settings", settings);
+}
+
+async function synchronizeProjectionWindows(settings: DisplaySettings) {
+  if (!projectionWindow || projectionWindow.isDestroyed()) return;
+  const { mainTarget, thirdTarget } = projectionTargets(settings);
+  applyDisplaySettingsToWindow(projectionWindow, mainTarget, settings);
+
+  if (!thirdTarget) {
+    if (thirdProjectionWindow && !thirdProjectionWindow.isDestroyed())
+      thirdProjectionWindow.close();
+    return;
+  }
+  if (!thirdProjectionWindow || thirdProjectionWindow.isDestroyed()) {
+    const thirdWindow = await createProjectionWindow(thirdTarget, settings);
+    thirdProjectionWindow = thirdWindow;
+    thirdWindow.on("closed", () => {
+      if (thirdProjectionWindow === thirdWindow) thirdProjectionWindow = null;
+    });
+    return;
+  }
+  applyDisplaySettingsToWindow(thirdProjectionWindow, thirdTarget, settings);
 }
 
 function refreshProjectionGeometry() {
   const settings = database.getDisplaySettings();
   mergeState({ outputViewport: projectionViewport(settings) });
-  applyDisplaySettingsToOpenWindows(settings);
+  void synchronizeProjectionWindows(settings);
 }
 
 const imageExtensions = [
@@ -735,6 +801,11 @@ function projectRemoteMultimedia(itemId: number) {
         align: (payload.align as ProjectionState["text"]["align"]) || "center",
         borderRadius: Number(payload.borderRadius || 0),
         template: (payload.template as ProjectionState["text"]["template"]) || "plain",
+        animation:
+          (payload.animation as ProjectionState["text"]["animation"]) || "fade",
+        shadowEnabled: payload.shadowEnabled !== false,
+        shadowColor: String(payload.shadowColor || "#000000"),
+        shadowBlur: Number(payload.shadowBlur ?? 14),
       },
     });
     return;
@@ -1177,10 +1248,10 @@ if (hasSingleInstanceLock)
     ipcMain.handle("settings:display:get", () => database.getDisplaySettings());
     ipcMain.handle(
       "settings:display:set",
-      (_event, settings: DisplaySettings) => {
+      async (_event, settings: DisplaySettings) => {
         database.saveDisplaySettings(settings);
         mergeState({ outputViewport: projectionViewport(settings) });
-        applyDisplaySettingsToOpenWindows(settings);
+        await synchronizeProjectionWindows(settings);
         // The operator preview uses the same display setting as the actual
         // projector. Notify it too, not only the projection windows.
         controlWindow?.webContents.send("projection:display-settings", settings);
