@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 contextBridge.exposeInMainWorld("flProyector", {
   getState: () => ipcRenderer.invoke("projection:get-state"),
   updateState: (patch) => ipcRenderer.invoke("projection:update-state", patch),
+  finishVideoPlayback: () => ipcRenderer.invoke("projection:video-ended"),
   onState: (callback) => {
     const listener = (_event, state) => callback(state);
     ipcRenderer.on("projection:state", listener);

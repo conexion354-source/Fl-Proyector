@@ -244,6 +244,8 @@ export type BackgroundState = {
 
 export type VideoPlaybackState = {
   playing: boolean;
+  /** Los fondos animados repiten; el contenido audiovisual se reproduce una sola vez. */
+  loop: boolean;
   volume: number;
   muted: boolean;
   seekTime: number;
@@ -359,7 +361,7 @@ export const initialProjectionState: ProjectionState = {
     slideCount: 0,
     visible: false,
   },
-  video: { playing: true, volume: 1, muted: false, seekTime: 0, commandId: 0, duration: 0, currentTime: 0 },
+  video: { playing: false, loop: true, volume: 1, muted: false, seekTime: 0, commandId: 0, duration: 0, currentTime: 0 },
   bibleStyle: initialBibleDisplaySettings,
   songStyle: initialSongDisplaySettings,
   church: initialChurchSettings,

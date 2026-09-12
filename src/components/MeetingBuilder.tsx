@@ -649,11 +649,30 @@ export function MeetingBuilder({
     setSelected({ ...selected, payload: { ...selected.payload, ...patch } });
   const mediaById = (id: unknown) =>
     media.find((item) => item.id === Number(id));
+  const backgroundVideoState = (background?: MediaItem) =>
+    background?.kind === "video"
+      ? {
+          playing: true,
+          loop: true,
+          seekTime: 0,
+          commandId: state.video.commandId + 1,
+        }
+      : { playing: false, loop: true };
 
   useEffect(() => {
     const onAir = items.find((item) => item.id === onAirItemId);
     if (onAir?.type !== "media") globalBackground.current = state.background;
   }, [state.background, items, onAirItemId]);
+  useEffect(() => {
+    const onAir = items.find((item) => item.id === onAirItemId);
+    if (onAir?.type !== "media" || state.video.playing || !state.video.loop)
+      return;
+    const payload = onAir.payload as Record<string, unknown>;
+    const source =
+      (payload.meetingMedia as MediaItem | undefined) ??
+      mediaById(payload.mediaId);
+    if (source?.kind === "video") setOnAirItemId(null);
+  }, [items, media, onAirItemId, state.video.playing, state.video.loop]);
 
   const fireSongStanza = (item: MeetingItem, index: number) => {
     const payload = item.payload as any;
@@ -674,6 +693,7 @@ export function MeetingBuilder({
       logo: false,
       presentation: { visible: false },
       lowerThird: { visible: false },
+      video: backgroundVideoState(background),
       background: background
         ? {
             id: background.id,
@@ -725,6 +745,7 @@ export function MeetingBuilder({
       logo: false,
       presentation: { visible: false },
       lowerThird: { visible: false },
+      video: backgroundVideoState(background),
       background: background
         ? {
             id: background.id,
@@ -771,7 +792,7 @@ export function MeetingBuilder({
       logo: false,
       text: { visible: false },
       lowerThird: { visible: false },
-      video: { playing: false },
+      video: { playing: false, loop: true },
       presentation: {
         path: String(payload.path),
         url: String(payload.url || ""),
@@ -860,7 +881,7 @@ export function MeetingBuilder({
         lowerThird: { visible: false },
         presentation: { visible: false },
         background: globalBackground.current,
-        video: { playing: false },
+        video: { playing: false, loop: true },
       });
       return;
     }
@@ -876,7 +897,7 @@ export function MeetingBuilder({
           logo: false,
           text: { visible: false },
           lowerThird: { visible: false },
-          video: { playing: false },
+          video: { playing: false, loop: true },
           presentation: {
             path: null,
             url: background.url,
@@ -903,6 +924,7 @@ export function MeetingBuilder({
           background.kind === "video"
             ? {
                 playing: true,
+                loop: false,
                 seekTime: 0,
                 commandId: state.video.commandId + 1,
               }
@@ -922,8 +944,14 @@ export function MeetingBuilder({
       logo: false,
       presentation: { visible: false },
       lowerThird: { visible: false },
+      video: backgroundVideoState(background),
       background: background
-        ? { id: background.id, url: background.url, name: background.name }
+        ? {
+            id: background.id,
+            url: background.url,
+            name: background.name,
+            kind: background.kind,
+          }
         : globalBackground.current,
       text: {
         html:

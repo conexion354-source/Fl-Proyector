@@ -100,6 +100,8 @@ let database: AppDatabase;
 let remoteServer: ReturnType<typeof startRemoteServer>;
 let remoteActiveMediaItemId: number | null = null;
 let remoteReturnState: Pick<ProjectionState, "background" | "video"> | null = null;
+let videoReturnBackground: ProjectionState["background"] | null = null;
+let videoFinishScheduled = false;
 let mediaDir = "";
 let meetingMediaDir = "";
 let churchAssetsDir = "";
@@ -339,6 +341,13 @@ function registerAutoUpdaterEvents() {
 }
 
 function mergeState(patch: ProjectionPatch) {
+  if (
+    patch.video?.playing === true &&
+    patch.video.loop === false &&
+    state.video.loop !== false
+  )
+    videoReturnBackground = { ...state.background };
+  if (patch.video?.loop === true) videoReturnBackground = null;
   state = {
     ...state,
     ...patch,
@@ -355,6 +364,19 @@ function mergeState(patch: ProjectionPatch) {
     alert: { ...state.alert, ...patch.alert },
     outputViewport: { ...state.outputViewport, ...patch.outputViewport },
   };
+  if (
+    !state.video.loop &&
+    state.video.playing &&
+    state.video.duration > 0 &&
+    state.video.duration - state.video.currentTime <= 0.45 &&
+    !videoFinishScheduled
+  ) {
+    videoFinishScheduled = true;
+    setImmediate(() => {
+      videoFinishScheduled = false;
+      finishVideoPlayback();
+    });
+  }
   for (const win of [controlWindow, projectionWindow, thirdProjectionWindow])
     if (win && !win.isDestroyed())
       win.webContents.send("projection:state", state);
@@ -784,10 +806,13 @@ function beginRemoteMultimedia(itemId: number) {
 
 function remoteBasePatch(): ProjectionPatch {
   if (!remoteReturnState) return {};
+  const returnsToVideo = remoteReturnState.background.kind === "video";
   return {
     background: { ...remoteReturnState.background },
     video: {
       ...remoteReturnState.video,
+      playing: returnsToVideo ? remoteReturnState.video.playing : false,
+      loop: true,
       commandId: state.video.commandId + 1,
     },
   };
@@ -797,6 +822,7 @@ function clearRemoteMultimedia() {
   const restore = remoteBasePatch();
   remoteActiveMediaItemId = null;
   remoteReturnState = null;
+  videoReturnBackground = null;
   mergeState({
     ...restore,
     blackout: false,
@@ -804,6 +830,26 @@ function clearRemoteMultimedia() {
     text: { visible: false },
     lowerThird: { visible: false },
     presentation: { visible: false },
+  });
+}
+
+function finishVideoPlayback() {
+  if (state.video.loop || !videoReturnBackground) return;
+  if (remoteActiveMediaItemId !== null) {
+    clearRemoteMultimedia();
+    return;
+  }
+  const background = { ...videoReturnBackground };
+  videoReturnBackground = null;
+  mergeState({
+    background,
+    video: {
+      playing: false,
+      loop: true,
+      seekTime: 0,
+      currentTime: 0,
+      commandId: state.video.commandId + 1,
+    },
   });
 }
 
@@ -856,7 +902,14 @@ function projectRemoteMultimedia(itemId: number) {
   mergeState({
     blackout: false, logo: false, text: { visible: false }, lowerThird: { visible: false }, presentation: { visible: false },
     background: { id: source.id, url: source.url, name: source.name, kind: source.kind },
-    video: source.kind === "video" ? { playing: true, seekTime: 0, commandId: state.video.commandId + 1 } : { playing: false },
+    video: source.kind === "video"
+      ? {
+          playing: true,
+          loop: false,
+          seekTime: 0,
+          commandId: state.video.commandId + 1,
+        }
+      : { playing: false, loop: true },
   });
 }
 const hydrateChurch = (settings: ChurchSettings): ChurchSettings => ({
@@ -1080,6 +1133,7 @@ if (hasSingleInstanceLock)
       "projection:update-state",
       (_event, patch: ProjectionPatch) => mergeState(patch),
     );
+    ipcMain.handle("projection:video-ended", finishVideoPlayback);
     ipcMain.handle("projection:open", openProjection);
     ipcMain.handle("projection:close", () => {
       projectionWindow?.close();

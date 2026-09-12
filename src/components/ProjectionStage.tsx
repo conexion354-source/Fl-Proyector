@@ -11,6 +11,7 @@ type Props = {
   onPresentationSlideCount?: (count: number) => void;
   onVideoMetadata?: (duration: number) => void;
   onVideoTime?: (time: number) => void;
+  onVideoEnded?: () => void;
 };
 
 const forceUppercaseHtml = (html: string) =>
@@ -24,6 +25,7 @@ export function ProjectionStage({
   onPresentationSlideCount,
   onVideoMetadata,
   onVideoTime,
+  onVideoEnded,
 }: Props) {
   const outputViewport = state.outputViewport ?? {
     width: 1920,
@@ -254,6 +256,7 @@ export function ProjectionStage({
             preview={preview}
             onMetadata={onVideoMetadata}
             onTime={onVideoTime}
+            onEnded={onVideoEnded}
           />
         )}
         <div
@@ -452,6 +455,7 @@ function MediaLayer({
   preview,
   onMetadata,
   onTime,
+  onEnded,
 }: {
   url: string;
   speed: number;
@@ -460,6 +464,7 @@ function MediaLayer({
   preview: boolean;
   onMetadata?: (duration: number) => void;
   onTime?: (time: number) => void;
+  onEnded?: () => void;
 }) {
   if (
     url.startsWith("data:image/") ||
@@ -475,6 +480,7 @@ function MediaLayer({
       preview={preview}
       onMetadata={onMetadata}
       onTime={onTime}
+      onEnded={onEnded}
     />
   );
 }
@@ -487,6 +493,7 @@ function VideoLayer({
   preview,
   onMetadata,
   onTime,
+  onEnded,
 }: {
   url: string;
   speed: number;
@@ -495,8 +502,18 @@ function VideoLayer({
   preview: boolean;
   onMetadata?: (duration: number) => void;
   onTime?: (time: number) => void;
+  onEnded?: () => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const finishNotified = useRef(false);
+  const notifyPlaybackEnded = (video: HTMLVideoElement) => {
+    if (preview || playback.loop || finishNotified.current) return;
+    finishNotified.current = true;
+    onEnded?.();
+  };
+  useEffect(() => {
+    if (playback.playing && !playback.loop) finishNotified.current = false;
+  }, [url, playback.commandId, playback.playing, playback.loop]);
   useEffect(() => {
     if (ref.current) ref.current.playbackRate = speed;
   }, [speed]);
@@ -526,26 +543,18 @@ function VideoLayer({
       video.play().catch(() => {});
     };
     const restart = () => {
-      if (!preview && playback.playing) video.play().catch(() => {});
-    };
-    const recoverFromEnd = () => {
-      if (!playback.playing) return;
-      try {
-        video.currentTime = 0;
-      } catch {}
-      video.play().catch(() => {});
+      if (!preview && playback.playing && !video.ended)
+        video.play().catch(() => {});
     };
     // Some codecs can pause after a stall or at a loop boundary in a
     // background/projection window. Keep the motion layer alive without
     // overriding the operator's explicit Pause command.
     const watchdog = window.setInterval(keepPlaying, 1500);
-    video.addEventListener("ended", recoverFromEnd);
     video.addEventListener("stalled", restart);
     video.addEventListener("waiting", restart);
     video.addEventListener("canplay", restart);
     return () => {
       window.clearInterval(watchdog);
-      video.removeEventListener("ended", recoverFromEnd);
       video.removeEventListener("stalled", restart);
       video.removeEventListener("waiting", restart);
       video.removeEventListener("canplay", restart);
@@ -557,7 +566,7 @@ function VideoLayer({
       className={className}
       src={url}
       autoPlay
-      loop
+      loop={playback.loop}
       preload="auto"
       muted={preview || playback.muted}
       playsInline
@@ -571,8 +580,26 @@ function VideoLayer({
         onMetadata?.(video.duration);
       }}
       onDurationChange={(event) => onMetadata?.(event.currentTarget.duration)}
-      onTimeUpdate={(event) => onTime?.(event.currentTarget.currentTime)}
+      onTimeUpdate={(event) => {
+        const video = event.currentTarget;
+        onTime?.(video.currentTime);
+        if (
+          video.duration > 0 &&
+          video.duration - video.currentTime <= 0.45
+        )
+          notifyPlaybackEnded(video);
+      }}
       onSeeked={(event) => onTime?.(event.currentTarget.currentTime)}
+      onPause={(event) => {
+        const video = event.currentTarget;
+        if (
+          playback.playing &&
+          video.duration > 0 &&
+          video.duration - video.currentTime <= 0.75
+        )
+          notifyPlaybackEnded(video);
+      }}
+      onEnded={(event) => notifyPlaybackEnded(event.currentTarget)}
     />
   );
 }

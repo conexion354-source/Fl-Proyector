@@ -53,7 +53,12 @@ export function MediaLibrary({ state, update }: Props) {
       },
       video:
         item.kind === "video"
-          ? { playing: true, seekTime: 0, commandId: state.video.commandId + 1 }
+          ? {
+              playing: true,
+              loop: true,
+              seekTime: 0,
+              commandId: state.video.commandId + 1,
+            }
           : undefined,
     });
   const chooseFiles = async () => {
@@ -94,7 +99,7 @@ export function MediaLibrary({ state, update }: Props) {
       if (state.background.id === pendingDelete.id)
         update({
           background: { id: null, url: null, name: "", kind: null },
-          video: { playing: false },
+          video: { playing: false, loop: true },
         });
       setPendingDelete(null);
       reload();

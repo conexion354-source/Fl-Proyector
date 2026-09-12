@@ -22,7 +22,10 @@ export function ProjectionPage() {
           height: `${state.outputViewport.height}px`,
         }}
       >
-        <ProjectionStage state={state} />
+        <ProjectionStage
+          state={state}
+          onVideoEnded={() => window.flProyector.finishVideoPlayback()}
+        />
       </div>
     </main>
   )
