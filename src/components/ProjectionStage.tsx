@@ -100,13 +100,17 @@ export function ProjectionStage({
         const middle = (low + high) / 2;
         element.style.fontSize = `${middle}px`;
         element.style.setProperty("--fit-text-size", `${middle}px`);
-        const measuredElement =
+        const bibleSlot =
           state.text.kind === "biblia"
-            ? element.querySelector<HTMLElement>(".bible-verse-slot") || element
-            : element;
+            ? element.querySelector<HTMLElement>(".bible-verse-slot")
+            : null;
+        const bibleText = bibleSlot?.querySelector<HTMLElement>(".bible-verse-text");
+        const measuredElement = bibleText || bibleSlot || element;
+        const availableWidth = bibleSlot?.clientWidth ?? element.clientWidth;
+        const availableHeight = bibleSlot?.clientHeight ?? element.clientHeight;
         if (
-          measuredElement.scrollHeight <= measuredElement.clientHeight + 1 &&
-          measuredElement.scrollWidth <= measuredElement.clientWidth + 1
+          measuredElement.scrollHeight <= availableHeight + 1 &&
+          measuredElement.scrollWidth <= availableWidth + 1
         ) {
           best = middle;
           low = middle;
@@ -153,7 +157,11 @@ export function ProjectionStage({
   const projectionSafeArea = bibleSafeArea || songSafeArea;
   const bibleFill = bibleSafeArea && state.bibleStyle.fillScreen;
   const fitText =
-    (bibleSafeArea && (state.bibleStyle.autoFit || bibleFill)) ||
+    (bibleSafeArea && (
+      state.bibleStyle.autoFit ||
+      bibleFill ||
+      state.bibleStyle.longVerseMode !== "auto-fit"
+    )) ||
     (songSafeArea && state.songStyle.autoFit);
   const uppercase =
     (state.text.kind === "biblia" && state.bibleStyle.uppercase) ||
