@@ -121,7 +121,7 @@ export function App() {
   const liveAudienceUrl = status.remoteUrls[0] && liveAudienceStatus.code
     ? `${status.remoteUrls[0]}/live/${liveAudienceStatus.code}`
     : "";
-  const liveAudienceQrOnAir = state.text.html.includes("data-live-audience-qr");
+  const liveAudienceQrOnAir = state.text.visible && state.text.html.includes("data-live-audience-qr");
   const refreshStatus = () =>
     window.flProyector.projectionStatus().then(setStatus);
   useEffect(() => {
@@ -220,7 +220,7 @@ export function App() {
     const previous = beforeLiveAudienceQr.current;
     beforeLiveAudienceQr.current = null;
     if (!previous) {
-      await update({ text: { visible: false } });
+      await update({ text: { visible: false, html: "" } });
       return;
     }
     await update({
@@ -479,7 +479,8 @@ export function App() {
                 Pantalla negra
               </button>
               <button
-                className={liveAudienceStatus.active ? "active purple" : ""}
+                className={liveAudienceQrOnAir ? "active red" : ""}
+                aria-label={liveAudienceQrOnAir ? "Quitar QR de la proyección" : "Proyectar QR en vivo"}
                 title="Clic: mostrar o quitar QR · Clic derecho: administrar sesión"
                 onClick={toggleLiveAudienceQr}
                 onContextMenu={(event) => {
@@ -487,9 +488,8 @@ export function App() {
                   setShowLiveAudienceDialog(true);
                 }}
               >
-                <QrCode />
-                {liveAudienceQrOnAir ? "Quitar QR" : "QR en vivo"}
-                {liveAudienceStatus.active && <small>{liveAudienceStatus.viewers} conectado{liveAudienceStatus.viewers === 1 ? "" : "s"}</small>}
+                <QrCode aria-hidden="true" />
+                <small aria-hidden="true">{liveAudienceStatus.viewers} conectado{liveAudienceStatus.viewers === 1 ? "" : "s"}</small>
               </button>
               <button
                 className={state.logo ? "active blue" : ""}
