@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import QRCode from "qrcode";
 import {
   MonitorPlay,
   BellRing,
@@ -13,6 +14,7 @@ import {
   Music2,
   Pause,
   Play,
+  QrCode,
   Settings,
   Smartphone,
   Square,
@@ -28,6 +30,7 @@ import { BibleOperator } from "./components/BibleOperator";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { MeetingBuilder } from "./components/MeetingBuilder";
 import { RemotePanel } from "./components/RemotePanel";
+import { LiveAudienceDialog } from "./components/LiveAudienceDialog";
 import { Win11SettingsDialog } from "./components/Win11SettingsDialog";
 import { HelpDialog } from "./components/HelpDialog";
 import {
@@ -43,6 +46,7 @@ import {
   initialDisplaySettings,
   type DisplayInfo,
   type DisplaySettings,
+  type LiveAudienceStatus,
 } from "../shared/types";
 
 type Tab = "reuniones" | "canciones" | "fondos" | "biblia" | "remoto" | "ajustes";
@@ -82,6 +86,10 @@ export function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [overlaySettings, setOverlaySettings] = useState<"timer" | "clock" | null>(null);
   const [showAlertSettings, setShowAlertSettings] = useState(false);
+  const [showLiveAudienceDialog, setShowLiveAudienceDialog] = useState(false);
+  const [liveAudienceStatus, setLiveAudienceStatus] = useState<LiveAudienceStatus>({ active: false, code: null, viewers: 0 });
+  const [liveAudienceQr, setLiveAudienceQr] = useState("");
+  const beforeLiveAudienceQr = useRef<typeof state | null>(null);
   const [settingsPreview, setSettingsPreview] = useState<ReturnType<typeof useProjectionState>["state"] | null>(null);
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(initialDisplaySettings);
   const [displayPreviewSettings, setDisplayPreviewSettings] = useState<DisplaySettings | null>(null);
@@ -110,6 +118,10 @@ export function App() {
       : activeDisplaySettings.aspectRatio === "custom"
         ? "16 / 9"
         : activeDisplaySettings.aspectRatio.replace(":", " / ");
+  const liveAudienceUrl = status.remoteUrls[0] && liveAudienceStatus.code
+    ? `${status.remoteUrls[0]}/live/${liveAudienceStatus.code}`
+    : "";
+  const liveAudienceQrOnAir = state.text.html.includes("data-live-audience-qr");
   const refreshStatus = () =>
     window.flProyector.projectionStatus().then(setStatus);
   useEffect(() => {
@@ -119,6 +131,21 @@ export function App() {
       clearInterval(timer);
     };
   }, []);
+  useEffect(() => {
+    const refresh = () => window.flProyector.getLiveAudienceStatus().then(setLiveAudienceStatus);
+    refresh();
+    const timer = window.setInterval(refresh, 1500);
+    return () => window.clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (!liveAudienceUrl) return void setLiveAudienceQr("");
+    QRCode.toDataURL(liveAudienceUrl, {
+      width: 900,
+      margin: 2,
+      errorCorrectionLevel: "M",
+      color: { dark: "#111827", light: "#ffffff" },
+    }).then(setLiveAudienceQr).catch(() => setLiveAudienceQr(""));
+  }, [liveAudienceUrl]);
   useEffect(() => {
     window.flProyector.getDisplaySettings().then(setDisplaySettings);
     return window.flProyector.onDisplaySettings(setDisplaySettings);
@@ -185,6 +212,85 @@ export function App() {
   };
   const timerRemaining = Math.max(0, state.timer.remaining - (state.timer.running ? Math.floor((Date.now() - state.timer.startedAt) / 1000) : 0));
   const openOverlaySettings = (kind: "timer" | "clock") => setOverlaySettings(kind);
+  const startLiveAudience = async () => {
+    if (!status.remoteUrls[0]) return;
+    setLiveAudienceStatus(await window.flProyector.startLiveAudience());
+  };
+  const restoreBeforeLiveAudienceQr = async () => {
+    const previous = beforeLiveAudienceQr.current;
+    beforeLiveAudienceQr.current = null;
+    if (!previous) {
+      await update({ text: { visible: false } });
+      return;
+    }
+    await update({
+      text: previous.text,
+      presentation: previous.presentation,
+      lowerThird: previous.lowerThird,
+      blackout: previous.blackout,
+      logo: previous.logo,
+    });
+  };
+  const projectLiveAudienceQr = async (qr = liveAudienceQr) => {
+    if (!qr) return;
+    if (!liveAudienceQrOnAir) beforeLiveAudienceQr.current = structuredClone(state);
+    await window.flProyector.openProjection();
+    await update({
+      blackout: false,
+      logo: false,
+      presentation: { visible: false },
+      lowerThird: { visible: false },
+      text: {
+        visible: true,
+        kind: "anuncio",
+        html: `<div data-live-audience-qr="true" class="live-audience-projection"><span>LECTURA EN VIVO</span><strong>Seguí canciones y Biblia en vivo</strong><img src="${qr}" alt="Código QR"></div>`,
+        fontSize: 48,
+        fontFamily: "Inter",
+        color: "#ffffff",
+        backgroundColor: "rgba(0,0,0,0)",
+        position: "center",
+        align: "center",
+        template: "plain",
+        animation: "fade",
+        shadowEnabled: true,
+        shadowColor: "#000000",
+        shadowBlur: 14,
+      },
+    });
+    refreshStatus();
+  };
+  const toggleLiveAudienceQr = async () => {
+    if (liveAudienceQrOnAir) {
+      await restoreBeforeLiveAudienceQr();
+      return;
+    }
+    let nextStatus = liveAudienceStatus;
+    if (!nextStatus.active) {
+      if (!status.remoteUrls[0]) return;
+      nextStatus = await window.flProyector.startLiveAudience();
+      setLiveAudienceStatus(nextStatus);
+    }
+    const nextUrl = status.remoteUrls[0] && nextStatus.code
+      ? `${status.remoteUrls[0]}/live/${nextStatus.code}`
+      : "";
+    const nextQr = nextUrl
+      ? await QRCode.toDataURL(nextUrl, {
+          width: 900,
+          margin: 2,
+          errorCorrectionLevel: "M",
+          color: { dark: "#111827", light: "#ffffff" },
+        })
+      : "";
+    if (nextQr) {
+      setLiveAudienceQr(nextQr);
+      await projectLiveAudienceQr(nextQr);
+    }
+  };
+  const stopLiveAudience = async () => {
+    if (liveAudienceQrOnAir) await restoreBeforeLiveAudienceQr();
+    setLiveAudienceStatus(await window.flProyector.stopLiveAudience());
+    setLiveAudienceQr("");
+  };
   useEffect(() => {
     localStorage.setItem(`fl-layout-live-${tab}`, String(livePanelWidth));
   }, [tab, livePanelWidth]);
@@ -303,7 +409,7 @@ export function App() {
           {tab === "fondos" && <MediaLibrary state={state} update={update} />}{" "}
           {tab === "biblia" && <BibleOperator state={state} update={update} />}{" "}
           {tab === "remoto" && (
-            <RemotePanel urls={status.remoteUrls} state={state} update={update} />
+            <RemotePanel urls={status.remoteUrls} />
           )}{" "}
           {tab === "ajustes" && (
             <SettingsPanel
@@ -364,13 +470,26 @@ export function App() {
           />
           <div className="master-controls">
             <span className="eyebrow">Controles maestros</span>
-            <div className="master-grid two">
+            <div className="master-grid">
               <button
                 className={state.blackout ? "active red" : ""}
                 onClick={() => update({ blackout: !state.blackout })}
               >
                 <Square fill="currentColor" />
                 Pantalla negra
+              </button>
+              <button
+                className={liveAudienceStatus.active ? "active purple" : ""}
+                title="Clic: mostrar o quitar QR · Clic derecho: administrar sesión"
+                onClick={toggleLiveAudienceQr}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  setShowLiveAudienceDialog(true);
+                }}
+              >
+                <QrCode />
+                {liveAudienceQrOnAir ? "Quitar QR" : "QR en vivo"}
+                {liveAudienceStatus.active && <small>{liveAudienceStatus.viewers} conectado{liveAudienceStatus.viewers === 1 ? "" : "s"}</small>}
               </button>
               <button
                 className={state.logo ? "active blue" : ""}
@@ -532,6 +651,19 @@ export function App() {
             update({ alert: values });
             setShowAlertSettings(false);
           }}
+        />
+      )}
+      {showLiveAudienceDialog && (
+        <LiveAudienceDialog
+          status={liveAudienceStatus}
+          url={liveAudienceUrl}
+          qr={liveAudienceQr}
+          qrOnAir={liveAudienceQrOnAir}
+          networkAvailable={Boolean(status.remoteUrls[0])}
+          onClose={() => setShowLiveAudienceDialog(false)}
+          onStart={startLiveAudience}
+          onToggleQr={toggleLiveAudienceQr}
+          onStop={stopLiveAudience}
         />
       )}
       <HelpDialog open={showHelp} onClose={() => setShowHelp(false)} />

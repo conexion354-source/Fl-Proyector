@@ -809,6 +809,17 @@ html[data-theme="light"] .about-dialog > small {
   background: #362c17;
   border-color: #6e571f;
 }
+.master-grid button.active.purple {
+  color: #d6d0ff;
+  background: #2c245c;
+  border-color: #6958df;
+}
+.master-grid button small {
+  color: inherit;
+  font-size: 7px;
+  font-weight: 600;
+  opacity: 0.78;
+}
 .background-controls {
   margin-top: 18px;
   padding: 14px;
