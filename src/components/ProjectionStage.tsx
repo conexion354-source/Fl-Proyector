@@ -49,6 +49,11 @@ export function ProjectionStage({
   const textRef = useRef<HTMLDivElement>(null);
   const [fitTextSize, setFitTextSize] = useState(state.text.fontSize);
   const [contentScale, setContentScale] = useState(preview ? 0.2 : 1);
+  const [bibleFit, setBibleFit] = useState({
+    referenceScale: 1,
+    horizontalMargin: state.bibleStyle.horizontalMargin,
+    verticalMargin: state.bibleStyle.verticalMargin,
+  });
   const fontFamily =
     state.text.fontFamily === "Inter"
       ? "Inter, ui-sans-serif, system-ui, sans-serif"
@@ -96,39 +101,97 @@ export function ProjectionStage({
       );
       const shouldFillBible =
         state.text.kind === "biblia" && state.bibleStyle.fillScreen;
-      // In fill mode the configured size is the starting point, not a ceiling.
-      // The real rendered safe area determines how far a short passage can grow,
-      // so this also adapts naturally to 4:3, 16:9 and ultrawide outputs.
-      const responsiveCeiling = Math.max(
-        requestedSize,
-        Math.min(element.clientWidth * 0.24, element.clientHeight * 0.58),
-      );
-      // The configured font size is a preferred maximum. The safety floor may
-      // go lower when necessary so a line is never clipped by the projector.
-      let low = Math.min(requestedSize, Math.max(2, 7 * scale)),
-        high = shouldFillBible ? responsiveCeiling : requestedSize,
-        best = low;
-      for (let step = 0; step < 12; step++) {
-        const middle = (low + high) / 2;
-        element.style.fontSize = `${middle}px`;
-        element.style.setProperty("--fit-text-size", `${middle}px`);
-        const bibleSlot =
-          state.text.kind === "biblia"
-            ? element.querySelector<HTMLElement>(".bible-verse-slot")
-            : null;
-        const bibleText = bibleSlot?.querySelector<HTMLElement>(".bible-verse-text");
-        const measuredElement = bibleText || bibleSlot || element;
-        const availableWidth = bibleSlot?.clientWidth ?? element.clientWidth;
-        const availableHeight = bibleSlot?.clientHeight ?? element.clientHeight;
-        if (
-          measuredElement.scrollHeight <= availableHeight + 1 &&
-          measuredElement.scrollWidth <= availableWidth + 1
-        ) {
-          best = middle;
-          low = middle;
-        } else high = middle;
+      const configuredHorizontal = state.bibleStyle.horizontalMargin;
+      const configuredVertical = state.bibleStyle.verticalMargin;
+      const evaluate = (horizontalMargin: number, verticalMargin: number) => {
+        if (state.text.kind === "biblia") {
+          element.style.left = `${horizontalMargin}%`;
+          element.style.right = `${horizontalMargin}%`;
+          element.style.top = `${verticalMargin}%`;
+          element.style.bottom = `${verticalMargin}%`;
+        }
+        // In fill mode the configured size is the starting point, not a ceiling.
+        const responsiveCeiling = Math.max(
+          requestedSize,
+          Math.min(element.clientWidth * 0.24, element.clientHeight * 0.58),
+        );
+        let low = Math.min(requestedSize, Math.max(2, 7 * scale)),
+          high = shouldFillBible ? responsiveCeiling : requestedSize,
+          best = low;
+        for (let step = 0; step < 12; step++) {
+          const middle = (low + high) / 2;
+          const referenceScale = Math.min(1, middle / requestedSize);
+          element.style.fontSize = `${middle}px`;
+          element.style.setProperty("--fit-text-size", `${middle}px`);
+          if (state.text.kind === "biblia") {
+            element.style.setProperty(
+              "--bible-reference-size",
+              `${Math.max(8 * scale, state.bibleStyle.referenceFontSize * scale * referenceScale)}px`,
+            );
+            element.style.setProperty(
+              "--bible-reference-height",
+              `${Math.max(14 * scale, state.bibleStyle.referenceFontSize * 1.65 * scale * referenceScale)}px`,
+            );
+            element.style.setProperty(
+              "--bible-reference-gap",
+              `${Math.max(4 * scale, state.bibleStyle.referenceFontSize * 0.45 * scale * referenceScale)}px`,
+            );
+          }
+          const bibleSlot =
+            state.text.kind === "biblia"
+              ? element.querySelector<HTMLElement>(".bible-verse-slot")
+              : null;
+          const bibleText =
+            bibleSlot?.querySelector<HTMLElement>(".bible-verse-text");
+          const measuredElement = bibleText || bibleSlot || element;
+          const availableWidth = bibleSlot?.clientWidth ?? element.clientWidth;
+          const availableHeight =
+            bibleSlot?.clientHeight ?? element.clientHeight;
+          if (
+            measuredElement.scrollHeight <= availableHeight + 1 &&
+            measuredElement.scrollWidth <= availableWidth + 1
+          ) {
+            best = middle;
+            low = middle;
+          } else high = middle;
+        }
+        return {
+          fontSize: best,
+          referenceScale: Math.min(1, best / requestedSize),
+          horizontalMargin,
+          verticalMargin,
+        };
+      };
+
+      let result = evaluate(configuredHorizontal, configuredVertical);
+      // “Rellenar pantalla” first respects the chosen safe area. If that would
+      // force the preferred font size down, it recovers otherwise unused space
+      // down to a small 2% safety edge before reducing the type.
+      if (
+        shouldFillBible &&
+        result.fontSize < requestedSize - 0.5 &&
+        (configuredHorizontal > 2 || configuredVertical > 2)
+      ) {
+        const expanded = evaluate(
+          Math.min(configuredHorizontal, 2),
+          Math.min(configuredVertical, 2),
+        );
+        if (expanded.fontSize >= result.fontSize) result = expanded;
+        else result = evaluate(configuredHorizontal, configuredVertical);
       }
-      setFitTextSize(best);
+      setFitTextSize(result.fontSize);
+      if (state.text.kind === "biblia")
+        setBibleFit((current) =>
+          Math.abs(current.referenceScale - result.referenceScale) > 0.002 ||
+          current.horizontalMargin !== result.horizontalMargin ||
+          current.verticalMargin !== result.verticalMargin
+            ? {
+                referenceScale: result.referenceScale,
+                horizontalMargin: result.horizontalMargin,
+                verticalMargin: result.verticalMargin,
+              }
+            : current,
+        );
     };
     const frame = requestAnimationFrame(measure);
     const observer = new ResizeObserver(measure);
@@ -196,18 +259,18 @@ export function ProjectionStage({
     ...(projectionSafeArea
       ? {
           left: bibleSafeArea
-            ? `${state.bibleStyle.horizontalMargin}%`
+            ? `${bibleFit.horizontalMargin}%`
             : "8%",
           right: bibleSafeArea
-            ? `${state.bibleStyle.horizontalMargin}%`
+            ? `${bibleFit.horizontalMargin}%`
             : "8%",
           top: bibleSafeArea
-            ? `${state.bibleStyle.verticalMargin}%`
+            ? `${bibleFit.verticalMargin}%`
             : state.text.title && state.text.titlePosition === "top"
               ? "17%"
               : "8%",
           bottom: bibleSafeArea
-            ? `${state.bibleStyle.verticalMargin}%`
+            ? `${bibleFit.verticalMargin}%`
             : state.text.title && state.text.titlePosition === "bottom"
               ? "17%"
               : "8%",
@@ -227,9 +290,9 @@ export function ProjectionStage({
       : {}),
     ...(bibleSafeArea
       ? {
-          "--bible-reference-size": `${Math.max(8, state.bibleStyle.referenceFontSize * contentScale)}px`,
-          "--bible-reference-height": `${Math.max(14, state.bibleStyle.referenceFontSize * 1.65 * contentScale)}px`,
-          "--bible-reference-gap": `${Math.max(4, state.bibleStyle.referenceFontSize * 0.45 * contentScale)}px`,
+          "--bible-reference-size": `${Math.max(8, state.bibleStyle.referenceFontSize * contentScale * bibleFit.referenceScale)}px`,
+          "--bible-reference-height": `${Math.max(14, state.bibleStyle.referenceFontSize * 1.65 * contentScale * bibleFit.referenceScale)}px`,
+          "--bible-reference-gap": `${Math.max(4, state.bibleStyle.referenceFontSize * 0.45 * contentScale * bibleFit.referenceScale)}px`,
         }
       : {}),
   } as CSSProperties;

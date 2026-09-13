@@ -1316,7 +1316,7 @@ export function SettingsPanel({
                 <ExpanderRow
                   className="bible-fill-card"
                   title="Rellenar pantalla"
-                  description="Amplía el texto automáticamente hasta aprovechar el área segura."
+                  description="Aprovecha el área disponible y reduce suavemente el texto y la referencia si hace falta para evitar cortes."
                   checked={bible.fillScreen}
                   onCheckedChange={(fillScreen) =>
                     setBible((v) => ({ ...v, fillScreen }))
