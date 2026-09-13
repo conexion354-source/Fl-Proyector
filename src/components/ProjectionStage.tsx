@@ -118,11 +118,10 @@ export function ProjectionStage({
         let low = Math.min(requestedSize, Math.max(2, 7 * scale)),
           high = shouldFillBible ? responsiveCeiling : requestedSize,
           best = low;
-        for (let step = 0; step < 12; step++) {
-          const middle = (low + high) / 2;
-          const referenceScale = Math.min(1, middle / requestedSize);
-          element.style.fontSize = `${middle}px`;
-          element.style.setProperty("--fit-text-size", `${middle}px`);
+        const applyCandidate = (fontSize: number) => {
+          const referenceScale = Math.min(1, fontSize / requestedSize);
+          element.style.fontSize = `${fontSize}px`;
+          element.style.setProperty("--fit-text-size", `${fontSize}px`);
           if (state.text.kind === "biblia") {
             element.style.setProperty(
               "--bible-reference-size",
@@ -137,24 +136,54 @@ export function ProjectionStage({
               `${Math.max(4 * scale, state.bibleStyle.referenceFontSize * 0.45 * scale * referenceScale)}px`,
             );
           }
+        };
+        const contentFits = (fontSize: number) => {
           const bibleSlot =
             state.text.kind === "biblia"
               ? element.querySelector<HTMLElement>(".bible-verse-slot")
               : null;
           const bibleText =
             bibleSlot?.querySelector<HTMLElement>(".bible-verse-text");
-          const measuredElement = bibleText || bibleSlot || element;
-          const availableWidth = bibleSlot?.clientWidth ?? element.clientWidth;
-          const availableHeight =
-            bibleSlot?.clientHeight ?? element.clientHeight;
-          if (
-            measuredElement.scrollHeight <= availableHeight + 1 &&
-            measuredElement.scrollWidth <= availableWidth + 1
-          ) {
+          if (bibleSlot && bibleText) {
+            // scrollHeight cannot detect content clipped above a centered flex
+            // item. Comparing the real rectangles catches clipping on all four
+            // edges, including the failure visible with long 4:3 passages.
+            const slotRect = bibleSlot.getBoundingClientRect();
+            const range = document.createRange();
+            range.selectNodeContents(bibleText);
+            const rangeRect = range.getBoundingClientRect();
+            const textRect = rangeRect.width
+              ? rangeRect
+              : bibleText.getBoundingClientRect();
+            const tolerance = 1;
+            // Font metrics describe the line box, not always the visible ink.
+            // A small proportional guard prevents tall uppercase glyphs and
+            // shadows from touching the crop edge without visibly reducing the
+            // chosen size.
+            const verticalGuard = Math.max(2 * scale, fontSize * 0.075);
+            return (
+              textRect.top >= slotRect.top + verticalGuard - tolerance &&
+              textRect.bottom <= slotRect.bottom - verticalGuard + tolerance &&
+              bibleText.scrollHeight <= bibleSlot.clientHeight + tolerance &&
+              bibleText.scrollWidth <= bibleSlot.clientWidth + tolerance
+            );
+          }
+          return (
+            element.scrollHeight <= element.clientHeight + 1 &&
+            element.scrollWidth <= element.clientWidth + 1
+          );
+        };
+        for (let step = 0; step < 12; step++) {
+          const middle = (low + high) / 2;
+          applyCandidate(middle);
+          if (contentFits(middle)) {
             best = middle;
             low = middle;
           } else high = middle;
         }
+        // Leave the DOM at the accepted value even when React can reuse the
+        // previous state value and therefore skip a render.
+        applyCandidate(best);
         return {
           fontSize: best,
           referenceScale: Math.min(1, best / requestedSize),
