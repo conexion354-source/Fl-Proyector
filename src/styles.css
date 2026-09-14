@@ -777,6 +777,9 @@ html[data-theme="light"] .about-dialog > small {
   gap: 7px;
   margin-top: 9px;
 }
+.master-grid.master-grid-four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
 .master-grid button {
   height: 64px;
   border: 1px solid #2a303b;

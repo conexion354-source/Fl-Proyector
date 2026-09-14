@@ -308,24 +308,71 @@ export function BibleOperator({
   }, [activeVerse, verses]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
       if (
-        !activeSlides.length ||
         !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(
           event.key,
         ) ||
-        ["INPUT", "SELECT"].includes((event.target as HTMLElement)?.tagName)
+        ["INPUT", "SELECT", "TEXTAREA"].includes(target?.tagName || "") ||
+        target?.isContentEditable
       )
         return;
+
+      const direction = ["ArrowDown", "ArrowRight"].includes(event.key)
+        ? 1
+        : -1;
       event.preventDefault();
-      projectSlide(
-        activeSlides,
-        activeSlide +
-          (["ArrowDown", "ArrowRight"].includes(event.key) ? 1 : -1),
+
+      if (!activeSlides.length) {
+        const firstVerse = direction > 0
+          ? displayedVerses[0]
+          : displayedVerses[displayedVerses.length - 1];
+        if (firstVerse) send(firstVerse);
+        return;
+      }
+
+      const nextSlide = activeSlide + direction;
+      if (nextSlide >= 0 && nextSlide < activeSlides.length) {
+        projectSlide(activeSlides, nextSlide);
+        return;
+      }
+
+      const verseIndex = displayedVerses.findIndex(
+        (verse) => verseKey(verse) === activeVerse,
       );
+      const nextVerse = displayedVerses[verseIndex + direction];
+      if (!nextVerse) return;
+
+      if (direction > 0) {
+        send(nextVerse);
+        return;
+      }
+
+      const version =
+        versions.find((value) => value.id === versionId)?.code || "";
+      const previousSlides = buildBibleSlides(
+        nextVerse.text,
+        `${nextVerse.book} ${nextVerse.chapter}:${nextVerse.verse}`,
+        version,
+        state.bibleStyle,
+        state.outputViewport,
+      );
+      setActiveVerse(verseKey(nextVerse));
+      setActiveSlides(previousSlides);
+      projectSlide(previousSlides, previousSlides.length - 1);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [activeSlides, activeSlide, state.bibleStyle]);
+  }, [
+    activeSlides,
+    activeSlide,
+    activeVerse,
+    displayedVerses,
+    state.bibleStyle,
+    state.outputViewport,
+    versionId,
+    versions,
+  ]);
 
   return (
     <section className="bible-page">

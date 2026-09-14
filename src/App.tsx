@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CircleHelp,
   Film,
+  Eraser,
   MonitorUp,
   Music2,
   Pause,
@@ -470,7 +471,7 @@ export function App() {
           />
           <div className="master-controls">
             <span className="eyebrow">Controles maestros</span>
-            <div className="master-grid">
+            <div className="master-grid master-grid-four">
               <button
                 className={state.blackout ? "active red" : ""}
                 onClick={() => update({ blackout: !state.blackout })}
@@ -490,6 +491,20 @@ export function App() {
               >
                 <QrCode aria-hidden="true" />
                 <small aria-hidden="true">{liveAudienceStatus.viewers} conectado{liveAudienceStatus.viewers === 1 ? "" : "s"}</small>
+              </button>
+              <button
+                aria-label="Limpiar textos de la proyección"
+                title="Oculta Biblia, canciones, anuncios y alertas; conserva el fondo"
+                onClick={() =>
+                  update({
+                    text: { visible: false },
+                    lowerThird: { visible: false },
+                    alert: { visible: false },
+                  })
+                }
+              >
+                <Eraser aria-hidden="true" />
+                Limpiar texto
               </button>
               <button
                 className={state.logo ? "active blue" : ""}
