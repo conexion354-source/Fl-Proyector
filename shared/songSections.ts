@@ -78,8 +78,8 @@ function comparableLyricsBlock(block: string) {
 
 /**
  * Interprets section headings commonly returned in plain-text lyrics and uses
- * exact repeated blocks as a conservative chorus hint. Headings are omitted
- * from the clean blocks so they never become part of the projected lyrics.
+ * exact repeated blocks as a conservative chorus hint. Headings and duplicate
+ * blocks are omitted so the operator sees each usable section only once.
  */
 export function inferSongLyricsStructure(lyrics: string): ParsedSongLyrics {
   const blocks: string[] = [];
@@ -118,17 +118,37 @@ export function inferSongLyricsStructure(lyrics: string): ParsedSongLyrics {
   keys.forEach((key, index) => {
     if (!key) return;
     occurrences.set(key, (occurrences.get(key) ?? 0) + 1);
-    if (explicitTypes[index]) knownTypes.set(key, explicitTypes[index]);
+    const explicitType = explicitTypes[index];
+    if (
+      explicitType &&
+      (!knownTypes.has(key) || explicitType === "chorus")
+    ) {
+      knownTypes.set(key, explicitType);
+    }
+  });
+
+  const resolvedTypes = keys.map((key, index) => {
+    if ((occurrences.get(key) ?? 0) > 1) {
+      return knownTypes.get(key) ?? "chorus";
+    }
+    if (explicitTypes[index]) return explicitTypes[index];
+    const knownType = knownTypes.get(key);
+    if (knownType) return knownType;
+    return "verse";
+  });
+  const uniqueBlocks: string[] = [];
+  const uniqueTypes: SongSectionType[] = [];
+  const seen = new Set<string>();
+  keys.forEach((key, index) => {
+    if (seen.has(key)) return;
+    seen.add(key);
+    uniqueBlocks.push(blocks[index]);
+    uniqueTypes.push(resolvedTypes[index]);
   });
 
   return {
-    blocks,
-    sectionTypes: keys.map((key, index) => {
-      if (explicitTypes[index]) return explicitTypes[index];
-      const knownType = knownTypes.get(key);
-      if (knownType) return knownType;
-      return (occurrences.get(key) ?? 0) > 1 ? "chorus" : "verse";
-    }),
+    blocks: uniqueBlocks,
+    sectionTypes: uniqueTypes,
   };
 }
 
