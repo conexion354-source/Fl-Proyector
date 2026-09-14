@@ -121,6 +121,21 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.7",
+    title: "Canciones más ágiles y controles más claros",
+    publishedAt: "2026-09-14T17:28:00Z",
+    changes: [
+      "Las canciones pueden crearse manualmente o buscarse por título y artista desde el servidor de letras.",
+      "La importación reconoce estrofas, estribillos, puentes y otras partes, elimina repeticiones idénticas y aplica colores de identificación sólo dentro del sistema.",
+      "Cada estrofa puede editarse, reclasificarse o eliminarse individualmente desde su menú contextual.",
+      "El ajuste automático de canciones mide los límites visuales reales y reduce el texto sólo cuando podría quedar cortado en la pantalla.",
+      "Se incorporaron categorías de canciones, búsqueda rápida de libros bíblicos y navegación de versículos con el teclado.",
+      "La barra lateral puede plegarse y el botón para dejar únicamente el fondo agiliza la operación en vivo.",
+      "Los fondos admiten nombres y etiquetas editables con validaciones y mensajes más claros.",
+      "Se corrigieron colores, sombras, botones y tarjetas para respetar correctamente los temas claro y oscuro.",
+    ],
+  },
+  {
     version: "10.11.6",
     title: "Lectura en vivo, colaboración y encuadre inteligente",
     publishedAt: "2026-09-14T15:21:10Z",
