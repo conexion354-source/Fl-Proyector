@@ -124,6 +124,21 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.8",
+    title: "Colaboración y lectura en vivo más completas",
+    publishedAt: "2026-09-14T19:52:07Z",
+    changes: [
+      "Las estrofas pueden editarse, dividirse o eliminarse individualmente desde el orden de la reunión.",
+      "El colaborador puede corregir canciones, dividir estrofas y agregar canciones a la reunión; los cambios activos se reflejan sin interrumpir la proyección.",
+      "La lectura en vivo por QR limpia su contenido al usar Limpiar texto, Pantalla negra o Mostrar logo.",
+      "Se añadió una captura desde el celular para guardar o compartir solamente el versículo, la letra o la diapositiva visible.",
+      "PowerPoint se transmite como imagen JPEG optimizada incluso con la salida física cerrada, con reintentos, deduplicación y compresión adaptativa.",
+      "Se corrigieron las transiciones de videos para que se quiten del aire al primer intento y no permanezcan como fondo.",
+      "El ajuste automático de Biblia y canciones protege el texto contra recortes tanto en la vista previa como en la pantalla proyectada.",
+      "El cartel QR incorpora instrucciones más claras, en mayúsculas y con tipografía de alta visibilidad.",
+    ],
+  },
+  {
     version: "10.11.7",
     title: "Canciones más ágiles y controles más claros",
     publishedAt: "2026-09-14T17:28:00Z",
