@@ -521,7 +521,7 @@ export function App() {
                 title="Oculta Biblia, canciones, anuncios y alertas; conserva el fondo"
                 onClick={() =>
                   update({
-                    text: { visible: false },
+                    text: { visible: false, html: "" },
                     lowerThird: { visible: false },
                     alert: { visible: false },
                   })
