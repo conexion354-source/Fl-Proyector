@@ -1215,13 +1215,14 @@ html[data-theme="light"] .about-dialog > small {
   transition: opacity 0.5s;
 }
 .logo-mark {
-  width: 110px;
-  height: 110px;
+  width: min(42vw, 42vh, 520px);
+  height: auto;
+  aspect-ratio: 1;
   display: grid;
   place-items: center;
-  border-radius: 28px;
+  border-radius: 20%;
   background: linear-gradient(145deg, #7c3aed, #4338ca);
-  font-size: 42px;
+  font-size: min(14vw, 14vh, 170px);
   letter-spacing: 0;
   margin-bottom: 18px;
   box-shadow: 0 0 70px #5b4ee955;
@@ -1253,10 +1254,10 @@ html[data-theme="light"] .about-dialog > small {
   width: 3px;
 }
 .preview-stage .logo-mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  font-size: 12px;
+  width: 42%;
+  height: auto;
+  border-radius: 20%;
+  font-size: clamp(18px, 3vw, 52px);
   margin-bottom: 5px;
 }
 .preview-stage .logo-layer {
