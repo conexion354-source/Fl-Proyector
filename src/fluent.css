@@ -2345,3 +2345,56 @@ html[data-theme="light"] .app-shell :is(.dialog-close,.win11-settings-close,.hel
   border-color:#e81123!important;
   background:#e81123!important;
 }
+
+/* The Bible navigator is used from a distance. Keep its compact single-row
+   layout, but give labels and selected values a comfortably readable size. */
+.app-shell .bible-toolbar {
+  width:100%;
+  grid-template-columns:
+    minmax(180px,1.1fr) minmax(150px,.9fr) minmax(92px,.55fr)
+    minmax(110px,.65fr) minmax(240px,2.3fr);
+  gap:10px;
+  padding:12px;
+}
+.app-shell .bible-toolbar label,
+.app-shell .bible-toolbar .bible-book-field {
+  gap:6px;
+  font-size:11px!important;
+  font-weight:600;
+  line-height:1.2;
+}
+.app-shell .bible-toolbar :is(select,.bible-book-trigger,.bible-search) {
+  height:40px!important;
+  min-height:40px!important;
+}
+.app-shell .bible-toolbar select,
+.app-shell .bible-toolbar .bible-book-trigger,
+.app-shell .bible-toolbar .bible-search input {
+  font-size:13px!important;
+}
+.app-shell .bible-toolbar .bible-search {
+  padding-inline:12px;
+  gap:9px;
+}
+.app-shell .bible-toolbar .bible-search > svg {
+  width:19px;
+  height:19px;
+  flex:0 0 19px;
+}
+@media (max-width:1250px) {
+  .app-shell .bible-toolbar {
+    grid-template-columns:
+      minmax(145px,1.1fr) minmax(130px,.9fr) minmax(85px,.55fr)
+      minmax(95px,.65fr) minmax(180px,1.7fr);
+  }
+}
+@media (max-width:900px) {
+  .app-shell .bible-toolbar {
+    grid-template-columns:
+      minmax(150px,1.2fr) minmax(135px,1fr) minmax(90px,.65fr)
+      minmax(105px,.75fr);
+  }
+  .app-shell .bible-toolbar .bible-search {
+    grid-column:1 / -1;
+  }
+}
