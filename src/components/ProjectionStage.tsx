@@ -138,42 +138,69 @@ export function ProjectionStage({
           }
         };
         const contentFits = (fontSize: number) => {
-          const bibleSlot =
-            state.text.kind === "biblia"
-              ? element.querySelector<HTMLElement>(".bible-verse-slot")
-              : null;
-          const bibleText =
-            bibleSlot?.querySelector<HTMLElement>(".bible-verse-text");
-          const container = bibleSlot ?? element;
-          const content = bibleText ?? element;
-          // scrollHeight cannot detect content clipped above or below a
-          // centered flex item. Measuring the rendered glyph range catches
-          // clipping on all four edges for both Bible verses and song stanzas.
-          const containerRect = container.getBoundingClientRect();
-          const range = document.createRange();
-          range.selectNodeContents(content);
-          const rangeRect = range.getBoundingClientRect();
-          const contentRect = rangeRect.width || rangeRect.height
-            ? rangeRect
-            : content.getBoundingClientRect();
-          const tolerance = 1;
-          // Font metrics describe the line box, not always the visible ink.
-          // A small proportional guard also keeps uppercase glyphs and shadows
-          // away from the physical crop edge without visibly shrinking text.
+          // A centered flex item can be clipped on both sides while its live
+          // scrollHeight still reports the constrained box. Measure an
+          // invisible, unconstrained copy instead so preview and real output
+          // use the complete natural height of every song or Bible passage.
           const verticalGuard = Math.max(2 * scale, fontSize * 0.075);
           const horizontalGuard = Math.max(1 * scale, fontSize * 0.025);
-          return (
-            contentRect.top >=
-              containerRect.top + verticalGuard - tolerance &&
-            contentRect.bottom <=
-              containerRect.bottom - verticalGuard + tolerance &&
-            contentRect.left >=
-              containerRect.left + horizontalGuard - tolerance &&
-            contentRect.right <=
-              containerRect.right - horizontalGuard + tolerance &&
-            content.scrollHeight <= container.clientHeight + tolerance &&
-            content.scrollWidth <= container.clientWidth + tolerance
+          const availableWidth = Math.max(
+            1,
+            element.clientWidth - horizontalGuard * 2,
           );
+          const availableHeight = Math.max(
+            1,
+            element.clientHeight - verticalGuard * 2,
+          );
+          const measurement = element.cloneNode(true) as HTMLElement;
+          measurement.removeAttribute("id");
+          Object.assign(measurement.style, {
+            position: "fixed",
+            visibility: "hidden",
+            pointerEvents: "none",
+            left: "-100000px",
+            right: "auto",
+            top: "0",
+            bottom: "auto",
+            width: `${availableWidth}px`,
+            minWidth: "0",
+            maxWidth: "none",
+            height: "auto",
+            minHeight: "0",
+            maxHeight: "none",
+            overflow: "visible",
+            display: "block",
+            transform: "none",
+            transition: "none",
+            animation: "none",
+            fontSize: `${fontSize}px`,
+          });
+          const bibleSlide =
+            measurement.querySelector<HTMLElement>(".bible-slide");
+          const bibleVerseSlot =
+            measurement.querySelector<HTMLElement>(".bible-verse-slot");
+          if (bibleSlide) {
+            Object.assign(bibleSlide.style, {
+              height: "auto",
+              minHeight: "0",
+              overflow: "visible",
+            });
+          }
+          if (bibleVerseSlot) {
+            Object.assign(bibleVerseSlot.style, {
+              display: "block",
+              height: "auto",
+              minHeight: "0",
+              overflow: "visible",
+              flex: "none",
+            });
+          }
+          document.body.appendChild(measurement);
+          const fits =
+            measurement.scrollHeight <= availableHeight + 1 &&
+            measurement.scrollWidth <= availableWidth + 1;
+          measurement.remove();
+          return fits;
         };
         for (let step = 0; step < 12; step++) {
           const middle = (low + high) / 2;
@@ -263,13 +290,11 @@ export function ProjectionStage({
   const songSafeArea = state.text.kind === "canto";
   const projectionSafeArea = bibleSafeArea || songSafeArea;
   const bibleFill = bibleSafeArea && state.bibleStyle.fillScreen;
-  const fitText =
-    (bibleSafeArea && (
-      state.bibleStyle.autoFit ||
-      bibleFill ||
-      state.bibleStyle.longVerseMode !== "auto-fit"
-    )) ||
-    (songSafeArea && state.songStyle.autoFit);
+  // Bible passages and song stanzas must never be allowed to escape their
+  // physical projection area. Keep the configured size as the ceiling and
+  // apply the safety fit in both preview and output, including installations
+  // whose older saved preferences have autoFit disabled.
+  const fitText = projectionSafeArea;
   const uppercase =
     (state.text.kind === "biblia" && state.bibleStyle.uppercase) ||
     (state.text.kind === "canto" && state.songStyle.uppercase);
