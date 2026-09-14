@@ -23,6 +23,9 @@ html[data-theme="dark"] {
 .app-shell { color: var(--fl-text); background: var(--fl-bg); }
 .app-shell button { letter-spacing: 0; text-transform: none; }
 .app-shell .eyebrow { color: var(--fl-muted); font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+html[data-theme="light"] .app-shell :is(.song-rich-editor,.announcement-editor) {
+  text-shadow: none!important;
+}
 
 /* Window chrome */
 .topbar { height: 48px; min-height: 48px; padding: 0 12px; gap: 12px; color: var(--fl-text); border-color: var(--fl-border); background: color-mix(in srgb,var(--fl-bg) 92%,transparent); backdrop-filter: blur(18px); }
