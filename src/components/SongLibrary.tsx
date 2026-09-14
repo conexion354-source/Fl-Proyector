@@ -92,6 +92,7 @@ export function SongLibrary({
   const [newSongTitle, setNewSongTitle] = useState("");
   const [newCategoryDialog, setNewCategoryDialog] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [assignNewCategory, setAssignNewCategory] = useState(false);
   const [editing, setEditing] = useState(false);
   const [addingToMeeting, setAddingToMeeting] = useState(false);
   const [editorRevision, setEditorRevision] = useState(0);
@@ -297,19 +298,36 @@ export function SongLibrary({
     await updateSong(song, { color });
     setSongContextMenu(null);
   };
-  const openNewCategory = () => {
+  const openNewCategory = (assignToCurrentSong = false) => {
     setNewCategoryName("");
+    setAssignNewCategory(assignToCurrentSong);
     setNewCategoryDialog(true);
   };
   const addCategory = async () => {
     const name = newCategoryName.trim();
     if (!name) return;
-    const id = await withSaveNotification(
-      () => window.flProyector.createSongCategory(name),
-      `La categoría “${name}” fue creada.`,
-    );
+    const id = await withSaveNotification(async () => {
+      const createdId = await window.flProyector.createSongCategory(name);
+      if (assignNewCategory) {
+        setSelected((current) => ({ ...current, categoryId: createdId }));
+        if (selected.id) {
+          const storedSong = (await window.flProyector.listSongs()).find(
+            (song) => song.id === selected.id,
+          );
+          if (storedSong)
+            await window.flProyector.saveSong({
+              ...storedSong,
+              categoryId: createdId,
+            });
+        }
+      }
+      return createdId;
+    }, assignNewCategory
+      ? `La categoría “${name}” fue creada y asignada.`
+      : `La categoría “${name}” fue creada.`);
     if (!id) return;
     setNewCategoryDialog(false);
+    setAssignNewCategory(false);
     setCategoryId(null);
     await reload();
   };
@@ -412,7 +430,7 @@ export function SongLibrary({
       <aside className="song-categories">
         <div className="pane-title">
           <b>CATEGORÍAS</b>
-          <button onClick={openNewCategory} aria-label="Nueva categoría" title="Nueva categoría">
+          <button onClick={() => openNewCategory(false)} aria-label="Nueva categoría" title="Nueva categoría">
             <FolderPlus size={16} />
           </button>
         </div>
@@ -521,11 +539,19 @@ export function SongLibrary({
             />
           </div>
           <select
+            aria-label="Categoría de la canción"
+            title="Elegí una categoría o creá una nueva"
             disabled={!selected.id && !editing}
             value={selected.categoryId ?? ""}
-            onChange={(e) =>
-              assignCategory(e.target.value ? Number(e.target.value) : null)
-            }
+            onChange={(e) => {
+              if (e.target.value === "__new__") {
+                openNewCategory(true);
+                return;
+              }
+              void assignCategory(
+                e.target.value ? Number(e.target.value) : null,
+              );
+            }}
           >
             <option value="">Sin categoría</option>
             {categories.map((category) => (
@@ -533,6 +559,7 @@ export function SongLibrary({
                 {category.name}
               </option>
             ))}
+            <option value="__new__">＋ Crear nueva categoría…</option>
           </select>
         </div>
         {editing && (
@@ -838,13 +865,24 @@ export function SongLibrary({
               type="button"
               className="dialog-close"
               aria-label="Cerrar"
-              onClick={() => setNewCategoryDialog(false)}
+              onClick={() => {
+                setNewCategoryDialog(false);
+                setAssignNewCategory(false);
+              }}
             >
               <X />
             </button>
             <span className="eyebrow">NUEVA CATEGORÍA</span>
-            <h2>Crear categoría</h2>
-            <p>Después podrás asignarla a cualquier canción desde el editor.</p>
+            <h2>
+              {assignNewCategory
+                ? "Crear y asignar categoría"
+                : "Crear categoría"}
+            </h2>
+            <p>
+              {assignNewCategory
+                ? "La categoría nueva quedará asignada a esta canción automáticamente."
+                : "Después podrás asignarla a cualquier canción desde el selector del editor."}
+            </p>
             <label>
               Nombre de la categoría
               <input
@@ -855,11 +893,17 @@ export function SongLibrary({
               />
             </label>
             <div className="song-create-actions">
-              <button type="button" onClick={() => setNewCategoryDialog(false)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewCategoryDialog(false);
+                  setAssignNewCategory(false);
+                }}
+              >
                 Cancelar
               </button>
               <button className="primary" disabled={!newCategoryName.trim()}>
-                Guardar
+                {assignNewCategory ? "Crear y asignar" : "Crear"}
               </button>
             </div>
           </form>
