@@ -144,33 +144,35 @@ export function ProjectionStage({
               : null;
           const bibleText =
             bibleSlot?.querySelector<HTMLElement>(".bible-verse-text");
-          if (bibleSlot && bibleText) {
-            // scrollHeight cannot detect content clipped above a centered flex
-            // item. Comparing the real rectangles catches clipping on all four
-            // edges, including the failure visible with long 4:3 passages.
-            const slotRect = bibleSlot.getBoundingClientRect();
-            const range = document.createRange();
-            range.selectNodeContents(bibleText);
-            const rangeRect = range.getBoundingClientRect();
-            const textRect = rangeRect.width
-              ? rangeRect
-              : bibleText.getBoundingClientRect();
-            const tolerance = 1;
-            // Font metrics describe the line box, not always the visible ink.
-            // A small proportional guard prevents tall uppercase glyphs and
-            // shadows from touching the crop edge without visibly reducing the
-            // chosen size.
-            const verticalGuard = Math.max(2 * scale, fontSize * 0.075);
-            return (
-              textRect.top >= slotRect.top + verticalGuard - tolerance &&
-              textRect.bottom <= slotRect.bottom - verticalGuard + tolerance &&
-              bibleText.scrollHeight <= bibleSlot.clientHeight + tolerance &&
-              bibleText.scrollWidth <= bibleSlot.clientWidth + tolerance
-            );
-          }
+          const container = bibleSlot ?? element;
+          const content = bibleText ?? element;
+          // scrollHeight cannot detect content clipped above or below a
+          // centered flex item. Measuring the rendered glyph range catches
+          // clipping on all four edges for both Bible verses and song stanzas.
+          const containerRect = container.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(content);
+          const rangeRect = range.getBoundingClientRect();
+          const contentRect = rangeRect.width || rangeRect.height
+            ? rangeRect
+            : content.getBoundingClientRect();
+          const tolerance = 1;
+          // Font metrics describe the line box, not always the visible ink.
+          // A small proportional guard also keeps uppercase glyphs and shadows
+          // away from the physical crop edge without visibly shrinking text.
+          const verticalGuard = Math.max(2 * scale, fontSize * 0.075);
+          const horizontalGuard = Math.max(1 * scale, fontSize * 0.025);
           return (
-            element.scrollHeight <= element.clientHeight + 1 &&
-            element.scrollWidth <= element.clientWidth + 1
+            contentRect.top >=
+              containerRect.top + verticalGuard - tolerance &&
+            contentRect.bottom <=
+              containerRect.bottom - verticalGuard + tolerance &&
+            contentRect.left >=
+              containerRect.left + horizontalGuard - tolerance &&
+            contentRect.right <=
+              containerRect.right - horizontalGuard + tolerance &&
+            content.scrollHeight <= container.clientHeight + tolerance &&
+            content.scrollWidth <= container.clientWidth + tolerance
           );
         };
         for (let step = 0; step < 12; step++) {
@@ -235,6 +237,7 @@ export function ProjectionStage({
   }, [
     state.text.html,
     state.text.kind,
+    state.text.visible,
     state.text.fontSize,
     state.text.fontFamily,
     state.text.position,
