@@ -28,6 +28,7 @@ import {
   type ProjectionState,
   type SongDisplaySettings,
   type MediaItem,
+  type LyricsSearchResult,
   type ReleaseHistoryEntry,
   type UpdateStatus,
 } from "../shared/types.js";
@@ -1338,6 +1339,69 @@ if (hasSingleInstanceLock)
     );
     ipcMain.handle("songs:create-category", (_event, name: string) =>
       database.createCategory(name),
+    );
+    ipcMain.handle(
+      "lyrics:search",
+      async (_event, title: string, artist: string): Promise<LyricsSearchResult[]> => {
+        const normalizedTitle = String(title || "").trim();
+        const normalizedArtist = String(artist || "").trim();
+        if (!normalizedTitle) return [];
+        const endpoint = new URL("https://lrclib.net/api/search");
+        endpoint.searchParams.set("track_name", normalizedTitle);
+        if (normalizedArtist)
+          endpoint.searchParams.set("artist_name", normalizedArtist);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12_000);
+        try {
+          const response = await net.fetch(endpoint.toString(), {
+            signal: controller.signal,
+            headers: {
+              "Lrclib-Client": `FL-Proyector v${app.getVersion()} (https://github.com/conexion354-source/Fl-Proyector)`,
+            },
+          });
+          if (response.status === 429)
+            throw new Error("El servidor recibió demasiadas búsquedas. Esperá unos segundos.");
+          if (!response.ok)
+            throw new Error("El servidor de letras no está disponible en este momento.");
+          const records = (await response.json()) as Array<{
+            id?: unknown;
+            trackName?: unknown;
+            name?: unknown;
+            artistName?: unknown;
+            albumName?: unknown;
+            duration?: unknown;
+            instrumental?: unknown;
+            plainLyrics?: unknown;
+          }>;
+          if (!Array.isArray(records)) return [];
+          return records
+            .filter(
+              (record) =>
+                record.instrumental !== true &&
+                typeof record.plainLyrics === "string" &&
+                record.plainLyrics.trim(),
+            )
+            .slice(0, 20)
+            .map((record) => ({
+              provider: "LRCLIB" as const,
+              externalId: Number(record.id || 0),
+              title: String(record.trackName || record.name || normalizedTitle).trim(),
+              artist: String(record.artistName || "Artista desconocido").trim(),
+              album: (() => {
+                const value = String(record.albumName || "").trim();
+                return /^(null|undefined)$/i.test(value) ? "" : value;
+              })(),
+              duration: Math.max(0, Number(record.duration || 0)),
+              lyrics: String(record.plainLyrics).replace(/\r\n?/g, "\n").trim(),
+            }));
+        } catch (error) {
+          if (controller.signal.aborted)
+            throw new Error("La búsqueda tardó demasiado. Revisá la conexión a Internet.");
+          throw error;
+        } finally {
+          clearTimeout(timeout);
+        }
+      },
     );
     ipcMain.handle("bible:versions", () => database.listBibleVersions());
     ipcMain.handle("bible:version-enabled", (_event, id: number, enabled: boolean) =>

@@ -171,6 +171,7 @@ if (!window.flProyector) {
         song.title.toLowerCase().includes(search.toLowerCase()),
       ),
     listSongCategories: async () => [],
+    searchLyrics: async () => [],
     saveSong: async (song: any) => {
       if (song.id) {
         songs = songs.map((value) =>

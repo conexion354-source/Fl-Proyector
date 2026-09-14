@@ -21,6 +21,7 @@ import {
 import type {
   Song,
   SongCategory,
+  LyricsSearchResult,
   SongSectionType,
 } from "../../shared/types";
 import {
@@ -43,6 +44,7 @@ import {
   emptyRichText,
   withoutLegacyEditorPrompt,
 } from "../editorPlaceholders";
+import { NewSongDialog } from "./NewSongDialog";
 
 const songColors = [
   "#ef4444",
@@ -58,6 +60,22 @@ const songColors = [
   "#ec4899",
   "#64748b",
 ];
+
+const lyricsToSongHtml = (lyrics: string) =>
+  lyrics
+    .replace(/\r\n?/g, "\n")
+    .split(/\n\s*\n+/)
+    .map((block) =>
+      block
+        .trim()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\n/g, "<br>"),
+    )
+    .filter(Boolean)
+    .map((block) => `<p>${block}</p>`)
+    .join("<hr>");
 
 export function SongLibrary({
   meetingId,
@@ -89,7 +107,6 @@ export function SongLibrary({
   } | null>(null);
   const [renamingSong, setRenamingSong] = useState<Song | null>(null);
   const [newSongDialog, setNewSongDialog] = useState(false);
-  const [newSongTitle, setNewSongTitle] = useState("");
   const [newCategoryDialog, setNewCategoryDialog] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [assignNewCategory, setAssignNewCategory] = useState(false);
@@ -194,12 +211,16 @@ export function SongLibrary({
     setEditing(false);
     editor?.commands.setContent(withoutLegacyEditorPrompt(song.content, "song"));
   };
-  const create = (title = "Nuevo canto") => {
+  const create = (title = "Nuevo canto", content = emptyRichText) => {
+    const stanzaCount = splitSongStanzas(content).length;
     const fresh = {
       title,
       categoryId,
-      content: emptyRichText,
-      sectionTypes: ["verse"] as SongSectionType[],
+      content,
+      sectionTypes: Array.from(
+        { length: Math.max(1, stanzaCount) },
+        () => "verse" as SongSectionType,
+      ),
       color: "#8b5cf6",
       shadowEnabled: true,
       shadowColor: "#000000",
@@ -207,17 +228,18 @@ export function SongLibrary({
     };
     setSelected(fresh);
     setEditing(true);
-    editor?.commands.setContent(emptyRichText);
+    editor?.commands.setContent(content);
   };
   const openNewSong = () => {
-    setNewSongTitle("");
     setNewSongDialog(true);
   };
-  const confirmNewSong = () => {
-    const title = newSongTitle.trim();
-    if (!title) return;
+  const createManualSong = (title: string) => {
     setNewSongDialog(false);
     create(title);
+  };
+  const importLyrics = (result: LyricsSearchResult) => {
+    setNewSongDialog(false);
+    create(result.title, lyricsToSongHtml(result.lyrics));
   };
   const save = async () => {
     await withSaveNotification(async () => {
@@ -811,46 +833,11 @@ export function SongLibrary({
         />
       )}
       {newSongDialog && (
-        <div className="modal-backdrop">
-          <form
-            className="song-create-dialog"
-            onSubmit={(event) => {
-              event.preventDefault();
-              confirmNewSong();
-            }}
-          >
-            <button
-              type="button"
-              className="dialog-close"
-              aria-label="Cerrar"
-              onClick={() => setNewSongDialog(false)}
-            >
-              <X />
-            </button>
-            <span className="eyebrow">NUEVO CANTO</span>
-            <h2>Crear canción</h2>
-            <p>
-              Escribí el título para comenzar a cargar la letra y sus estrofas.
-            </p>
-            <label>
-              Título de la canción
-              <input
-                autoFocus
-                value={newSongTitle}
-                onChange={(event) => setNewSongTitle(event.target.value)}
-                placeholder="Ej. Cuán grande es Él"
-              />
-            </label>
-            <div className="song-create-actions">
-              <button type="button" onClick={() => setNewSongDialog(false)}>
-                Cancelar
-              </button>
-              <button className="primary" disabled={!newSongTitle.trim()}>
-                Crear canción
-              </button>
-            </div>
-          </form>
-        </div>
+        <NewSongDialog
+          onClose={() => setNewSongDialog(false)}
+          onManual={createManualSong}
+          onImport={importLyrics}
+        />
       )}
       {newCategoryDialog && (
         <div className="modal-backdrop">

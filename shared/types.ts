@@ -9,6 +9,15 @@ export type MediaItem = {
 };
 
 export type SongCategory = { id: number; name: string; songCount: number };
+export type LyricsSearchResult = {
+  provider: "LRCLIB";
+  externalId: number;
+  title: string;
+  artist: string;
+  album: string;
+  duration: number;
+  lyrics: string;
+};
 export type SongSectionType =
   | "verse"
   | "chorus"

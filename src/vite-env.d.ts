@@ -13,6 +13,7 @@ import type {
   Meeting,
   MeetingItem,
   LiveAudienceStatus,
+  LyricsSearchResult,
   ProjectionPatch,
   ProjectionState,
   ReleaseHistoryEntry,
@@ -57,6 +58,7 @@ declare global {
       ): Promise<number>;
       deleteSong(id: number): Promise<void>;
       createSongCategory(name: string): Promise<number>;
+      searchLyrics(title: string, artist: string): Promise<LyricsSearchResult[]>;
       listBibleVersions(): Promise<BibleVersion[]>;
       setBibleVersionEnabled(id: number, enabled: boolean): Promise<void>;
       listBibleBooks(versionId: number): Promise<BibleBook[]>;

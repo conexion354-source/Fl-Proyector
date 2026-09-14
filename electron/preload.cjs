@@ -44,6 +44,8 @@ contextBridge.exposeInMainWorld("flProyector", {
   deleteSong: (id) => ipcRenderer.invoke("songs:delete", id),
   createSongCategory: (name) =>
     ipcRenderer.invoke("songs:create-category", name),
+  searchLyrics: (title, artist) =>
+    ipcRenderer.invoke("lyrics:search", title, artist),
   listBibleVersions: () => ipcRenderer.invoke("bible:versions"),
   setBibleVersionEnabled: (id, enabled) => ipcRenderer.invoke("bible:version-enabled", id, enabled),
   listBibleBooks: (versionId) => ipcRenderer.invoke("bible:books", versionId),

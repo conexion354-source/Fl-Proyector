@@ -1940,7 +1940,8 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   .meeting-dialog > div,
   .live-audience-actions,
   .version-history-dialog > footer,
-  .help-dialog-footer
+  .help-dialog-footer,
+  .lyrics-search-footer
 ) button:not(.primary):not(.danger) {
   color:var(--fl-text)!important;
   border-color:var(--fl-border-strong)!important;
@@ -1955,7 +1956,8 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   .meeting-dialog > div,
   .live-audience-actions,
   .version-history-dialog > footer,
-  .help-dialog-footer
+  .help-dialog-footer,
+  .lyrics-search-footer
 ) button:not(.primary):not(.danger):hover { background:var(--fl-hover)!important; }
 .app-shell :is(.inspector-actions,.editor-actions) button.danger {
   color:var(--fl-danger)!important;
