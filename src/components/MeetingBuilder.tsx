@@ -668,9 +668,14 @@ export function MeetingBuilder({
       : { playing: false, loop: true };
 
   useEffect(() => {
+    // A non-looping video is temporary meeting content. When it is removed,
+    // React can clear onAirItemId one render before the restored projection
+    // state arrives. Never capture that transient video as the global
+    // background, otherwise the next song restores the video itself.
+    if (!state.video.loop) return;
     const onAir = items.find((item) => item.id === onAirItemId);
     if (onAir?.type !== "media") globalBackground.current = state.background;
-  }, [state.background, items, onAirItemId]);
+  }, [state.background, state.video.loop, items, onAirItemId]);
   useEffect(() => {
     const onAir = items.find((item) => item.id === onAirItemId);
     if (onAir?.type !== "media" || state.video.playing || !state.video.loop)
