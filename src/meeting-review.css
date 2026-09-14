@@ -192,8 +192,10 @@
   padding: 11px 2px;
 }
 .stanza-list > button {
+  --song-section-color: #3b82f6;
   border: 1px solid #282e38;
-  background: #11141a;
+  border-left: 4px solid var(--song-section-color);
+  background: color-mix(in srgb, var(--song-section-color) 8%, #11141a);
   border-radius: 8px;
   padding: 11px;
   text-align: left;
@@ -201,13 +203,20 @@
   cursor: pointer;
 }
 .stanza-list > button:hover {
-  border-color: #4c5362;
+  border-color: var(--song-section-color);
 }
 .stanza-list > button.active {
-  border-color: #665cff;
-  background: #24203e;
-  box-shadow: inset 3px 0 #756cff;
+  border-color: var(--song-section-color);
+  background: color-mix(in srgb, var(--song-section-color) 20%, #11141a);
+  box-shadow: inset 3px 0 var(--song-section-color);
 }
+.stanza-list > button[data-section-type="chorus"] { --song-section-color: #22c55e; }
+.stanza-list > button[data-section-type="prechorus"] { --song-section-color: #a855f7; }
+.stanza-list > button[data-section-type="bridge"] { --song-section-color: #f59e0b; }
+.stanza-list > button[data-section-type="intro"] { --song-section-color: #06b6d4; }
+.stanza-list > button[data-section-type="interlude"] { --song-section-color: #14b8a6; }
+.stanza-list > button[data-section-type="ending"] { --song-section-color: #ef4444; }
+.stanza-list > button[data-section-type="other"] { --song-section-color: #64748b; }
 .stanza-list > button > b {
   display: block;
   color: #827aff;

@@ -467,39 +467,43 @@
   min-height: 100%;
 }
 .song-rich-editor .tiptap > p[data-song-section-label] {
+  --song-section-color: #3b82f6;
   position: relative;
   margin: 0 0 10px;
-  padding: 30px 12px 12px;
-  border: 1px solid transparent;
+  padding: 30px 12px 12px 15px;
+  border: 1px solid color-mix(in srgb, var(--song-section-color) 42%, transparent);
+  border-left: 4px solid var(--song-section-color);
   border-radius: 8px;
+  background: color-mix(in srgb, var(--song-section-color) 9%, transparent);
   transition: border-color 120ms ease, background 120ms ease;
 }
 .song-rich-editor .tiptap > p[data-song-section-label]:hover {
-  border-color: var(--fl-border-strong, #465064);
-  background: color-mix(in srgb, var(--fl-accent, #0078d4) 7%, transparent);
+  border-color: var(--song-section-color);
+  background: color-mix(in srgb, var(--song-section-color) 15%, transparent);
 }
 .song-rich-editor .tiptap > p[data-song-section-label]::before {
   content: attr(data-song-section-label) "  ·  clic derecho para cambiar";
   position: absolute;
   top: 7px;
   left: 12px;
-  color: #58adf0;
+  color: var(--song-section-color);
   font: 750 10px/1.2 "Segoe UI Variable", "Segoe UI", sans-serif;
   letter-spacing: .02em;
   text-shadow: none;
 }
-.song-rich-editor .tiptap > p[data-song-section-type="chorus"]::before { color: #a99cff; }
-.song-rich-editor .tiptap > p[data-song-section-type="prechorus"]::before { color: #d8a3ff; }
-.song-rich-editor .tiptap > p[data-song-section-type="bridge"]::before { color: #ffb35c; }
-.song-rich-editor .tiptap > p[data-song-section-type="intro"]::before,
-.song-rich-editor .tiptap > p[data-song-section-type="interlude"]::before { color: #58d2bd; }
-.song-rich-editor .tiptap > p[data-song-section-type="ending"]::before { color: #ff8290; }
-.stanza-list > button[data-section-type="chorus"] b { color: #a99cff; }
-.stanza-list > button[data-section-type="prechorus"] b { color: #d8a3ff; }
-.stanza-list > button[data-section-type="bridge"] b { color: #ffb35c; }
-.stanza-list > button[data-section-type="intro"] b,
-.stanza-list > button[data-section-type="interlude"] b { color: #58d2bd; }
-.stanza-list > button[data-section-type="ending"] b { color: #ff8290; }
+.song-rich-editor .tiptap > p[data-song-section-type="chorus"] { --song-section-color: #22c55e; }
+.song-rich-editor .tiptap > p[data-song-section-type="prechorus"] { --song-section-color: #a855f7; }
+.song-rich-editor .tiptap > p[data-song-section-type="bridge"] { --song-section-color: #f59e0b; }
+.song-rich-editor .tiptap > p[data-song-section-type="intro"] { --song-section-color: #06b6d4; }
+.song-rich-editor .tiptap > p[data-song-section-type="interlude"] { --song-section-color: #14b8a6; }
+.song-rich-editor .tiptap > p[data-song-section-type="ending"] { --song-section-color: #ef4444; }
+.song-rich-editor .tiptap > p[data-song-section-type="other"] { --song-section-color: #64748b; }
+.stanza-list > button[data-section-type="chorus"] b { color: #4ade80; }
+.stanza-list > button[data-section-type="prechorus"] b { color: #c084fc; }
+.stanza-list > button[data-section-type="bridge"] b { color: #fbbf24; }
+.stanza-list > button[data-section-type="intro"] b { color: #22d3ee; }
+.stanza-list > button[data-section-type="interlude"] b { color: #2dd4bf; }
+.stanza-list > button[data-section-type="ending"] b { color: #fb7185; }
 .editor-actions button:disabled,
 .bible-sendbar button:disabled {
   opacity: 0.4;

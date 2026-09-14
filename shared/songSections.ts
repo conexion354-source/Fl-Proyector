@@ -18,6 +18,120 @@ const validTypes = new Set<SongSectionType>(
   songSectionOptions.map((option) => option.value),
 );
 
+export type ParsedSongLyrics = {
+  blocks: string[];
+  sectionTypes: SongSectionType[];
+};
+
+const sectionHeadingPatterns: Array<{
+  type: SongSectionType;
+  pattern: RegExp;
+}> = [
+  {
+    type: "prechorus",
+    pattern: /^(?:pre[\s-]?(?:chorus|coro|estribillo)|preestribillo)(?:\s+\d+)?$/i,
+  },
+  {
+    type: "chorus",
+    pattern: /^(?:chorus|coro|estribillo|refr[aá]n)(?:\s+\d+)?$/i,
+  },
+  { type: "bridge", pattern: /^(?:bridge|puente)(?:\s+\d+)?$/i },
+  {
+    type: "intro",
+    pattern: /^(?:intro|introducci[oó]n)(?:\s+\d+)?$/i,
+  },
+  {
+    type: "interlude",
+    pattern: /^(?:interlude|interludio|instrumental)(?:\s+\d+)?$/i,
+  },
+  {
+    type: "ending",
+    pattern: /^(?:ending|outro|final|coda)(?:\s+\d+)?$/i,
+  },
+  {
+    type: "verse",
+    pattern: /^(?:verse|verso|estrofa)(?:\s+\d+)?$/i,
+  },
+];
+
+function songSectionHeading(line: string): SongSectionType | null {
+  const candidate = line
+    .trim()
+    .replace(/^\[|\]$/g, "")
+    .replace(/^\(|\)$/g, "")
+    .replace(/\s*[:：]\s*$/, "")
+    .trim();
+  return (
+    sectionHeadingPatterns.find(({ pattern }) => pattern.test(candidate))
+      ?.type ?? null
+  );
+}
+
+function comparableLyricsBlock(block: string) {
+  return block
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es-AR")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Interprets section headings commonly returned in plain-text lyrics and uses
+ * exact repeated blocks as a conservative chorus hint. Headings are omitted
+ * from the clean blocks so they never become part of the projected lyrics.
+ */
+export function inferSongLyricsStructure(lyrics: string): ParsedSongLyrics {
+  const blocks: string[] = [];
+  const explicitTypes: Array<SongSectionType | null> = [];
+  let currentLines: string[] = [];
+  let pendingType: SongSectionType | null = null;
+
+  const flush = () => {
+    const block = currentLines.join("\n").trim();
+    if (block) {
+      blocks.push(block);
+      explicitTypes.push(pendingType);
+    }
+    currentLines = [];
+    pendingType = null;
+  };
+
+  for (const rawLine of lyrics.replace(/\r\n?/g, "\n").split("\n")) {
+    const heading = songSectionHeading(rawLine);
+    if (heading) {
+      flush();
+      pendingType = heading;
+      continue;
+    }
+    if (!rawLine.trim()) {
+      if (currentLines.length) flush();
+      continue;
+    }
+    currentLines.push(rawLine.trim());
+  }
+  flush();
+
+  const keys = blocks.map(comparableLyricsBlock);
+  const occurrences = new Map<string, number>();
+  const knownTypes = new Map<string, SongSectionType>();
+  keys.forEach((key, index) => {
+    if (!key) return;
+    occurrences.set(key, (occurrences.get(key) ?? 0) + 1);
+    if (explicitTypes[index]) knownTypes.set(key, explicitTypes[index]);
+  });
+
+  return {
+    blocks,
+    sectionTypes: keys.map((key, index) => {
+      if (explicitTypes[index]) return explicitTypes[index];
+      const knownType = knownTypes.get(key);
+      if (knownType) return knownType;
+      return (occurrences.get(key) ?? 0) > 1 ? "chorus" : "verse";
+    }),
+  };
+}
+
 export function splitSongStanzas(html: string) {
   const marker = "___FL_STANZA___";
   const normalized = html

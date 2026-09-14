@@ -25,6 +25,7 @@ import type {
   SongSectionType,
 } from "../../shared/types";
 import {
+  inferSongLyricsStructure,
   normalizeSongSectionTypes,
   songSectionLabel,
   songSectionOptions,
@@ -61,21 +62,24 @@ const songColors = [
   "#64748b",
 ];
 
-const lyricsToSongHtml = (lyrics: string) =>
-  lyrics
-    .replace(/\r\n?/g, "\n")
-    .split(/\n\s*\n+/)
-    .map((block) =>
-      block
+const lyricsToSong = (lyrics: string) => {
+  const parsed = inferSongLyricsStructure(lyrics);
+  return {
+    sectionTypes: parsed.sectionTypes,
+    html: parsed.blocks
+      .map((block) =>
+        block
         .trim()
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/\n/g, "<br>"),
-    )
-    .filter(Boolean)
-    .map((block) => `<p>${block}</p>`)
-    .join("<hr>");
+      )
+      .filter(Boolean)
+      .map((block) => `<p>${block}</p>`)
+      .join("<hr>"),
+  };
+};
 
 export function SongLibrary({
   meetingId,
@@ -211,16 +215,25 @@ export function SongLibrary({
     setEditing(false);
     editor?.commands.setContent(withoutLegacyEditorPrompt(song.content, "song"));
   };
-  const create = (title = "Nuevo canto", content = emptyRichText) => {
+  const create = (
+    title = "Nuevo canto",
+    content = emptyRichText,
+    importedSectionTypes?: SongSectionType[],
+  ) => {
     const stanzaCount = splitSongStanzas(content).length;
     const fresh = {
       title,
       categoryId,
       content,
-      sectionTypes: Array.from(
-        { length: Math.max(1, stanzaCount) },
-        () => "verse" as SongSectionType,
-      ),
+      sectionTypes: importedSectionTypes
+        ? normalizeSongSectionTypes(
+            importedSectionTypes,
+            Math.max(1, stanzaCount),
+          )
+        : Array.from(
+            { length: Math.max(1, stanzaCount) },
+            () => "verse" as SongSectionType,
+          ),
       color: "#8b5cf6",
       shadowEnabled: true,
       shadowColor: "#000000",
@@ -239,7 +252,8 @@ export function SongLibrary({
   };
   const importLyrics = (result: LyricsSearchResult) => {
     setNewSongDialog(false);
-    create(result.title, lyricsToSongHtml(result.lyrics));
+    const imported = lyricsToSong(result.lyrics);
+    create(result.title, imported.html, imported.sectionTypes);
   };
   const save = async () => {
     await withSaveNotification(async () => {
