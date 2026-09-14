@@ -82,17 +82,25 @@ export function NewSongDialog({ onClose, onManual, onImport }: Props) {
           <>
             <span className="eyebrow">NUEVO CANTO</span>
             <h2 id="new-song-dialog-title">¿Cómo querés crearlo?</h2>
-            <p>Elegí cómo cargar la letra. En ambos casos podrás editarla antes de guardar.</p>
+            <p>Elegí cómo cargar la letra.</p>
             <div className="new-song-mode-grid">
-              <button type="button" onClick={() => setMode("manual")}>
+              <button
+                type="button"
+                title="Escribir o pegar la letra"
+                aria-label="Crear canción manualmente"
+                onClick={() => setMode("manual")}
+              >
                 <FilePenLine />
-                <strong>Crear manualmente</strong>
-                <span>Escribir o pegar la letra en el editor.</span>
+                <strong>Manual</strong>
               </button>
-              <button type="button" onClick={() => setMode("web")}>
+              <button
+                type="button"
+                title="Buscar la letra por título y artista"
+                aria-label="Buscar canción en el servidor"
+                onClick={() => setMode("web")}
+              >
                 <Globe2 />
-                <strong>Buscar letra en Internet</strong>
-                <span>Buscar por título y artista en LRCLIB.</span>
+                <strong>Servidor</strong>
               </button>
             </div>
           </>
