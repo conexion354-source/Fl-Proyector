@@ -55,6 +55,10 @@ import {
   ColumnResizer,
   storedColumnWidth,
 } from "./ColumnResizer";
+import {
+  emptyRichText,
+  withoutLegacyEditorPrompt,
+} from "../editorPlaceholders";
 
 const itemIcons = {
   announcement: Megaphone,
@@ -134,8 +138,12 @@ function splitAnnouncementPages(html: string, limit = 240) {
 function announcementPages(payload: Record<string, unknown>) {
   const saved = payload.announcementPages;
   if (Array.isArray(saved) && saved.every((page) => typeof page === "string"))
-    return saved as string[];
-  return splitAnnouncementPages(String(payload.html || ""));
+    return (saved as string[]).map((page) =>
+      withoutLegacyEditorPrompt(page, "announcement"),
+    );
+  return splitAnnouncementPages(
+    withoutLegacyEditorPrompt(String(payload.html || ""), "announcement"),
+  );
 }
 
 function legacyBibleText(html: string) {
@@ -326,7 +334,7 @@ export function MeetingBuilder({
       song
         ? {
             title: selected.title || song.title,
-            content: song.content,
+            content: withoutLegacyEditorPrompt(song.content, "song"),
             shadowEnabled: song.shadowEnabled,
             shadowColor: song.shadowColor,
             shadowBlur: song.shadowBlur,
@@ -443,7 +451,7 @@ export function MeetingBuilder({
     const payload: Record<string, unknown> =
       type === "announcement"
         ? {
-            html: "<p>Bienvenidos</p>",
+            html: emptyRichText,
             position: "center",
             fontSize: 64,
             color: "#ffffff",
@@ -2250,12 +2258,16 @@ function RichAnnouncementEditor({
       FontFamily,
       Highlight.configure({ multicolor: true }),
     ],
-    content: html,
+    content: withoutLegacyEditorPrompt(html, "announcement"),
+    editorProps: {
+      attributes: { "data-placeholder": "Escribí el anuncio aquí…" },
+    },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
   useEffect(() => {
-    if (editor && editor.getHTML() !== html)
-      editor.commands.setContent(html, { emitUpdate: false });
+    const content = withoutLegacyEditorPrompt(html, "announcement");
+    if (editor && editor.getHTML() !== content)
+      editor.commands.setContent(content, { emitUpdate: false });
   }, [editor, html]);
   return (
     <div className="announcement-rich">
@@ -2311,7 +2323,10 @@ function RichSongEditor({
       FontFamily,
       Highlight.configure({ multicolor: true }),
     ],
-    content: draft.content,
+    content: withoutLegacyEditorPrompt(draft.content, "song"),
+    editorProps: {
+      attributes: { "data-placeholder": "Escribí aquí la letra de la canción…" },
+    },
     onUpdate: ({ editor }) => onChange({ ...draft, content: editor.getHTML() }),
   });
   const stanzaCount = Math.max(1, splitSongStanzas(draft.content).length);

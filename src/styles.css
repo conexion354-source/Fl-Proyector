@@ -274,6 +274,27 @@ textarea:focus {
   outline: 2px solid var(--control-focus);
   outline-offset: 1px;
 }
+.ProseMirror[data-placeholder] {
+  position: relative;
+}
+.ProseMirror[data-placeholder]:has(> p:only-child > br.ProseMirror-trailingBreak)::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  inset: 0 auto auto 0;
+  color: #737c8d;
+  font-style: italic;
+  opacity: 0.72;
+  pointer-events: none;
+  text-shadow: none;
+}
+html[data-theme="light"]
+  .ProseMirror[data-placeholder]:has(> p:only-child > br.ProseMirror-trailingBreak)::before {
+  color: #7a8493;
+}
+.song-editor.is-reading
+  .ProseMirror[data-placeholder]:has(> p:only-child > br.ProseMirror-trailingBreak)::before {
+  display: none;
+}
 button {
   min-width: 0;
   max-width: 100%;

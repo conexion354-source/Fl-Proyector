@@ -39,6 +39,10 @@ import {
   ColumnResizer,
   storedColumnWidth,
 } from "./ColumnResizer";
+import {
+  emptyRichText,
+  withoutLegacyEditorPrompt,
+} from "../editorPlaceholders";
 
 const songColors = [
   "#ef4444",
@@ -70,7 +74,7 @@ export function SongLibrary({
   const [selected, setSelected] = useState<Partial<Song>>({
     title: "",
     categoryId: null,
-    content: "<p>Escribí aquí la letra del canto…</p>",
+    content: emptyRichText,
     sectionTypes: ["verse"],
     shadowEnabled: true,
     shadowColor: "#000000",
@@ -125,8 +129,11 @@ export function SongLibrary({
       FontFamily,
       Highlight.configure({ multicolor: true }),
     ],
-    content: selected.content,
+    content: withoutLegacyEditorPrompt(selected.content, "song"),
     editable: false,
+    editorProps: {
+      attributes: { "data-placeholder": "Escribí aquí la letra del canto…" },
+    },
     onUpdate: () => setEditorRevision((value) => value + 1),
   });
 
@@ -184,13 +191,13 @@ export function SongLibrary({
   const choose = (song: Song) => {
     setSelected(song);
     setEditing(false);
-    editor?.commands.setContent(song.content);
+    editor?.commands.setContent(withoutLegacyEditorPrompt(song.content, "song"));
   };
   const create = (title = "Nuevo canto") => {
     const fresh = {
       title,
       categoryId,
-      content: "<p>Escribí aquí la letra del canto…</p>",
+      content: emptyRichText,
       sectionTypes: ["verse"] as SongSectionType[],
       color: "#8b5cf6",
       shadowEnabled: true,
@@ -199,7 +206,7 @@ export function SongLibrary({
     };
     setSelected(fresh);
     setEditing(true);
-    editor?.commands.setContent(fresh.content);
+    editor?.commands.setContent(emptyRichText);
   };
   const openNewSong = () => {
     setNewSongTitle("");
