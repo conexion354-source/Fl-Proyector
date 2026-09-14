@@ -376,7 +376,7 @@ if (!window.flProyector) {
     },
     getUpdateStatus: async () => ({
       state: "development",
-      currentVersion: "10.11.5",
+      currentVersion: "10.11.6",
       availableVersion: null,
       progress: null,
       message: "La búsqueda está desactivada mientras se prueba el sistema.",
@@ -384,7 +384,32 @@ if (!window.flProyector) {
     }),
     getReleaseHistory: async () => [
       {
+        version: "10.11.6",
+        title: "Lectura en vivo, colaboración y encuadre inteligente",
+        publishedAt: "2026-09-14T15:21:10Z",
+        changes: [
+          "Se incorporó una lectura en vivo por QR para que teléfonos y otros dispositivos sigan canciones y pasajes bíblicos en tiempo real.",
+          "El control maestro del QR restaura correctamente el contenido anterior al quitarlo de la proyección.",
+          "El modo colaborador permite organizar reuniones, crear y corregir canciones y editar anuncios con sincronización inmediata.",
+          "Los videos restauran el fondo al finalizar y se encuadran completos en pantallas 4:3, 16:9 y otras proporciones sin recortarse.",
+          "Rellenar pantalla aprovecha mejor el área disponible y reduce sutilmente texto y referencia cuando una tipografía podría quedar cortada.",
+          "La división bíblica A/B evita partes innecesarias y protege cada fragmento contra desbordes visuales.",
+        ],
+      },
+      {
         version: "10.11.5",
+        title: "Pantallas, diseño y proyección más confiables",
+        publishedAt: "2026-09-12T18:00:00Z",
+        changes: [
+          "Los cambios de monitor principal y tercera pantalla se aplican en vivo, creando, moviendo o cerrando cada salida correctamente.",
+          "La relación 16:9, 16:10 o 4:3 y la resolución elegida ahora se respetan en la salida real, manteniendo la ventana de Windows en pantalla completa.",
+          "El color sin contenido se muestra también en la pantalla de proyección y se reforzó el uso de márgenes seguros.",
+          "Anuncios y referencias incorporan nuevos zócalos, movimientos, fuentes Montserrat y Oswald y sombras consistentes.",
+          "Se completó la transmisión de estilos y controles desde el sistema principal y el control remoto.",
+        ],
+      },
+      {
+        version: "10.11.4",
         title: "Versículos completos y división A/B inteligente",
         publishedAt: "2026-09-11T16:55:00Z",
         changes: [

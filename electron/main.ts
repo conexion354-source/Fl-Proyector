@@ -120,6 +120,19 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.6",
+    title: "Lectura en vivo, colaboración y encuadre inteligente",
+    publishedAt: "2026-09-14T15:21:10Z",
+    changes: [
+      "Se incorporó una lectura en vivo por QR para que teléfonos y otros dispositivos sigan canciones y pasajes bíblicos en tiempo real.",
+      "El control maestro del QR restaura correctamente el contenido anterior al quitarlo de la proyección.",
+      "El modo colaborador permite organizar reuniones, crear y corregir canciones y editar anuncios con sincronización inmediata.",
+      "Los videos restauran el fondo al finalizar y se encuadran completos en pantallas 4:3, 16:9 y otras proporciones sin recortarse.",
+      "Rellenar pantalla aprovecha mejor el área disponible y reduce sutilmente texto y referencia cuando una tipografía podría quedar cortada.",
+      "La división bíblica A/B evita partes innecesarias y protege cada fragmento contra desbordes visuales.",
+    ],
+  },
+  {
     version: "10.11.5",
     title: "Pantallas, diseño y proyección más confiables",
     publishedAt: "2026-09-12T18:00:00Z",
