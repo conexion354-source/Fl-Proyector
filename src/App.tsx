@@ -14,8 +14,6 @@ import {
   MonitorUp,
   Music2,
   Pause,
-  PanelLeftClose,
-  PanelLeftOpen,
   Play,
   QrCode,
   Settings,
@@ -351,7 +349,7 @@ export function App() {
             aria-label={sidebarCollapsed ? "Expandir menú" : "Contraer menú"}
             title={sidebarCollapsed ? "Expandir menú" : "Contraer menú"}
           >
-            {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+            {sidebarCollapsed ? <ChevronRight /> : <ChevronLeft />}
           </button>
           <nav>
             <button

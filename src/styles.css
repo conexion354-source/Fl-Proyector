@@ -540,23 +540,22 @@ html[data-theme="light"] .about-dialog > small {
   position: absolute;
   z-index: 3;
   top: 50%;
-  right: -10px;
-  width: 20px;
-  height: 44px;
-  min-height: 44px;
+  right: 1px;
+  width: 17px;
+  height: 38px;
+  min-height: 38px;
   transform: translateY(-50%);
   flex-direction: row;
   margin: 0;
-  border: 1px solid #2c3340;
-  border-radius: 0 8px 8px 0;
-  background: #151922;
+  border: 0;
+  border-radius: 7px 0 0 7px;
+  background: transparent;
   color: #8a93a4;
-  box-shadow: 3px 0 9px #0004;
-  opacity: 0.72;
+  box-shadow: none;
+  opacity: 0.52;
 }
 .sidebar .sidebar-toggle:hover {
-  border-color: #4f596b;
-  background: #1c212c;
+  background: #202631;
   color: #d5dae4;
   opacity: 1;
 }
@@ -577,13 +576,11 @@ html[data-theme="light"] .about-dialog > small {
   display: none;
 }
 html[data-theme="light"] .sidebar .sidebar-toggle {
-  background: #f7f9fc;
-  border-color: #d6dde7;
+  background: transparent;
   color: #626d7d;
 }
 html[data-theme="light"] .sidebar .sidebar-toggle:hover {
-  background: #edf1f6;
-  border-color: #bcc7d4;
+  background: #e7ecf2;
   color: #303848;
 }
 .content {
