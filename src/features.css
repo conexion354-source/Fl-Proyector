@@ -139,6 +139,21 @@
   font-weight: 800;
   cursor: pointer;
 }
+.stanza-edit-dialog {
+  width: min(680px, calc(100vw - 40px));
+}
+.stanza-edit-dialog .announcement-toolbar {
+  margin-top: 14px;
+}
+.stanza-edit-content {
+  min-height: 210px;
+  max-height: min(45vh, 420px);
+  margin-top: 8px;
+  overflow: auto;
+}
+.stanza-edit-content .tiptap {
+  min-height: 190px;
+}
 .new-song-dialog {
   color: var(--fl-text, #fff);
   background: var(--fl-surface, #11141a);

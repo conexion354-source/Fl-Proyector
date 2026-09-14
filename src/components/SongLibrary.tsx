@@ -81,6 +81,85 @@ const lyricsToSong = (lyrics: string) => {
   };
 };
 
+const asSingleStanzaHtml = (html: string) => {
+  const inner = html
+    .trim()
+    .replace(/^<p[^>]*>/i, "")
+    .replace(/<\/p>$/i, "")
+    .replace(/<\/p>\s*<p[^>]*>/gi, "<br>")
+    .replace(/<hr[^>]*>/gi, "<br>");
+  return `<p>${inner}</p>`;
+};
+
+function StanzaEditDialog({
+  label,
+  html,
+  onCancel,
+  onSave,
+}: {
+  label: string;
+  html: string;
+  onCancel: () => void;
+  onSave: (html: string) => void | Promise<void>;
+}) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      TextStyle,
+      Color,
+      FontFamily,
+      Highlight.configure({ multicolor: true }),
+    ],
+    content: html,
+  });
+
+  useEffect(() => {
+    if (editor && editor.getHTML() !== html) {
+      editor.commands.setContent(html, { emitUpdate: false });
+    }
+  }, [editor, html]);
+
+  return (
+    <div className="modal-backdrop">
+      <section
+        className="song-create-dialog stanza-edit-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stanza-edit-title"
+      >
+        <button
+          type="button"
+          className="dialog-close"
+          aria-label="Cerrar"
+          onClick={onCancel}
+        >
+          <X />
+        </button>
+        <span className="eyebrow">EDITAR SÓLO ESTA PARTE</span>
+        <h2 id="stanza-edit-title">{label}</h2>
+        <p>Los cambios se aplicarán únicamente a esta estrofa.</p>
+        <RichTextToolbar editor={editor} />
+        <EditorContent
+          editor={editor}
+          className="rich-editor stanza-edit-content"
+        />
+        <div className="song-create-actions">
+          <button type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => void onSave(editor?.getHTML() ?? html)}
+          >
+            Guardar estrofa
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function SongLibrary({
   meetingId,
   onAddToMeeting,
@@ -121,6 +200,15 @@ export function SongLibrary({
     index: number;
     x: number;
     y: number;
+  } | null>(null);
+  const [editingSection, setEditingSection] = useState<{
+    index: number;
+    label: string;
+    html: string;
+  } | null>(null);
+  const [pendingDeleteSection, setPendingDeleteSection] = useState<{
+    index: number;
+    label: string;
   } | null>(null);
   const [categoriesWidth, setCategoriesWidth] = useState(() =>
     clampColumnWidth(
@@ -399,6 +487,45 @@ export function SongLibrary({
       notifySaved("La estructura de la canción fue guardada.");
       await reload();
     }
+  };
+  const updateSingleSection = async (
+    index: number,
+    replacement: string | null,
+  ) => {
+    const content = editor?.getHTML() ?? selected.content ?? "";
+    const stanzas = splitSongStanzas(content);
+    if (!stanzas[index]) return;
+    const sectionTypes = normalizeSongSectionTypes(
+      selected.sectionTypes,
+      stanzas.length,
+    );
+    if (replacement === null) {
+      stanzas.splice(index, 1);
+      sectionTypes.splice(index, 1);
+    } else {
+      stanzas[index] = asSingleStanzaHtml(replacement);
+    }
+    const nextContent = stanzas.length ? stanzas.join("<hr>") : "<p></p>";
+    const changed = {
+      ...selected,
+      content: nextContent,
+      sectionTypes,
+    };
+    setSelected(changed);
+    editor?.commands.setContent(nextContent, { emitUpdate: false });
+    setEditorRevision((value) => value + 1);
+    if (selected.id) {
+      await window.flProyector.saveSong({
+        ...changed,
+        title: changed.title?.trim() || "Sin título",
+      });
+      await reload();
+    }
+    notifySaved(
+      replacement === null
+        ? "La estrofa fue eliminada."
+        : "La estrofa fue actualizada.",
+    );
   };
   const send = async () => {
     if (!selected.id) return;
@@ -722,17 +849,47 @@ export function SongLibrary({
           y={sectionContextMenu.y}
           onClose={() => setSectionContextMenu(null)}
           ariaLabel={`Tipo de ${songSectionLabel(visibleSectionTypes, sectionContextMenu.index)}`}
-          items={songSectionOptions.map((option) => ({
-            label: `Asignar como ${option.label}`,
-            icon:
-              visibleSectionTypes[sectionContextMenu.index] === option.value ? (
-                <Check />
-              ) : (
-                <Music2 />
-              ),
-            onClick: () =>
-              void changeSectionType(sectionContextMenu.index, option.value),
-          }))}
+          items={[
+            {
+              label: "Editar esta estrofa",
+              icon: <Pencil />,
+              onClick: () =>
+                setEditingSection({
+                  index: sectionContextMenu.index,
+                  label: songSectionLabel(
+                    visibleSectionTypes,
+                    sectionContextMenu.index,
+                  ),
+                  html: visibleStanzas[sectionContextMenu.index],
+                }),
+            },
+            ...songSectionOptions.map((option, index) => ({
+              label: `Asignar como ${option.label}`,
+              icon:
+                visibleSectionTypes[sectionContextMenu.index] ===
+                option.value ? (
+                  <Check />
+                ) : (
+                  <Music2 />
+                ),
+              separatorBefore: index === 0,
+              onClick: () =>
+                void changeSectionType(sectionContextMenu.index, option.value),
+            })),
+            {
+              label: "Eliminar esta estrofa",
+              icon: <Trash2 />,
+              danger: true,
+              onClick: () =>
+                setPendingDeleteSection({
+                  index: sectionContextMenu.index,
+                  label: songSectionLabel(
+                    visibleSectionTypes,
+                    sectionContextMenu.index,
+                  ),
+                }),
+            },
+          ]}
         />
       )}
       {songContextMenu && (
@@ -844,6 +1001,28 @@ export function SongLibrary({
           detail="La canción se quitará definitivamente de la biblioteca. Esta acción no se puede deshacer."
           onCancel={() => setPendingDeleteSong(null)}
           onConfirm={remove}
+        />
+      )}
+      {editingSection && (
+        <StanzaEditDialog
+          label={editingSection.label}
+          html={editingSection.html}
+          onCancel={() => setEditingSection(null)}
+          onSave={async (html) => {
+            await updateSingleSection(editingSection.index, html);
+            setEditingSection(null);
+          }}
+        />
+      )}
+      {pendingDeleteSection && (
+        <ConfirmDeleteDialog
+          title={`¿Eliminar “${pendingDeleteSection.label}”?`}
+          detail="Se eliminará solamente esta estrofa. El resto de la canción conservará su contenido y orden."
+          onCancel={() => setPendingDeleteSection(null)}
+          onConfirm={async () => {
+            await updateSingleSection(pendingDeleteSection.index, null);
+            setPendingDeleteSection(null);
+          }}
         />
       )}
       {newSongDialog && (
