@@ -499,8 +499,10 @@
   border-color: #665cff;
 }
 .verse-list b {
-  font-size: 11px;
-  color: #a8a2ff;
+  font-size: 13px;
+  font-weight: 850;
+  color: #5ee28f;
+  letter-spacing: 0.01em;
 }
 .verse-list span {
   font-size: 12px;
@@ -623,8 +625,10 @@
 .bible-slide-list > button > b {
   display: block;
   margin-bottom: 7px;
-  color: #aaa4ff;
-  font-size: 9px;
+  color: #5ee28f;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.01em;
 }
 .bible-slide-list p {
   margin: 0;

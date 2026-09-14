@@ -194,6 +194,11 @@ html[data-theme="light"] .media-meta strong,
 html[data-theme="light"] .song-list > button strong {
   color: #252b36 !important;
 }
+html[data-theme="light"] .verse-list b,
+html[data-theme="light"] .bible-slide-list > button > b {
+  color: #c62828 !important;
+  font-weight: 850;
+}
 html[data-theme="light"] .verse-list > button.selected,
 html[data-theme="light"] .bible-slide-list > button.selected,
 html[data-theme="light"] .meeting-list > button.selected,
