@@ -148,6 +148,7 @@ html[data-theme="light"] .song-list > button span {
   color: #556174 !important;
 }
 html[data-theme="light"] .bible-toolbar label,
+html[data-theme="light"] .bible-book-field,
 html[data-theme="light"] .bible-column-heading span,
 html[data-theme="light"] .bible-column-heading small,
 html[data-theme="light"] .control-title,
@@ -157,6 +158,30 @@ html[data-theme="light"] .live-control-title b,
 html[data-theme="light"] .media-meta span,
 html[data-theme="light"] .song-list > button span {
   color: #667184 !important;
+}
+html[data-theme="light"] .bible-book-trigger,
+html[data-theme="light"] .bible-book-popover,
+html[data-theme="light"] .bible-book-search {
+  background: #ffffff;
+  border-color: #cbd4e0;
+  color: #252b36;
+}
+html[data-theme="light"] .bible-book-popover {
+  box-shadow: 0 15px 36px #24304a24;
+}
+html[data-theme="light"] .bible-book-search {
+  background: #f8fafc;
+}
+html[data-theme="light"] .bible-book-search input,
+html[data-theme="light"] .bible-book-options button {
+  color: #252b36 !important;
+}
+html[data-theme="light"] .bible-book-options button:hover {
+  background: #eef1f6;
+}
+html[data-theme="light"] .bible-book-options button.selected {
+  background: #ece9ff;
+  color: #4338ca !important;
 }
 html[data-theme="light"] .bible-search input,
 html[data-theme="light"] .search input,

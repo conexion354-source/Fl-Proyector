@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Highlighter, Search, X } from "lucide-react";
+import { BookOpen, ChevronDown, Highlighter, Search, X } from "lucide-react";
 import type {
   BibleBook,
   BibleVerse,
@@ -36,6 +36,108 @@ function loadBiblePosition(): BibleOperatorPosition {
   } catch {
     return { versionId: 0, book: "", chapter: 1, activeVerse: "", activeSlide: 0 };
   }
+}
+
+function normalizeBookSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es");
+}
+
+function BibleBookPicker({
+  books,
+  value,
+  onChange,
+}: {
+  books: BibleBook[];
+  value: string;
+  onChange: (book: string) => void;
+}) {
+  const root = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const filteredBooks = books.filter((item) =>
+    normalizeBookSearch(item.book).includes(normalizeBookSearch(search.trim())),
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    input.current?.focus();
+    const close = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [open]);
+
+  const choose = (nextBook: string) => {
+    onChange(nextBook);
+    setSearch("");
+    setOpen(false);
+  };
+
+  return (
+    <div className="bible-book-picker" ref={root}>
+      <button
+        type="button"
+        className={`bible-book-trigger ${open ? "open" : ""}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span>{value || "Elegir libro"}</span>
+        <Search className="book-search-icon" aria-hidden="true" />
+        <ChevronDown className="book-chevron" aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="bible-book-popover">
+          <div className="bible-book-search">
+            <Search aria-hidden="true" />
+            <input
+              ref={input}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setOpen(false);
+                if (event.key === "Enter" && filteredBooks[0])
+                  choose(filteredBooks[0].book);
+              }}
+              placeholder="Buscar libro..."
+              aria-label="Buscar libro de la Biblia"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="Limpiar búsqueda"
+              >
+                <X aria-hidden="true" />
+              </button>
+            )}
+          </div>
+          <div className="bible-book-options" role="listbox">
+            {filteredBooks.map((item) => (
+              <button
+                type="button"
+                role="option"
+                aria-selected={item.book === value}
+                className={item.book === value ? "selected" : ""}
+                key={item.book}
+                onClick={() => choose(item.book)}
+              >
+                {item.book}
+              </button>
+            ))}
+            {!filteredBooks.length && (
+              <span className="bible-book-empty">No encontramos ese libro</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function BibleOperator({
@@ -396,24 +498,19 @@ export function BibleOperator({
             ))}
           </select>
         </label>
-        <label>
-          Libro
-          <select
+        <div className="bible-book-field">
+          <span>Libro</span>
+          <BibleBookPicker
+            books={books}
             value={book}
-            onChange={(e) => {
-              setBook(e.target.value);
+            onChange={(nextBook) => {
+              setBook(nextBook);
               setChapter(1);
               setQuery("");
               setVerseFilter("");
             }}
-          >
-            {books.map((item) => (
-              <option value={item.book} key={item.book}>
-                {item.book}
-              </option>
-            ))}
-          </select>
-        </label>
+          />
+        </div>
         <label>
           Capítulo
           <select
