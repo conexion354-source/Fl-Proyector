@@ -96,6 +96,7 @@ function parseXmlBible(xml: string): BibleData {
 let controlWindow: BrowserWindow | null = null;
 let projectionWindow: BrowserWindow | null = null;
 let thirdProjectionWindow: BrowserWindow | null = null;
+let liveAudienceWindow: BrowserWindow | null = null;
 let tagsDialogWindow: BrowserWindow | null = null;
 let state: ProjectionState = structuredClone(initialProjectionState);
 let database: AppDatabase;
@@ -109,6 +110,7 @@ let meetingMediaDir = "";
 let churchAssetsDir = "";
 let updaterConfigured = false;
 let liveAudienceCaptureTimer: ReturnType<typeof setTimeout> | null = null;
+let liveAudienceCaptureRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let updateStatus: UpdateStatus = {
   state: app.isPackaged ? "idle" : "development",
   currentVersion: app.getVersion(),
@@ -395,6 +397,15 @@ function mergeState(patch: ProjectionPatch) {
     outputViewport: { ...state.outputViewport, ...patch.outputViewport },
   };
   if (
+    patch.outputViewport &&
+    liveAudienceWindow &&
+    !liveAudienceWindow.isDestroyed()
+  )
+    liveAudienceWindow.setContentSize(
+      Math.max(320, Math.round(state.outputViewport.width)),
+      Math.max(240, Math.round(state.outputViewport.height)),
+    );
+  if (
     !state.video.loop &&
     state.video.playing &&
     state.video.duration > 0 &&
@@ -407,7 +418,12 @@ function mergeState(patch: ProjectionPatch) {
       finishVideoPlayback();
     });
   }
-  for (const win of [controlWindow, projectionWindow, thirdProjectionWindow])
+  for (const win of [
+    controlWindow,
+    projectionWindow,
+    thirdProjectionWindow,
+    liveAudienceWindow,
+  ])
     if (win && !win.isDestroyed())
       win.webContents.send("projection:state", state);
   remoteServer?.broadcast(state);
@@ -417,32 +433,63 @@ function mergeState(patch: ProjectionPatch) {
 function scheduleLiveAudienceFrame() {
   if (!remoteServer?.needsLiveFrame(state)) {
     if (liveAudienceCaptureTimer) clearTimeout(liveAudienceCaptureTimer);
+    if (liveAudienceCaptureRetryTimer)
+      clearTimeout(liveAudienceCaptureRetryTimer);
     liveAudienceCaptureTimer = null;
+    liveAudienceCaptureRetryTimer = null;
     return;
   }
   if (liveAudienceCaptureTimer) clearTimeout(liveAudienceCaptureTimer);
+  if (liveAudienceCaptureRetryTimer)
+    clearTimeout(liveAudienceCaptureRetryTimer);
+  liveAudienceCaptureRetryTimer = null;
   // Trailing throttle: several rapid slide changes produce one capture of the
   // final frame, never a queue of obsolete JPEGs.
   liveAudienceCaptureTimer = setTimeout(async () => {
     liveAudienceCaptureTimer = null;
-    const source = projectionWindow && !projectionWindow.isDestroyed()
-      ? projectionWindow
-      : thirdProjectionWindow && !thirdProjectionWindow.isDestroyed()
-        ? thirdProjectionWindow
-        : null;
-    if (!source || !remoteServer?.needsLiveFrame(state)) return;
-    try {
-      const captured = await source.webContents.capturePage();
-      const size = captured.getSize();
-      const resized = size.width > 960
-        ? captured.resize({ width: 960, quality: "good" })
-        : captured;
-      const quality = remoteServer.getLiveAudienceStatus().viewers > 50 ? 40 : 50;
-      remoteServer.broadcastLiveFrame(resized.toJPEG(quality));
-    } catch (error) {
-      console.error("[live-audience] no se pudo capturar la salida", error);
-    }
+    await captureLiveAudienceFrame();
+    if (!state.presentation.visible) return;
+    const presentationKey = `${state.presentation.url}|${state.presentation.slideIndex}`;
+    let retries = 2;
+    const retry = () => {
+      liveAudienceCaptureRetryTimer = setTimeout(async () => {
+        liveAudienceCaptureRetryTimer = null;
+        if (
+          !remoteServer?.needsLiveFrame(state) ||
+          `${state.presentation.url}|${state.presentation.slideIndex}` !==
+            presentationKey
+        )
+          return;
+        await captureLiveAudienceFrame();
+        retries -= 1;
+        if (retries > 0) retry();
+      }, 1400);
+    };
+    retry();
   }, 500);
+}
+
+async function captureLiveAudienceFrame() {
+  if (!remoteServer?.needsLiveFrame(state)) return;
+  const source = projectionWindow && !projectionWindow.isDestroyed()
+    ? projectionWindow
+    : thirdProjectionWindow && !thirdProjectionWindow.isDestroyed()
+      ? thirdProjectionWindow
+      : liveAudienceWindow && !liveAudienceWindow.isDestroyed()
+        ? liveAudienceWindow
+        : null;
+  if (!source) return;
+  try {
+    const captured = await source.webContents.capturePage();
+    const size = captured.getSize();
+    const resized = size.width > 960
+      ? captured.resize({ width: 960, quality: "good" })
+      : captured;
+    const quality = remoteServer.getLiveAudienceStatus().viewers > 50 ? 40 : 50;
+    remoteServer.broadcastLiveFrame(resized.toJPEG(quality));
+  } catch (error) {
+    console.error("[live-audience] no se pudo capturar la salida", error);
+  }
 }
 
 function projectionViewport(settings: DisplaySettings) {
@@ -553,6 +600,41 @@ async function openProjection() {
     controlWindow?.webContents.send("projection:status-changed", false);
   });
   await synchronizeProjectionWindows(settings);
+}
+
+async function ensureLiveAudienceWindow() {
+  if (liveAudienceWindow && !liveAudienceWindow.isDestroyed()) return;
+  const settings = database.getDisplaySettings();
+  const width = Math.max(320, Math.round(state.outputViewport.width));
+  const height = Math.max(240, Math.round(state.outputViewport.height));
+  const win = new BrowserWindow({
+    show: false,
+    width,
+    height,
+    frame: false,
+    paintWhenInitiallyHidden: true,
+    backgroundColor: settings.backgroundColor,
+    webPreferences: {
+      preload: join(app.getAppPath(), "electron/preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+    },
+  });
+  liveAudienceWindow = win;
+  win.on("closed", () => {
+    if (liveAudienceWindow === win) liveAudienceWindow = null;
+  });
+  await win.loadURL(rendererUrl("projection"));
+  if (win.isDestroyed()) return;
+  win.webContents.send("projection:display-settings", settings);
+  win.webContents.send("projection:state", state);
+}
+
+function closeLiveAudienceWindow() {
+  if (liveAudienceWindow && !liveAudienceWindow.isDestroyed())
+    liveAudienceWindow.destroy();
+  liveAudienceWindow = null;
 }
 
 async function createProjectionWindow(
@@ -1228,14 +1310,19 @@ if (hasSingleInstanceLock)
     ipcMain.handle("live-audience:status", () =>
       remoteServer.getLiveAudienceStatus(),
     );
-    ipcMain.handle("live-audience:start", () => {
+    ipcMain.handle("live-audience:start", async () => {
+      await ensureLiveAudienceWindow();
       const result = remoteServer.startLiveAudience(state);
       scheduleLiveAudienceFrame();
       return result;
     });
     ipcMain.handle("live-audience:stop", () => {
       if (liveAudienceCaptureTimer) clearTimeout(liveAudienceCaptureTimer);
+      if (liveAudienceCaptureRetryTimer)
+        clearTimeout(liveAudienceCaptureRetryTimer);
       liveAudienceCaptureTimer = null;
+      liveAudienceCaptureRetryTimer = null;
+      closeLiveAudienceWindow();
       return remoteServer.stopLiveAudience();
     });
     ipcMain.handle("media:list", () => database.listMedia(mediaUrl));
