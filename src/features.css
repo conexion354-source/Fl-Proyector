@@ -2772,17 +2772,9 @@
   background: #e81123;
   color: #fff;
 }
-.media-tags-file {
-  margin: 16px 0;
-  overflow: hidden;
-  color: var(--fl-text-secondary, #aeb5c3);
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .media-tags-dialog label {
   display: block;
-  margin-bottom: 7px;
+  margin: 16px 0 7px;
   color: var(--fl-text-secondary, #aeb5c3);
   font-size: 12px;
   font-weight: 700;

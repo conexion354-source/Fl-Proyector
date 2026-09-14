@@ -1935,7 +1935,12 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   .song-create-actions,
   .editor-actions,
   .bible-picker-footer,
-  .collaborator-actions
+  .collaborator-actions,
+  .media-tags-actions,
+  .meeting-dialog > div,
+  .live-audience-actions,
+  .version-history-dialog > footer,
+  .help-dialog-footer
 ) button:not(.primary):not(.danger) {
   color:var(--fl-text)!important;
   border-color:var(--fl-border-strong)!important;
@@ -1945,7 +1950,12 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   .song-create-actions,
   .editor-actions,
   .bible-picker-footer,
-  .collaborator-actions
+  .collaborator-actions,
+  .media-tags-actions,
+  .meeting-dialog > div,
+  .live-audience-actions,
+  .version-history-dialog > footer,
+  .help-dialog-footer
 ) button:not(.primary):not(.danger):hover { background:var(--fl-hover)!important; }
 .app-shell :is(.inspector-actions,.editor-actions) button.danger {
   color:var(--fl-danger)!important;
@@ -2323,4 +2333,15 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   top:12px!important;
   right:12px!important;
   margin:0!important;
+}
+html[data-theme="light"] .app-shell :is(.dialog-close,.win11-settings-close,.help-dialog-close,.media-tags-close) {
+  color:var(--fl-muted)!important;
+  border:1px solid var(--fl-border-strong)!important;
+  background:var(--fl-surface-alt)!important;
+}
+html[data-theme="light"] .app-shell :is(.dialog-close,.win11-settings-close,.help-dialog-close,.media-tags-close):hover,
+html[data-theme="light"] .app-shell :is(.dialog-close,.win11-settings-close,.help-dialog-close,.media-tags-close):focus-visible {
+  color:#fff!important;
+  border-color:#e81123!important;
+  background:#e81123!important;
 }

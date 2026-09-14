@@ -29,6 +29,7 @@ export function MediaLibrary({ state, update }: Props) {
   const [importError, setImportError] = useState("");
   const [pendingDelete, setPendingDelete] = useState<MediaItem | null>(null);
   const [editingTags, setEditingTags] = useState<MediaItem | null>(null);
+  const [mediaNameDraft, setMediaNameDraft] = useState("");
   const [tagDraft, setTagDraft] = useState("");
   const reload = () => window.flProyector.listMedia().then(setMedia);
 
@@ -93,10 +94,13 @@ export function MediaLibrary({ state, update }: Props) {
   };
   const openTagEditor = (item: MediaItem) => {
     setEditingTags(item);
+    setMediaNameDraft(item.name.replace(/\.[^.]+$/, ""));
     setTagDraft(item.tags.join(", "));
   };
   const saveTags = async () => {
     if (!editingTags) return;
+    const name = mediaNameDraft.trim();
+    if (!name) return;
     const seen = new Set<string>();
     const tags = tagDraft
       .split(",")
@@ -108,13 +112,14 @@ export function MediaLibrary({ state, update }: Props) {
         return true;
       });
     try {
-      await window.flProyector.setTags(editingTags.id, tags);
+      await window.flProyector.updateMediaDetails(editingTags.id, name, tags);
       setMedia((current) =>
         current.map((item) =>
-          item.id === editingTags.id ? { ...item, tags } : item,
+          item.id === editingTags.id ? { ...item, name, tags } : item,
         ),
       );
       setEditingTags(null);
+      setMediaNameDraft("");
       setTagDraft("");
     } catch {
       setImportError("No se pudieron guardar las etiquetas. Intentá nuevamente.");
@@ -295,7 +300,7 @@ export function MediaLibrary({ state, update }: Props) {
             <div className="media-tags-header">
               <div>
                 <span className="eyebrow">ORGANIZAR FONDO</span>
-                <h2 id="media-tags-title">Editar etiquetas</h2>
+                <h2 id="media-tags-title">Editar fondo</h2>
               </div>
               <button
                 type="button"
@@ -306,13 +311,17 @@ export function MediaLibrary({ state, update }: Props) {
                 <X size={16} />
               </button>
             </div>
-            <p className="media-tags-file">
-              {editingTags.name.replace(/\.[^.]+$/, "")}
-            </p>
+            <label htmlFor="media-name-input">Nombre del fondo</label>
+            <input
+              id="media-name-input"
+              autoFocus
+              value={mediaNameDraft}
+              onChange={(event) => setMediaNameDraft(event.target.value)}
+              placeholder="Nombre visible del fondo"
+            />
             <label htmlFor="media-tags-input">Etiquetas separadas por coma</label>
             <input
               id="media-tags-input"
-              autoFocus
               value={tagDraft}
               onChange={(event) => setTagDraft(event.target.value)}
               placeholder="Ej. naturaleza, azul, celebración"
@@ -325,7 +334,7 @@ export function MediaLibrary({ state, update }: Props) {
                 Cancelar
               </button>
               <button type="submit" className="primary">
-                Guardar etiquetas
+                Guardar cambios
               </button>
             </div>
           </form>

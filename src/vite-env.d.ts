@@ -46,6 +46,7 @@ declare global {
       importDroppedFiles(files: File[]): Promise<MediaItem[]>;
       setFavorite(id: number, slot: number | null): Promise<void>;
       setTags(id: number, tags: string[]): Promise<void>;
+      updateMediaDetails(id: number, name: string, tags: string[]): Promise<void>;
       editMediaTags(id: number, tags: string[]): Promise<string[] | null>;
       deleteMedia(id: number): Promise<boolean>;
       onMediaChanged(callback: () => void): () => void;

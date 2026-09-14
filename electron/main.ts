@@ -1309,6 +1309,15 @@ if (hasSingleInstanceLock)
       database.setTags(id, tags);
       controlWindow?.webContents.send("media:changed");
     });
+    ipcMain.handle(
+      "media:update-details",
+      (_event, id: number, name: string, tags: string[]) => {
+        const normalizedName = String(name || "").trim();
+        if (!normalizedName) throw new Error("El nombre del fondo es obligatorio.");
+        database.updateMediaDetails(id, normalizedName, tags);
+        controlWindow?.webContents.send("media:changed");
+      },
+    );
     ipcMain.handle("media:delete", async (_event, id: number) => {
       const path = database.getMediaPath(id);
       if (!path) return false;

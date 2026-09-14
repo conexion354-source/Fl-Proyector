@@ -155,6 +155,11 @@ if (!window.flProyector) {
     },
     setFavorite: async () => {},
     setTags: async () => {},
+    updateMediaDetails: async (id: number, name: string, tags: string[]) => {
+      media = media.map((item) =>
+        item.id === id ? { ...item, name, tags } : item,
+      );
+    },
     editMediaTags: async (_id: number, tags: string[]) => tags,
     deleteMedia: async (id: number) => {
       media = media.filter((item) => item.id !== id);

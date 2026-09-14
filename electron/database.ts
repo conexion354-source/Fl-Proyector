@@ -196,6 +196,11 @@ export class AppDatabase {
       .prepare("UPDATE media SET tags = ? WHERE id = ?")
       .run(JSON.stringify(tags), id);
   }
+  updateMediaDetails(id: number, name: string, tags: string[]) {
+    this.db
+      .prepare("UPDATE media SET name = ?, tags = ? WHERE id = ?")
+      .run(name.trim(), JSON.stringify(tags), id);
+  }
   getMediaPath(id: number) {
     return (
       (

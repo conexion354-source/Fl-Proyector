@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld("flProyector", {
     ),
   setFavorite: (id, slot) => ipcRenderer.invoke("media:favorite", id, slot),
   setTags: (id, tags) => ipcRenderer.invoke("media:tags", id, tags),
+  updateMediaDetails: (id, name, tags) =>
+    ipcRenderer.invoke("media:update-details", id, name, tags),
   submitMediaTags: (tags) => ipcRenderer.send("media:tags-dialog-result", tags),
   deleteMedia: (id) => ipcRenderer.invoke("media:delete", id),
   onMediaChanged: (callback) => {
