@@ -2732,6 +2732,102 @@
   min-height: 260px;
 }
 
+.media-tags-backdrop {
+  z-index: 180;
+}
+.media-tags-dialog {
+  width: min(460px, calc(100vw - 32px));
+  padding: 22px;
+  border: 1px solid var(--fl-border-strong, #454b59);
+  border-radius: 12px;
+  background: var(--fl-surface, #20232b);
+  color: var(--fl-text, #fff);
+  box-shadow: 0 22px 70px #0008;
+}
+.media-tags-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.media-tags-header h2 {
+  margin: 5px 0 0;
+  font-size: 22px;
+}
+.media-tags-close {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--fl-border, #3a404d);
+  border-radius: 50%;
+  background: var(--fl-control, #2b2f39);
+  color: var(--fl-text-secondary, #aeb5c3);
+  cursor: pointer;
+}
+.media-tags-close:hover {
+  border-color: #e81123;
+  background: #e81123;
+  color: #fff;
+}
+.media-tags-file {
+  margin: 16px 0;
+  overflow: hidden;
+  color: var(--fl-text-secondary, #aeb5c3);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.media-tags-dialog label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--fl-text-secondary, #aeb5c3);
+  font-size: 12px;
+  font-weight: 700;
+}
+.media-tags-dialog input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--fl-border-strong, #505765);
+  border-radius: 7px;
+  outline: none;
+  background: var(--fl-control, #171a21);
+  color: var(--fl-text, #fff);
+  font: inherit;
+}
+.media-tags-dialog input:focus {
+  border-color: var(--fl-accent, #665cff);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--fl-accent, #665cff) 25%, transparent);
+}
+.media-tags-help {
+  margin: 8px 0 20px;
+  color: var(--fl-text-secondary, #8991a0);
+  font-size: 11px;
+}
+.media-tags-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+.media-tags-actions button {
+  min-height: 36px;
+  padding: 0 15px;
+  border: 1px solid var(--fl-border, #3a404d);
+  border-radius: 7px;
+  background: var(--fl-control, #2b2f39);
+  color: var(--fl-text, #fff);
+  font-weight: 700;
+  cursor: pointer;
+}
+.media-tags-actions button.primary {
+  border-color: var(--fl-accent, #665cff);
+  background: var(--fl-accent, #665cff);
+  color: #fff;
+}
+
 @media (max-width: 1050px) {
   .library-tools {
     align-items: stretch;

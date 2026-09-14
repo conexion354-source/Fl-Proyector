@@ -7,6 +7,7 @@ import {
   Tag,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import type {
   MediaItem,
@@ -27,6 +28,8 @@ export function MediaLibrary({ state, update }: Props) {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
   const [pendingDelete, setPendingDelete] = useState<MediaItem | null>(null);
+  const [editingTags, setEditingTags] = useState<MediaItem | null>(null);
+  const [tagDraft, setTagDraft] = useState("");
   const reload = () => window.flProyector.listMedia().then(setMedia);
 
   useEffect(() => {
@@ -88,9 +91,34 @@ export function MediaLibrary({ state, update }: Props) {
       setImporting(false);
     }
   };
-  const editTags = async (item: MediaItem) => {
-    const tags = await window.flProyector.editMediaTags(item.id, item.tags);
-    if (tags) await window.flProyector.setTags(item.id, tags);
+  const openTagEditor = (item: MediaItem) => {
+    setEditingTags(item);
+    setTagDraft(item.tags.join(", "));
+  };
+  const saveTags = async () => {
+    if (!editingTags) return;
+    const seen = new Set<string>();
+    const tags = tagDraft
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter((tag) => {
+        const key = tag.toLocaleLowerCase();
+        if (!tag || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    try {
+      await window.flProyector.setTags(editingTags.id, tags);
+      setMedia((current) =>
+        current.map((item) =>
+          item.id === editingTags.id ? { ...item, tags } : item,
+        ),
+      );
+      setEditingTags(null);
+      setTagDraft("");
+    } catch {
+      setImportError("No se pudieron guardar las etiquetas. Intentá nuevamente.");
+    }
   };
   const remove = async () => {
     if (!pendingDelete) return;
@@ -203,7 +231,7 @@ export function MediaLibrary({ state, update }: Props) {
                   title="Editar etiquetas"
                   onClick={(event) => {
                     event.stopPropagation();
-                    editTags(item);
+                    openTagEditor(item);
                   }}
                 >
                   <Tag size={14} />
@@ -245,6 +273,63 @@ export function MediaLibrary({ state, update }: Props) {
           onCancel={() => setPendingDelete(null)}
           onConfirm={remove}
         />
+      )}
+      {editingTags && (
+        <div
+          className="modal-backdrop media-tags-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setEditingTags(null);
+          }}
+        >
+          <form
+            className="media-tags-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="media-tags-title"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveTags();
+            }}
+          >
+            <div className="media-tags-header">
+              <div>
+                <span className="eyebrow">ORGANIZAR FONDO</span>
+                <h2 id="media-tags-title">Editar etiquetas</h2>
+              </div>
+              <button
+                type="button"
+                className="media-tags-close"
+                aria-label="Cerrar"
+                onClick={() => setEditingTags(null)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <p className="media-tags-file">
+              {editingTags.name.replace(/\.[^.]+$/, "")}
+            </p>
+            <label htmlFor="media-tags-input">Etiquetas separadas por coma</label>
+            <input
+              id="media-tags-input"
+              autoFocus
+              value={tagDraft}
+              onChange={(event) => setTagDraft(event.target.value)}
+              placeholder="Ej. naturaleza, azul, celebración"
+            />
+            <p className="media-tags-help">
+              Después podés encontrarlas desde el buscador de Fondos.
+            </p>
+            <div className="media-tags-actions">
+              <button type="button" onClick={() => setEditingTags(null)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary">
+                Guardar etiquetas
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </section>
   );
