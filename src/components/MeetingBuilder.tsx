@@ -245,6 +245,13 @@ export function MeetingBuilder({
   // A media item in a meeting is temporary content, not the application's
   // global background. Keep the latter so a song/Bible item can restore it.
   const globalBackground = useRef(state.background);
+  const meetingVideoReturnBackground = useRef<
+    ProjectionState["background"] | null
+  >(null);
+  const previousVideoPlayback = useRef({
+    playing: state.video.playing,
+    loop: state.video.loop,
+  });
   const [addingMedia, setAddingMedia] = useState(false);
   const [songDraft, setSongDraft] = useState<{
     title: string;
@@ -666,6 +673,12 @@ export function MeetingBuilder({
           commandId: state.video.commandId + 1,
         }
       : { playing: false, loop: true };
+  const releaseMeetingVideoBackground = () => {
+    const background =
+      meetingVideoReturnBackground.current ?? globalBackground.current;
+    meetingVideoReturnBackground.current = null;
+    return background;
+  };
 
   useEffect(() => {
     // A non-looping video is temporary meeting content. When it is removed,
@@ -673,18 +686,34 @@ export function MeetingBuilder({
     // state arrives. Never capture that transient video as the global
     // background, otherwise the next song restores the video itself.
     if (!state.video.loop) return;
-    const onAir = items.find((item) => item.id === onAirItemId);
-    if (onAir?.type !== "media") globalBackground.current = state.background;
+    if (onAirItemId === null) globalBackground.current = state.background;
   }, [state.background, state.video.loop, items, onAirItemId]);
   useEffect(() => {
     const onAir = items.find((item) => item.id === onAirItemId);
-    if (onAir?.type !== "media" || state.video.playing || !state.video.loop)
+    const previous = previousVideoPlayback.current;
+    previousVideoPlayback.current = {
+      playing: state.video.playing,
+      loop: state.video.loop,
+    };
+    // Only clear the meeting button after a video that was genuinely playing
+    // has finished. Looking only at the current idle state races with the first
+    // click and used to clear “QUITAR” before playback had even started.
+    if (
+      onAir?.type !== "media" ||
+      !previous.playing ||
+      previous.loop ||
+      state.video.playing ||
+      !state.video.loop
+    )
       return;
     const payload = onAir.payload as Record<string, unknown>;
     const source =
       (payload.meetingMedia as MediaItem | undefined) ??
       mediaById(payload.mediaId);
-    if (source?.kind === "video") setOnAirItemId(null);
+    if (source?.kind === "video") {
+      meetingVideoReturnBackground.current = null;
+      setOnAirItemId(null);
+    }
   }, [items, media, onAirItemId, state.video.playing, state.video.loop]);
 
   const fireSongStanza = (item: MeetingItem, index: number) => {
@@ -697,6 +726,7 @@ export function MeetingBuilder({
       Math.min(index, Math.max(stanzas.length - 1, 0)),
     );
     const background = mediaById(payload.backgroundId);
+    const restoredBackground = releaseMeetingVideoBackground();
     const theme = state.songStyle;
     const stanza = stanzas[safeIndex] || song.content;
     setActiveStanza(safeIndex);
@@ -714,7 +744,7 @@ export function MeetingBuilder({
             name: background.name,
             kind: background.kind,
           }
-        : globalBackground.current,
+        : restoredBackground,
       text: {
         html: stanza,
         kind: "canto",
@@ -751,6 +781,7 @@ export function MeetingBuilder({
     if (!sections.length) return;
     const safeIndex = Math.max(0, Math.min(index, sections.length - 1));
     const background = mediaById(payload.backgroundId);
+    const restoredBackground = releaseMeetingVideoBackground();
     setActiveStanza(safeIndex);
     setOnAirItemId(item.id);
     update({
@@ -766,7 +797,7 @@ export function MeetingBuilder({
             name: background.name,
             kind: background.kind,
           }
-        : globalBackground.current,
+        : restoredBackground,
       text: {
         html: sections[safeIndex].html,
         kind: "biblia",
@@ -799,12 +830,14 @@ export function MeetingBuilder({
       0,
       Math.min(requestedIndex, Math.max(slideCount - 1, 0)),
     );
+    const restoredBackground = releaseMeetingVideoBackground();
     setOnAirItemId(item.id);
     update({
       blackout: false,
       logo: false,
       text: { visible: false },
       lowerThird: { visible: false },
+      background: restoredBackground,
       video: { playing: false, loop: true },
       presentation: {
         path: String(payload.path),
@@ -888,12 +921,13 @@ export function MeetingBuilder({
 
   const fire = async (item: MeetingItem) => {
     if (onAirItemId === item.id) {
+      const restoredBackground = releaseMeetingVideoBackground();
       setOnAirItemId(null);
       update({
         text: { visible: false },
         lowerThird: { visible: false },
         presentation: { visible: false },
-        background: globalBackground.current,
+        background: restoredBackground,
         video: { playing: false, loop: true },
       });
       return;
@@ -903,13 +937,16 @@ export function MeetingBuilder({
     const background = attachment ?? mediaById(payload.backgroundId ?? payload.mediaId);
     if (item.type === "presentation") return firePresentation(item, 0);
     if (item.type === "media" && background) {
+      const activeItem = items.find((entry) => entry.id === onAirItemId);
       setOnAirItemId(item.id);
-      if (background.kind === "image")
+      if (background.kind === "image") {
+        const restoredBackground = releaseMeetingVideoBackground();
         return update({
           blackout: false,
           logo: false,
           text: { visible: false },
           lowerThird: { visible: false },
+          background: restoredBackground,
           video: { playing: false, loop: true },
           presentation: {
             path: null,
@@ -921,6 +958,9 @@ export function MeetingBuilder({
             visible: true,
           },
         });
+      }
+      if (activeItem?.type !== "media")
+        meetingVideoReturnBackground.current = { ...state.background };
       return update({
         blackout: false,
         logo: false,
@@ -951,6 +991,7 @@ export function MeetingBuilder({
       0,
       Math.min(Number(payload.announcementPage || 0), pages.length - 1),
     );
+    const restoredBackground = releaseMeetingVideoBackground();
     setOnAirItemId(item.id);
     update({
       blackout: false,
@@ -965,7 +1006,7 @@ export function MeetingBuilder({
             name: background.name,
             kind: background.kind,
           }
-        : globalBackground.current,
+        : restoredBackground,
       text: {
         html:
           item.type === "announcement"
