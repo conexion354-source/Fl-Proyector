@@ -122,7 +122,9 @@ export function MediaLibrary({ state, update }: Props) {
       setMediaNameDraft("");
       setTagDraft("");
     } catch {
-      setImportError("No se pudieron guardar las etiquetas. Intentá nuevamente.");
+      setImportError(
+        "No se pudieron guardar los cambios del fondo. Intentá nuevamente.",
+      );
     }
   };
   const remove = async () => {
@@ -333,7 +335,11 @@ export function MediaLibrary({ state, update }: Props) {
               <button type="button" onClick={() => setEditingTags(null)}>
                 Cancelar
               </button>
-              <button type="submit" className="primary">
+              <button
+                type="submit"
+                className="primary"
+                disabled={!mediaNameDraft.trim()}
+              >
                 Guardar cambios
               </button>
             </div>
