@@ -3676,6 +3676,22 @@
   box-shadow:0 24px 80px rgba(0,0,0,.48);
   overflow:hidden;
 }
-.live-audience-projection > span { color:#9f91ff; font-size:.42em; font-weight:800; letter-spacing:.16em; }
-.live-audience-projection > strong { max-width:100%; font-size:.68em; line-height:1.1; text-wrap:balance; }
+.live-audience-projection > span {
+  color:#ef3340;
+  font-family:"Oswald","Arial Narrow",sans-serif;
+  font-size:.46em;
+  font-weight:700;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.live-audience-projection > strong {
+  max-width:100%;
+  font-family:"Oswald","Arial Narrow",sans-serif;
+  font-size:.68em;
+  font-weight:700;
+  line-height:1.1;
+  letter-spacing:.025em;
+  text-transform:uppercase;
+  text-wrap:balance;
+}
 .live-audience-projection > img { display:block; width:auto; height:100%; min-height:0; max-width:100%; max-height:100%; aspect-ratio:1; object-fit:contain; padding:.13em; border-radius:.22em; background:#fff; }

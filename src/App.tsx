@@ -250,7 +250,7 @@ export function App() {
       text: {
         visible: true,
         kind: "anuncio",
-        html: `<div data-live-audience-qr="true" class="live-audience-projection"><span>LECTURA EN VIVO</span><strong>Seguí canciones y Biblia en vivo</strong><img src="${qr}" alt="Código QR"></div>`,
+        html: `<div data-live-audience-qr="true" class="live-audience-projection"><span>ESCANEA EL QR CON EL CELULAR</span><strong>SEGUÍ CANCIONES Y BIBLIA EN VIVO</strong><img src="${qr}" alt="Código QR"></div>`,
         fontSize: 48,
         fontFamily: "Inter",
         color: "#ffffff",
