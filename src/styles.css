@@ -537,28 +537,35 @@ html[data-theme="light"] .about-dialog > small {
   margin-top: auto;
 }
 .sidebar .sidebar-toggle {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
-  align-self: flex-end;
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  right: -10px;
+  width: 20px;
+  height: 44px;
+  min-height: 44px;
+  transform: translateY(-50%);
   flex-direction: row;
-  margin: 0 0 9px;
+  margin: 0;
   border: 1px solid #2c3340;
-  border-radius: 8px;
+  border-radius: 0 8px 8px 0;
   background: #151922;
   color: #8a93a4;
+  box-shadow: 3px 0 9px #0004;
+  opacity: 0.72;
 }
 .sidebar .sidebar-toggle:hover {
   border-color: #4f596b;
   background: #1c212c;
   color: #d5dae4;
+  opacity: 1;
+}
+.sidebar .sidebar-toggle:active {
+  transform: translateY(-50%) scale(0.96);
 }
 .sidebar .sidebar-toggle svg {
-  width: 17px;
-  height: 17px;
-}
-.sidebar.collapsed .sidebar-toggle {
-  align-self: center;
+  width: 13px;
+  height: 13px;
 }
 .sidebar.collapsed nav button,
 .sidebar.collapsed .sidebar-bottom button {
