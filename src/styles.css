@@ -496,6 +496,14 @@ html[data-theme="light"] .about-dialog > small {
   border-right: 1px solid #242832;
   background: #0d0f14;
   padding: 12px 8px;
+  transition: width 180ms ease, min-width 180ms ease, flex-basis 180ms ease,
+    padding 180ms ease;
+}
+.sidebar.collapsed {
+  width: 54px;
+  min-width: 54px;
+  flex-basis: 54px;
+  padding-inline: 5px;
 }
 .sidebar nav,
 .sidebar-bottom {
@@ -519,6 +527,7 @@ html[data-theme="light"] .about-dialog > small {
 }
 .sidebar button svg {
   width: 21px;
+  flex: none;
 }
 .sidebar button.active {
   color: #a9a4ff;
@@ -526,6 +535,49 @@ html[data-theme="light"] .about-dialog > small {
 }
 .sidebar-bottom {
   margin-top: auto;
+}
+.sidebar .sidebar-toggle {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  align-self: flex-end;
+  flex-direction: row;
+  margin: 0 0 9px;
+  border: 1px solid #2c3340;
+  border-radius: 8px;
+  background: #151922;
+  color: #8a93a4;
+}
+.sidebar .sidebar-toggle:hover {
+  border-color: #4f596b;
+  background: #1c212c;
+  color: #d5dae4;
+}
+.sidebar .sidebar-toggle svg {
+  width: 17px;
+  height: 17px;
+}
+.sidebar.collapsed .sidebar-toggle {
+  align-self: center;
+}
+.sidebar.collapsed nav button,
+.sidebar.collapsed .sidebar-bottom button {
+  height: 48px;
+  gap: 0;
+}
+.sidebar.collapsed nav button > span,
+.sidebar.collapsed .sidebar-bottom button > span {
+  display: none;
+}
+html[data-theme="light"] .sidebar .sidebar-toggle {
+  background: #f7f9fc;
+  border-color: #d6dde7;
+  color: #626d7d;
+}
+html[data-theme="light"] .sidebar .sidebar-toggle:hover {
+  background: #edf1f6;
+  border-color: #bcc7d4;
+  color: #303848;
 }
 .content {
   position: relative;

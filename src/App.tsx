@@ -14,6 +14,8 @@ import {
   MonitorUp,
   Music2,
   Pause,
+  PanelLeftClose,
+  PanelLeftOpen,
   Play,
   QrCode,
   Settings,
@@ -72,6 +74,9 @@ const maximumLivePanelWidth = (tab: Tab) =>
 export function App() {
   const { state, update } = useProjectionState();
   const [tab, setTab] = useState<Tab>("reuniones");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem("fl-sidebar-collapsed") === "1",
+  );
   const [meetingId, setMeetingId] = useState<number | null>(null);
   const [focusedMeetingItemId, setFocusedMeetingItemId] = useState<
     number | null
@@ -132,6 +137,9 @@ export function App() {
       clearInterval(timer);
     };
   }, []);
+  useEffect(() => {
+    localStorage.setItem("fl-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
+  }, [sidebarCollapsed]);
   useEffect(() => {
     const refresh = () => window.flProyector.getLiveAudienceStatus().then(setLiveAudienceStatus);
     refresh();
@@ -335,11 +343,21 @@ export function App() {
           } as CSSProperties
         }
       >
-        <aside className="sidebar">
+        <aside className={`sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={() => setSidebarCollapsed((current) => !current)}
+            aria-label={sidebarCollapsed ? "Expandir menú" : "Contraer menú"}
+            title={sidebarCollapsed ? "Expandir menú" : "Contraer menú"}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+          </button>
           <nav>
             <button
               className={tab === "reuniones" ? "active" : ""}
               onClick={() => setTab("reuniones")}
+              title={sidebarCollapsed ? "Reuniones" : undefined}
             >
               <CalendarRange />
               <span>Reuniones</span>
@@ -347,6 +365,7 @@ export function App() {
             <button
               className={tab === "canciones" ? "active" : ""}
               onClick={() => setTab("canciones")}
+              title={sidebarCollapsed ? "Canciones" : undefined}
             >
               <Music2 />
               <span>Canciones</span>
@@ -354,6 +373,7 @@ export function App() {
             <button
               className={tab === "fondos" ? "active" : ""}
               onClick={() => setTab("fondos")}
+              title={sidebarCollapsed ? "Fondos" : undefined}
             >
               <Film />
               <span>Fondos</span>
@@ -361,6 +381,7 @@ export function App() {
             <button
               className={tab === "biblia" ? "active" : ""}
               onClick={() => setTab("biblia")}
+              title={sidebarCollapsed ? "Biblia" : undefined}
             >
               <BookOpenText />
               <span>Biblia</span>
@@ -368,6 +389,7 @@ export function App() {
             <button
               className={tab === "remoto" ? "active" : ""}
               onClick={() => setTab("remoto")}
+              title={sidebarCollapsed ? "Remoto" : undefined}
             >
               <Smartphone />
               <span>Remoto</span>
@@ -375,13 +397,17 @@ export function App() {
             <button
               className={tab === "ajustes" ? "active" : ""}
               onClick={() => setTab("ajustes")}
+              title={sidebarCollapsed ? "Ajustes" : undefined}
             >
               <Settings />
               <span>Ajustes</span>
             </button>
           </nav>
           <div className="sidebar-bottom">
-            <button onClick={() => setShowHelp(true)}>
+            <button
+              onClick={() => setShowHelp(true)}
+              title={sidebarCollapsed ? "Ayuda" : undefined}
+            >
               <CircleHelp />
               <span>Ayuda</span>
             </button>
