@@ -137,7 +137,10 @@ function StanzaEditDialog({
         </button>
         <span className="eyebrow">EDITAR SÓLO ESTA PARTE</span>
         <h2 id="stanza-edit-title">{label}</h2>
-        <p>Los cambios se aplicarán únicamente a esta estrofa.</p>
+        <p>
+          Enter crea una nueva estrofa al guardar. Shift + Enter agrega una
+          línea dentro de la misma estrofa.
+        </p>
         <RichTextToolbar editor={editor} />
         <EditorContent
           editor={editor}
@@ -503,7 +506,19 @@ export function SongLibrary({
       stanzas.splice(index, 1);
       sectionTypes.splice(index, 1);
     } else {
-      stanzas[index] = asSingleStanzaHtml(replacement);
+      const replacements = splitSongStanzas(replacement);
+      const nextStanzas = replacements.length
+        ? replacements.map(asSingleStanzaHtml)
+        : ["<p></p>"];
+      const originalType = sectionTypes[index] || "verse";
+      stanzas.splice(index, 1, ...nextStanzas);
+      sectionTypes.splice(
+        index,
+        1,
+        ...nextStanzas.map((_, offset) =>
+          offset === 0 ? originalType : "verse",
+        ),
+      );
     }
     const nextContent = stanzas.length ? stanzas.join("<hr>") : "<p></p>";
     const changed = {

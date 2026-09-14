@@ -32,6 +32,7 @@ import {
   type ReleaseHistoryEntry,
   type UpdateStatus,
 } from "../shared/types.js";
+import { splitSongStanzas } from "../shared/songSections.js";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -1066,6 +1067,42 @@ if (hasSingleInstanceLock)
       getCode: () => database.getCollaboratorCode(),
       listSongs: () => database.listSongs(""),
       saveSong: (song) => database.saveSong(song),
+      songSaved: (id) => {
+        if (
+          state.text.kind !== "canto" ||
+          state.text.sourceSongId !== id
+        )
+          return;
+        const song = database.listSongs("").find((entry) => entry.id === id);
+        if (!song) return;
+        const stanzas = splitSongStanzas(song.content);
+        const comparable = (html: string) =>
+          html
+            .replace(/<[^>]+>/g, " ")
+            .replace(/&nbsp;/gi, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .toLocaleLowerCase("es-AR");
+        const currentSection = comparable(state.text.html);
+        const matchingIndex = stanzas.findIndex(
+          (stanza) => comparable(stanza) === currentSection,
+        );
+        const storedIndex = Math.max(
+          0,
+          Math.min(
+            Number(state.text.sourceSectionIndex || 0),
+            Math.max(stanzas.length - 1, 0),
+          ),
+        );
+        const index = matchingIndex >= 0 ? matchingIndex : storedIndex;
+        mergeState({
+          text: {
+            html: stanzas[index] || song.content,
+            title: state.songStyle.showTitle ? song.title : "",
+            sourceSectionIndex: index,
+          },
+        });
+      },
       listMeetings: () => database.listMeetings(),
       createMeeting: (name, date) => database.createMeeting(name, date),
       updateMeeting: (id, patch) => database.updateMeeting(id, patch),

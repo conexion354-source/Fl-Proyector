@@ -242,6 +242,19 @@ export function MeetingBuilder({
   const [pickerSearch, setPickerSearch] = useState("");
   const [activeStanza, setActiveStanza] = useState(0);
   const [onAirItemId, setOnAirItemId] = useState<number | null>(null);
+  const [stanzaContextMenu, setStanzaContextMenu] = useState<{
+    index: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [editingStanza, setEditingStanza] = useState<{
+    index: number;
+    label: string;
+    html: string;
+  } | null>(null);
+  const [pendingStanzaDelete, setPendingStanzaDelete] = useState<number | null>(
+    null,
+  );
   // A media item in a meeting is temporary content, not the application's
   // global background. Keep the latter so a song/Bible item can restore it.
   const globalBackground = useRef(state.background);
@@ -332,6 +345,17 @@ export function MeetingBuilder({
   useEffect(() => {
     setActiveStanza(0);
   }, [selected?.id]);
+  useEffect(() => {
+    const onAir = items.find((item) => item.id === onAirItemId);
+    if (onAir?.type !== "song") return;
+    const songId = Number((onAir.payload as any).songId);
+    if (
+      state.text.kind === "canto" &&
+      state.text.sourceSongId === songId &&
+      Number.isInteger(state.text.sourceSectionIndex)
+    )
+      setActiveStanza(Number(state.text.sourceSectionIndex));
+  }, [items, onAirItemId, state.text.sourceSongId, state.text.sourceSectionIndex]);
   useEffect(() => {
     if (!editing || selected?.type !== "song") return setSongDraft(null);
     const song = songs.find(
@@ -748,6 +772,8 @@ export function MeetingBuilder({
       text: {
         html: stanza,
         kind: "canto",
+        sourceSongId: song.id,
+        sourceSectionIndex: safeIndex,
         visible: true,
         position: theme.position,
         fontSize: theme.fontSize,
@@ -1045,6 +1071,79 @@ export function MeetingBuilder({
     );
   };
 
+  const updateSongStanza = async (
+    index: number,
+    replacement: string | null,
+  ) => {
+    if (selected?.type !== "song") return;
+    const song = songs.find(
+      (entry) => entry.id === Number((selected.payload as any).songId),
+    );
+    if (!song) return;
+    const stanzas = splitSongStanzas(song.content);
+    if (!stanzas[index]) return;
+    const sectionTypes = normalizeSongSectionTypes(
+      song.sectionTypes,
+      stanzas.length,
+    );
+    let sectionDelta = 0;
+    if (replacement === null) {
+      stanzas.splice(index, 1);
+      sectionTypes.splice(index, 1);
+      sectionDelta = -1;
+    } else {
+      const replacements = splitSongStanzas(replacement);
+      const nextStanzas = replacements.length ? replacements : ["<p></p>"];
+      sectionDelta = nextStanzas.length - 1;
+      const originalType = sectionTypes[index] || "verse";
+      stanzas.splice(index, 1, ...nextStanzas);
+      sectionTypes.splice(
+        index,
+        1,
+        ...nextStanzas.map((_, offset) =>
+          offset === 0 ? originalType : "verse",
+        ),
+      );
+    }
+    const content = stanzas.length ? stanzas.join("<hr>") : "<p></p>";
+    await withSaveNotification(async () => {
+      await window.flProyector.saveSong({ ...song, content, sectionTypes });
+      const refreshed = await window.flProyector.listSongs();
+      setSongs(refreshed);
+      const projectedIndex = Number(state.text.sourceSectionIndex || 0);
+      if (
+        state.text.kind === "canto" &&
+        state.text.sourceSongId === song.id &&
+        projectedIndex === index
+      ) {
+        const safeIndex = Math.min(index, Math.max(stanzas.length - 1, 0));
+        update({
+          text: {
+            html: stanzas[safeIndex] || "<p></p>",
+            sourceSectionIndex: safeIndex,
+          },
+        });
+        setActiveStanza(safeIndex);
+      } else if (
+        state.text.kind === "canto" &&
+        state.text.sourceSongId === song.id &&
+        index < projectedIndex &&
+        sectionDelta !== 0
+      ) {
+        const shiftedIndex = Math.max(
+          0,
+          Math.min(projectedIndex + sectionDelta, stanzas.length - 1),
+        );
+        update({ text: { sourceSectionIndex: shiftedIndex } });
+        setActiveStanza(shiftedIndex);
+      } else if (activeStanza >= stanzas.length) {
+        setActiveStanza(Math.max(stanzas.length - 1, 0));
+      }
+    }, replacement === null ? "La estrofa fue eliminada." : "La estrofa fue actualizada.");
+    setEditingStanza(null);
+    setPendingStanzaDelete(null);
+  };
+
   return (
     <section
       ref={meetingPageRef}
@@ -1267,6 +1366,9 @@ export function MeetingBuilder({
                 ? fireBibleSection(selected, index)
                 : fireSongStanza(selected, index)
             }
+            onStanzaContextMenu={(index, x, y) =>
+              setStanzaContextMenu({ index, x, y })
+            }
             onEdit={() => setEditing(true)}
           />
         ) : (
@@ -1441,6 +1543,42 @@ export function MeetingBuilder({
         </Win11ContextMenu>
       )}
 
+      {stanzaContextMenu && selected?.type === "song" && (() => {
+        const song = songs.find(
+          (entry) => entry.id === Number((selected.payload as any).songId),
+        );
+        const stanzas = song ? splitSongStanzas(song.content) : [];
+        const types = song
+          ? normalizeSongSectionTypes(song.sectionTypes, stanzas.length)
+          : [];
+        return (
+          <Win11ContextMenu
+            x={stanzaContextMenu.x}
+            y={stanzaContextMenu.y}
+            onClose={() => setStanzaContextMenu(null)}
+            ariaLabel="Acciones de la estrofa"
+            items={[
+              {
+                label: "Editar esta estrofa",
+                icon: <Edit3 />,
+                onClick: () =>
+                  setEditingStanza({
+                    index: stanzaContextMenu.index,
+                    label: songSectionLabel(types, stanzaContextMenu.index),
+                    html: stanzas[stanzaContextMenu.index] || "<p></p>",
+                  }),
+              },
+              {
+                label: "Eliminar esta estrofa",
+                icon: <Trash2 />,
+                danger: true,
+                onClick: () => setPendingStanzaDelete(stanzaContextMenu.index),
+              },
+            ]}
+          />
+        );
+      })()}
+
       {renamingMeeting && (
         <div className="modal-backdrop">
           <form
@@ -1533,6 +1671,24 @@ export function MeetingBuilder({
         </div>
       )}
 
+      {editingStanza && (
+        <MeetingStanzaEditDialog
+          label={editingStanza.label}
+          html={editingStanza.html}
+          onCancel={() => setEditingStanza(null)}
+          onSave={(html) => updateSongStanza(editingStanza.index, html)}
+        />
+      )}
+
+      {pendingStanzaDelete !== null && (
+        <ConfirmDeleteDialog
+          title="¿Eliminar esta estrofa?"
+          detail="Se quitará solamente esta parte de la canción. El resto de la letra se conservará."
+          onCancel={() => setPendingStanzaDelete(null)}
+          onConfirm={() => updateSongStanza(pendingStanzaDelete, null)}
+        />
+      )}
+
       {backgroundTarget && (
         <div className="modal-backdrop">
           <div className="background-assignment-dialog">
@@ -1607,6 +1763,72 @@ export function MeetingBuilder({
   );
 }
 
+function MeetingStanzaEditDialog({
+  label,
+  html,
+  onCancel,
+  onSave,
+}: {
+  label: string;
+  html: string;
+  onCancel: () => void;
+  onSave: (html: string) => void | Promise<void>;
+}) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      TextStyle,
+      Color,
+      FontFamily,
+      Highlight.configure({ multicolor: true }),
+    ],
+    content: html,
+  });
+
+  return (
+    <div className="modal-backdrop">
+      <section
+        className="song-create-dialog stanza-edit-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="meeting-stanza-edit-title"
+      >
+        <button
+          type="button"
+          className="dialog-close"
+          aria-label="Cerrar"
+          onClick={onCancel}
+        >
+          <X />
+        </button>
+        <span className="eyebrow">EDITAR SÓLO ESTA PARTE</span>
+        <h2 id="meeting-stanza-edit-title">{label}</h2>
+        <p>
+          Enter crea una nueva estrofa al guardar. Shift + Enter agrega una
+          línea dentro de la misma estrofa.
+        </p>
+        <RichTextToolbar editor={editor} />
+        <EditorContent
+          editor={editor}
+          className="rich-editor stanza-edit-content"
+        />
+        <div className="song-create-actions">
+          <button type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => void onSave(editor?.getHTML() ?? html)}
+          >
+            Guardar estrofa
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ItemSummary({
   item,
   songs,
@@ -1615,6 +1837,7 @@ function ItemSummary({
   activeStanza,
   isOnAir,
   onStanza,
+  onStanzaContextMenu,
   onEdit,
 }: {
   item: MeetingItem;
@@ -1624,6 +1847,7 @@ function ItemSummary({
   activeStanza: number;
   isOnAir: boolean;
   onStanza: (index: number) => void;
+  onStanzaContextMenu: (index: number, x: number, y: number) => void;
   onEdit: () => void;
 }) {
   const payload = item.payload as any;
@@ -1683,6 +1907,11 @@ function ItemSummary({
                   className={activeStanza === index ? "active" : ""}
                   data-section-type={sectionTypes[index] || "verse"}
                   onClick={() => onStanza(index)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onStanzaContextMenu(index, event.clientX, event.clientY);
+                  }}
                   key={index}
                 >
                   <b>{songSectionLabel(sectionTypes, index).toLocaleUpperCase("es-AR")}</b>

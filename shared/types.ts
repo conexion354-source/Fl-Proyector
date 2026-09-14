@@ -295,6 +295,9 @@ export type ProjectionState = {
     html: string;
     visible: boolean;
     kind: "biblia" | "canto" | "anuncio";
+    /** Song and section currently feeding the projection, when applicable. */
+    sourceSongId?: number | null;
+    sourceSectionIndex?: number | null;
     fontSize: number;
     fontFamily: string;
     align: "left" | "center" | "right";
@@ -342,6 +345,8 @@ export const initialProjectionState: ProjectionState = {
     html: "<p>Bienvenidos</p>",
     visible: true,
     kind: "biblia",
+    sourceSongId: null,
+    sourceSectionIndex: null,
     fontSize: 64,
     fontFamily: "Inter",
     align: "center",

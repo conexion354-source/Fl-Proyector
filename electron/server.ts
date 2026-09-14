@@ -10,6 +10,10 @@ import {
   isLongBibleVerse,
   splitBibleVerse,
 } from "../shared/bibleLayout.js";
+import {
+  normalizeSongSectionTypes,
+  splitSongStanzas,
+} from "../shared/songSections.js";
 import type {
   BibleBook,
   BibleVerse,
@@ -74,6 +78,7 @@ type CollaboratorSource = {
   getCode: () => string;
   listSongs: () => Song[];
   saveSong: (song: Partial<Song> & { title: string; content: string }) => number;
+  songSaved?: (id: number) => void;
   listMeetings: () => Meeting[];
   createMeeting: (name: string, date?: string | null) => number;
   updateMeeting: (id: number, patch: Partial<Pick<Meeting, "name" | "color">>) => void;
@@ -295,8 +300,14 @@ export function startRemoteServer(
           ? source.color
           : existing?.color || "#665cff",
       categoryId: existing?.categoryId ?? null,
-      sectionTypes: existing?.sectionTypes || [],
+      sectionTypes: normalizeSongSectionTypes(
+        Array.isArray(source.sectionTypes)
+          ? source.sectionTypes
+          : existing?.sectionTypes,
+        splitSongStanzas(content).length,
+      ),
     });
+    collaborator.songSaved?.(id);
     collaboratorChanged("songs");
     return response.json({ id });
   });
