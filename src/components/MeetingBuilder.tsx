@@ -694,6 +694,8 @@ export function MeetingBuilder({
           playing: true,
           loop: true,
           seekTime: 0,
+          currentTime: 0,
+          duration: 0,
           commandId: state.video.commandId + 1,
         }
       : { playing: false, loop: true };
@@ -1005,6 +1007,8 @@ export function MeetingBuilder({
                 playing: true,
                 loop: false,
                 seekTime: 0,
+                currentTime: 0,
+                duration: 0,
                 commandId: state.video.commandId + 1,
               }
             : undefined,

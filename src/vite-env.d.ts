@@ -107,6 +107,7 @@ declare global {
         name: string;
         previewSlides?: string[];
       } | null>;
+      readPresentation(path: string): Promise<Uint8Array>;
       openPresentation(path: string): Promise<string>;
       openExternal(url: string): Promise<boolean>;
       getUpdateStatus(): Promise<UpdateStatus>;

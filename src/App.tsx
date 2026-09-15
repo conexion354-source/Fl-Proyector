@@ -982,7 +982,11 @@ function LiveContentControls({
     const target = Math.max(0, Math.min(value, videoDuration || value));
     setVideoTime(target);
     update({
-      video: { seekTime: target, commandId: state.video.commandId + 1 },
+      video: {
+        seekTime: target,
+        currentTime: target,
+        commandId: state.video.commandId + 1,
+      },
     });
   };
   return (
@@ -1010,9 +1014,11 @@ function LiveContentControls({
           max={Math.max(videoDuration, 1)}
           step="0.1"
           value={Math.min(videoTime, Math.max(videoDuration, 1))}
-          onInput={(event) => seek(Number(event.currentTarget.value))}
-          onChange={(event) => seek(Number(event.target.value))}
-          onPointerUp={(event) => seek(Number(event.currentTarget.value))}
+          onInput={(event) => setVideoTime(Number(event.currentTarget.value))}
+          onPointerUp={(event) => {
+            seek(Number(event.currentTarget.value));
+          }}
+          onKeyUp={(event) => seek(Number(event.currentTarget.value))}
         />
         <span>
           {formatMediaTime(videoTime)} / {formatMediaTime(videoDuration)}

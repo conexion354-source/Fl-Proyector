@@ -93,6 +93,7 @@ contextBridge.exposeInMainWorld("flProyector", {
     return () => ipcRenderer.removeListener("library:changed", listener);
   },
   importPresentation: () => ipcRenderer.invoke("presentation:import"),
+  readPresentation: (path) => ipcRenderer.invoke("presentation:read", path),
   openPresentation: (path) => ipcRenderer.invoke("presentation:open", path),
   openExternal: (url) => ipcRenderer.invoke("app:open-external", url),
   getUpdateStatus: () => ipcRenderer.invoke("updates:get-status"),

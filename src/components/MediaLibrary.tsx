@@ -61,6 +61,8 @@ export function MediaLibrary({ state, update }: Props) {
               playing: true,
               loop: true,
               seekTime: 0,
+              currentTime: 0,
+              duration: 0,
               commandId: state.video.commandId + 1,
             }
           : undefined,

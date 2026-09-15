@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  Component,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import {
   PowerPointViewer,
   type PowerPointViewerHandle,
@@ -13,6 +20,25 @@ type Props = {
   onVideoTime?: (time: number) => void;
   onVideoEnded?: () => void;
 };
+
+class PresentationErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error("No se pudo representar la presentación", error);
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
 
 const forceUppercaseHtml = (html: string) =>
   html.replace(/(^|>)([^<]+)(?=<|$)/g, (_match, prefix: string, text: string) =>
@@ -503,22 +529,33 @@ function PresentationLayer({
   useEffect(() => {
     setContent(null);
     setError("");
-    if (!presentation.url || presentation.previewSlides?.length) return;
+    if (
+      (!presentation.path && !presentation.url) ||
+      presentation.previewSlides?.length
+    )
+      return;
     let cancelled = false;
-    fetch(presentation.url)
-      .then((response) => {
-        if (!response.ok)
-          throw new Error(
-            `No se pudo leer la presentación (${response.status})`,
-          );
-        return response.arrayBuffer();
-      })
+    const read = presentation.path
+      ? window.flProyector.readPresentation(presentation.path)
+      : fetch(presentation.url!).then((response) => {
+          if (!response.ok)
+            throw new Error(
+              `No se pudo leer la presentación (${response.status})`,
+            );
+          return response.arrayBuffer();
+        });
+    read
       .then((buffer) => {
         if (!cancelled) setContent(new Uint8Array(buffer));
       })
-      .catch(() => {
+      .catch((reason) => {
+        console.error("No se pudo cargar la presentación", reason);
         if (!cancelled)
-          setError("No se pudo abrir este archivo de PowerPoint.");
+          setError(
+            reason instanceof Error && reason.message
+              ? reason.message
+              : "No se pudo abrir este archivo de PowerPoint.",
+          );
       });
     return () => {
       cancelled = true;
@@ -552,14 +589,25 @@ function PresentationLayer({
           alt={`Diapositiva ${presentation.slideIndex + 1}`}
         />
       ) : content ? (
-        <PowerPointViewer
-          ref={viewer}
-          content={content}
-          filePath={presentation.path || undefined}
-          fileName={presentation.name}
-          canEdit={false}
-          onSlideCountChange={onSlideCount}
-        />
+        <PresentationErrorBoundary
+          key={`${presentation.path || presentation.url}-${content.byteLength}`}
+          fallback={
+            <div className="presentation-loading">
+              <PresentationIcon />
+              No se pudo interpretar este archivo de PowerPoint.
+            </div>
+          }
+        >
+          <PowerPointViewer
+            ref={viewer}
+            content={content}
+            filePath={presentation.path || undefined}
+            fileName={presentation.name}
+            canEdit={false}
+            defaultLocale="en"
+            onSlideCountChange={onSlideCount}
+          />
+        </PresentationErrorBoundary>
       ) : (
         <div className="presentation-loading">
           <PresentationIcon />
@@ -643,6 +691,7 @@ function VideoLayer({
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const finishNotified = useRef(false);
+  const resumeAfterSeek = useRef(false);
   const notifyPlaybackEnded = (video: HTMLVideoElement) => {
     if (preview || playback.loop || finishNotified.current) return;
     finishNotified.current = true;
@@ -665,11 +714,15 @@ function VideoLayer({
   useEffect(() => {
     const video = ref.current;
     try {
-      if (video && video.readyState >= 1)
-        video.currentTime = Math.max(
-          0,
-          Math.min(playback.seekTime, video.duration || playback.seekTime),
-        );
+      if (video && video.readyState >= 1) {
+        resumeAfterSeek.current = playback.playing;
+        const upperBound = Number.isFinite(video.duration)
+          ? Math.max(0, video.duration - (playback.playing ? 0.05 : 0))
+          : playback.seekTime;
+        const target = Math.max(0, Math.min(playback.seekTime, upperBound));
+        if (typeof video.fastSeek === "function") video.fastSeek(target);
+        else video.currentTime = target;
+      }
     } catch {}
   }, [playback.commandId, playback.seekTime]);
   useEffect(() => {
@@ -727,7 +780,13 @@ function VideoLayer({
         )
           notifyPlaybackEnded(video);
       }}
-      onSeeked={(event) => onTime?.(event.currentTarget.currentTime)}
+      onSeeked={(event) => {
+        const video = event.currentTarget;
+        onTime?.(video.currentTime);
+        if (resumeAfterSeek.current && playback.playing && !video.ended)
+          video.play().catch(() => {});
+        resumeAfterSeek.current = false;
+      }}
       onPause={(event) => {
         const video = event.currentTarget;
         if (

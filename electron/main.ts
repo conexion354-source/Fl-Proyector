@@ -1034,6 +1034,8 @@ function projectRemoteMultimedia(itemId: number) {
           playing: true,
           loop: false,
           seekTime: 0,
+          currentTime: 0,
+          duration: 0,
           commandId: state.video.commandId + 1,
         }
       : { playing: false, loop: true },
@@ -1713,6 +1715,23 @@ if (hasSingleInstanceLock)
         url: mediaUrl(destination),
         name: basename(destination),
       };
+    });
+    ipcMain.handle("presentation:read", async (_event, path: string) => {
+      const source = String(path || "").trim();
+      const extension = extname(source).toLowerCase();
+      if (!source || ![".pptx", ".ppsx", ".pptm", ".potx"].includes(extension))
+        throw new Error("El archivo no es una presentación compatible.");
+      const content = await readFile(source);
+      // All supported Office Open XML formats are ZIP containers. Rejecting
+      // an invalid/empty file here produces a useful error before the React
+      // viewer tries to parse it in every projection window.
+      if (
+        content.length < 4 ||
+        content[0] !== 0x50 ||
+        content[1] !== 0x4b
+      )
+        throw new Error("El archivo de PowerPoint está vacío o dañado.");
+      return content;
     });
     ipcMain.handle("presentation:open", (_event, path: string) =>
       shell.openPath(path),
