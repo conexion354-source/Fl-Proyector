@@ -45,6 +45,11 @@ const forceUppercaseHtml = (html: string) =>
     `${prefix}${text.toLocaleUpperCase("es-AR")}`,
   );
 
+// "Rellenar pantalla" may enlarge a short passage, but keeping that growth
+// close to the preferred size avoids a jarring type-size jump when the next
+// verse needs the automatic safety reduction.
+const MAX_BALANCED_FILL_SCALE = 1.12;
+
 export function ProjectionStage({
   state,
   preview = false,
@@ -136,13 +141,19 @@ export function ProjectionStage({
           element.style.top = `${verticalMargin}%`;
           element.style.bottom = `${verticalMargin}%`;
         }
-        // In fill mode the configured size is the starting point, not a ceiling.
+        // In fill mode the configured size is the visual anchor. A short verse
+        // may grow subtly, but never enough to look like a different design
+        // from the following (longer) verse.
         const responsiveCeiling = Math.max(
           requestedSize,
           Math.min(element.clientWidth * 0.24, element.clientHeight * 0.58),
         );
+        const balancedFillCeiling = Math.min(
+          responsiveCeiling,
+          requestedSize * MAX_BALANCED_FILL_SCALE,
+        );
         let low = Math.min(requestedSize, Math.max(2, 7 * scale)),
-          high = shouldFillBible ? responsiveCeiling : requestedSize,
+          high = shouldFillBible ? balancedFillCeiling : requestedSize,
           best = low;
         const applyCandidate = (fontSize: number) => {
           const referenceScale = Math.min(1, fontSize / requestedSize);
