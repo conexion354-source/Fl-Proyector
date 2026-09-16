@@ -49,6 +49,8 @@ const forceUppercaseHtml = (html: string) =>
 // close to the preferred size avoids a jarring type-size jump when the next
 // verse needs the automatic safety reduction.
 const MAX_BALANCED_FILL_SCALE = 1.12;
+const BIBLE_REFERENCE_HEIGHT_SCALE = 2;
+const BIBLE_REFERENCE_GAP_SCALE = 0.55;
 
 export function ProjectionStage({
   state,
@@ -156,21 +158,20 @@ export function ProjectionStage({
           high = shouldFillBible ? balancedFillCeiling : requestedSize,
           best = low;
         const applyCandidate = (fontSize: number) => {
-          const referenceScale = Math.min(1, fontSize / requestedSize);
           element.style.fontSize = `${fontSize}px`;
           element.style.setProperty("--fit-text-size", `${fontSize}px`);
           if (state.text.kind === "biblia") {
             element.style.setProperty(
               "--bible-reference-size",
-              `${Math.max(8 * scale, state.bibleStyle.referenceFontSize * scale * referenceScale)}px`,
+              `${Math.max(8 * scale, state.bibleStyle.referenceFontSize * scale)}px`,
             );
             element.style.setProperty(
               "--bible-reference-height",
-              `${Math.max(14 * scale, state.bibleStyle.referenceFontSize * 1.65 * scale * referenceScale)}px`,
+              `${Math.max(16 * scale, state.bibleStyle.referenceFontSize * BIBLE_REFERENCE_HEIGHT_SCALE * scale)}px`,
             );
             element.style.setProperty(
               "--bible-reference-gap",
-              `${Math.max(4 * scale, state.bibleStyle.referenceFontSize * 0.45 * scale * referenceScale)}px`,
+              `${Math.max(5 * scale, state.bibleStyle.referenceFontSize * BIBLE_REFERENCE_GAP_SCALE * scale)}px`,
             );
           }
         };
@@ -252,7 +253,10 @@ export function ProjectionStage({
         applyCandidate(best);
         return {
           fontSize: best,
-          referenceScale: Math.min(1, best / requestedSize),
+          // The reference is an independent lower-third. Keeping it at its
+          // configured size reserves a stable row and prevents a long verse
+          // from pushing into or clipping its label.
+          referenceScale: 1,
           horizontalMargin,
           verticalMargin,
         };
@@ -384,9 +388,9 @@ export function ProjectionStage({
       : {}),
     ...(bibleSafeArea
       ? {
-          "--bible-reference-size": `${Math.max(8, state.bibleStyle.referenceFontSize * contentScale * bibleFit.referenceScale)}px`,
-          "--bible-reference-height": `${Math.max(14, state.bibleStyle.referenceFontSize * 1.65 * contentScale * bibleFit.referenceScale)}px`,
-          "--bible-reference-gap": `${Math.max(4, state.bibleStyle.referenceFontSize * 0.45 * contentScale * bibleFit.referenceScale)}px`,
+          "--bible-reference-size": `${Math.max(8 * contentScale, state.bibleStyle.referenceFontSize * contentScale * bibleFit.referenceScale)}px`,
+          "--bible-reference-height": `${Math.max(16 * contentScale, state.bibleStyle.referenceFontSize * BIBLE_REFERENCE_HEIGHT_SCALE * contentScale * bibleFit.referenceScale)}px`,
+          "--bible-reference-gap": `${Math.max(5 * contentScale, state.bibleStyle.referenceFontSize * BIBLE_REFERENCE_GAP_SCALE * contentScale * bibleFit.referenceScale)}px`,
         }
       : {}),
   } as CSSProperties;
@@ -535,6 +539,7 @@ function PresentationLayer({
   const viewer = useRef<PowerPointViewerHandle>(null);
   const [content, setContent] = useState<Uint8Array | null>(null);
   const [error, setError] = useState("");
+  const navigationTimer = useRef<number | null>(null);
   const mockSlide = presentation.previewSlides?.[presentation.slideIndex];
 
   useEffect(() => {
@@ -571,21 +576,30 @@ function PresentationLayer({
     return () => {
       cancelled = true;
     };
-  }, [presentation.url, presentation.previewSlides]);
+  }, [presentation.path, presentation.url, presentation.previewSlides]);
 
   useEffect(() => {
-    if (!content || !viewer.current) return;
-    const timer = window.setTimeout(() => {
-      viewer.current?.setMode("present");
-      viewer.current?.goTo(presentation.slideIndex);
-    }, 120);
-    return () => window.clearTimeout(timer);
-  }, [content]);
-
-  useEffect(() => {
-    if (!content) return;
-    viewer.current?.goTo(presentation.slideIndex);
-  }, [content, presentation.slideIndex]);
+    if (!content || !presentation.visible) return;
+    if (navigationTimer.current !== null)
+      window.clearTimeout(navigationTimer.current);
+    // PowerPoint parsing and remote taps can overlap. A short trailing delay
+    // sends only the last requested slide and switches to presentation mode
+    // before navigating, avoiding editor flashes and renderer stalls.
+    navigationTimer.current = window.setTimeout(() => {
+      navigationTimer.current = null;
+      try {
+        viewer.current?.setMode("present");
+        viewer.current?.goTo(Math.max(0, presentation.slideIndex));
+      } catch (reason) {
+        console.error("No se pudo cambiar la diapositiva", reason);
+      }
+    }, 90);
+    return () => {
+      if (navigationTimer.current !== null)
+        window.clearTimeout(navigationTimer.current);
+      navigationTimer.current = null;
+    };
+  }, [content, presentation.slideIndex, presentation.visible]);
 
   if (!presentation.visible)
     return <div className="presentation-layer layer-hidden" />;

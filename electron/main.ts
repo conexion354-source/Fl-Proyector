@@ -98,6 +98,7 @@ let projectionWindow: BrowserWindow | null = null;
 let thirdProjectionWindow: BrowserWindow | null = null;
 let liveAudienceWindow: BrowserWindow | null = null;
 let tagsDialogWindow: BrowserWindow | null = null;
+let projectionDisplayId: number | null = null;
 let state: ProjectionState = structuredClone(initialProjectionState);
 let database: AppDatabase;
 let remoteServer: ReturnType<typeof startRemoteServer>;
@@ -595,6 +596,23 @@ async function createControlWindow() {
       { role: "selectAll" },
     ]).popup({ window: controlWindow ?? undefined });
   });
+  controlWindow.on("closed", () => {
+    controlWindow = null;
+    // Hidden/cross-display windows otherwise keep Electron alive and can
+    // leave a frozen frame on the projector after the operator closes FL.
+    for (const auxiliary of [
+      projectionWindow,
+      thirdProjectionWindow,
+      liveAudienceWindow,
+      tagsDialogWindow,
+    ])
+      if (auxiliary && !auxiliary.isDestroyed()) auxiliary.destroy();
+    projectionWindow = null;
+    thirdProjectionWindow = null;
+    liveAudienceWindow = null;
+    tagsDialogWindow = null;
+    projectionDisplayId = null;
+  });
   await controlWindow.loadURL(rendererUrl());
 }
 
@@ -602,14 +620,16 @@ async function openProjection() {
   const settings = database.getDisplaySettings();
   if (projectionWindow && !projectionWindow.isDestroyed()) {
     await synchronizeProjectionWindows(settings);
-    projectionWindow.focus();
+    if (projectionWindow.isVisible()) projectionWindow.moveTop();
     return;
   }
   const { mainTarget } = projectionTargets(settings);
+  projectionDisplayId = mainTarget?.id ?? null;
   const mainWindow = await createProjectionWindow(mainTarget, settings);
   projectionWindow = mainWindow;
   mainWindow.on("closed", () => {
     if (projectionWindow === mainWindow) projectionWindow = null;
+    projectionDisplayId = null;
     if (thirdProjectionWindow && !thirdProjectionWindow.isDestroyed())
       thirdProjectionWindow.close();
     controlWindow?.webContents.send("projection:status-changed", false);
@@ -685,6 +705,7 @@ async function createProjectionWindow(
     resizable: false,
     movable: false,
     minimizable: false,
+    focusable: false,
     skipTaskbar: true,
     autoHideMenuBar: true,
     alwaysOnTop: false,
@@ -693,20 +714,35 @@ async function createProjectionWindow(
       preload: join(app.getAppPath(), "electron/preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      backgroundThrottling: false,
     },
   });
   win.setMenu(null);
   win.setMenuBarVisibility(false);
   win.setAutoHideMenuBar(true);
+  let recovering = false;
+  const sendProjectionState = () => {
+    recovering = false;
+    if (win.isDestroyed()) return;
+    win.webContents.send("projection:display-settings", settings);
+    win.webContents.send("projection:state", state);
+  };
+  const recoverProjectionRenderer = () => {
+    if (recovering || win.isDestroyed()) return;
+    recovering = true;
+    setTimeout(() => {
+      if (!win.isDestroyed()) win.webContents.reload();
+    }, 180);
+  };
+  win.webContents.on("did-finish-load", sendProjectionState);
+  win.on("unresponsive", recoverProjectionRenderer);
+  win.webContents.on("render-process-gone", recoverProjectionRenderer);
   await win.loadURL(rendererUrl("projection"));
   if (windowsKiosk && target) {
     win.setBounds(target.bounds, false);
     win.setAlwaysOnTop(true, "screen-saver");
     win.setKiosk(true);
   }
-  win.webContents.once("did-finish-load", () =>
-    win.webContents.send("projection:state", state),
-  );
   return win;
 }
 
@@ -752,7 +788,18 @@ function applyDisplaySettingsToWindow(
 async function synchronizeProjectionWindows(settings: DisplaySettings) {
   if (!projectionWindow || projectionWindow.isDestroyed()) return;
   const { mainTarget, thirdTarget } = projectionTargets(settings);
+  // A brief HDMI/display reset must never move the projection window onto the
+  // operator's primary monitor. Hide it until Windows reports an external
+  // display again, then restore it without taking keyboard focus.
+  if (!mainTarget && projectionDisplayId !== null) {
+    projectionWindow.hide();
+    if (thirdProjectionWindow && !thirdProjectionWindow.isDestroyed())
+      thirdProjectionWindow.hide();
+    return;
+  }
+  projectionDisplayId = mainTarget?.id ?? null;
   applyDisplaySettingsToWindow(projectionWindow, mainTarget, settings);
+  if (!projectionWindow.isVisible()) projectionWindow.showInactive();
 
   if (!thirdTarget) {
     if (thirdProjectionWindow && !thirdProjectionWindow.isDestroyed())
@@ -768,6 +815,7 @@ async function synchronizeProjectionWindows(settings: DisplaySettings) {
     return;
   }
   applyDisplaySettingsToWindow(thirdProjectionWindow, thirdTarget, settings);
+  if (!thirdProjectionWindow.isVisible()) thirdProjectionWindow.showInactive();
 }
 
 function refreshProjectionGeometry() {

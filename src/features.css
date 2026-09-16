@@ -2759,12 +2759,14 @@
 }
 .projection-text.bible-safe-area .bible-reference-slot {
   display: flex;
+  position: relative;
+  z-index: 2;
   width: 100%;
   height: var(--bible-reference-height);
   min-height: var(--bible-reference-height);
   flex: 0 0 var(--bible-reference-height);
   align-items: center;
-  overflow: hidden;
+  overflow: visible;
   line-height: 1;
 }
 .projection-text.bible-safe-area .bible-reference-slot.reference-before {

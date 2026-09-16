@@ -854,9 +854,14 @@ export function MeetingBuilder({
       state.presentation.path === String(payload.path)
         ? state.presentation.slideCount
         : Number(payload.slideCount || payload.previewSlides?.length || 0);
+    // The viewer reports its total asynchronously. Do not turn an early
+    // Siguiente command into a no-op while that count is still loading.
+    const maximumIndex = slideCount > 0
+      ? Math.max(slideCount - 1, 0)
+      : Math.max(requestedIndex, 0);
     const slideIndex = Math.max(
       0,
-      Math.min(requestedIndex, Math.max(slideCount - 1, 0)),
+      Math.min(requestedIndex, maximumIndex),
     );
     const restoredBackground = releaseMeetingVideoBackground();
     setOnAirItemId(item.id);

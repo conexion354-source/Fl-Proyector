@@ -942,15 +942,17 @@ function LiveContentControls({
   if (state.presentation.visible) {
     const count = state.presentation.slideCount;
     const index = state.presentation.slideIndex;
-    const move = (direction: -1 | 1) =>
+    const move = (direction: -1 | 1) => {
+      const requestedIndex = Math.max(0, index + direction);
       update({
         presentation: {
-          slideIndex: Math.max(
-            0,
-            Math.min(index + direction, Math.max(count - 1, 0)),
-          ),
+          slideIndex:
+            count > 0
+              ? Math.min(requestedIndex, Math.max(count - 1, 0))
+              : requestedIndex,
         },
       });
+    };
     return (
       <section className="live-media-controls presentation-live-controls">
         <div className="live-control-title">

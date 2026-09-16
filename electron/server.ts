@@ -203,6 +203,14 @@ export function startRemoteServer(
     moduleDirectory,
     "../../assets/FL-Remoto.apk",
   );
+  const remoteIcon192Path = path.resolve(
+    moduleDirectory,
+    "../../assets/remote-icon-192.png",
+  );
+  const remoteIcon512Path = path.resolve(
+    moduleDirectory,
+    "../../assets/remote-icon-512.png",
+  );
   app.use(express.json({ limit: "256kb" }));
 
   const collaboratorTokens = new Set<string>();
@@ -246,15 +254,27 @@ export function startRemoteServer(
     res.type("application/manifest+json").send({
       name: "FL Proyector Remoto",
       short_name: "FL Remoto",
+      id: "/",
       start_url: "/",
+      scope: "/",
       display: "standalone",
+      display_override: ["standalone", "minimal-ui"],
+      orientation: "any",
       background_color: "#0c1018",
       theme_color: "#5b42ea",
+      categories: ["utilities", "productivity"],
+      prefer_related_applications: false,
       icons: [
         {
-          src: "/remote-icon.svg",
-          sizes: "any",
-          type: "image/svg+xml",
+          src: "/remote-icon-192.png",
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "any maskable",
+        },
+        {
+          src: "/remote-icon-512.png",
+          sizes: "512x512",
+          type: "image/png",
           purpose: "any maskable",
         },
       ],
@@ -262,6 +282,12 @@ export function startRemoteServer(
   );
   app.get("/remote-icon.svg", (_req, res) =>
     res.type("image/svg+xml").send(remoteIcon),
+  );
+  app.get("/remote-icon-192.png", (_req, res) =>
+    res.sendFile(remoteIcon192Path),
+  );
+  app.get("/remote-icon-512.png", (_req, res) =>
+    res.sendFile(remoteIcon512Path),
   );
   app.get("/downloads/FL-Remoto.apk", (_req, res) => {
     if (!existsSync(remoteApkPath))
@@ -456,15 +482,17 @@ export function startRemoteServer(
   app.post("/api/remote/presentation", (req, res) => {
     const direction = Number(req.body?.direction);
     const current = getState().presentation;
-    if (current.visible && (direction === -1 || direction === 1))
+    if (current.visible && (direction === -1 || direction === 1)) {
+      const requestedIndex = Math.max(0, current.slideIndex + direction);
       applyPatch({
         presentation: {
-          slideIndex: Math.max(
-            0,
-            Math.min(current.slideIndex + direction, Math.max(0, current.slideCount - 1)),
-          ),
+          slideIndex:
+            current.slideCount > 0
+              ? Math.min(requestedIndex, Math.max(0, current.slideCount - 1))
+              : requestedIndex,
         },
       });
+    }
     res.status(204).end();
   });
 
@@ -484,7 +512,10 @@ export function startRemoteServer(
       socket.on("remote:presentation", (direction: -1 | 1) => {
         const current = getState().presentation;
         if (!current.visible || ![-1, 1].includes(direction)) return;
-        const slideIndex = Math.max(0, Math.min(current.slideIndex + direction, Math.max(0, current.slideCount - 1)));
+        const requestedIndex = Math.max(0, current.slideIndex + direction);
+        const slideIndex = current.slideCount > 0
+          ? Math.min(requestedIndex, Math.max(0, current.slideCount - 1))
+          : requestedIndex;
         applyPatch({ presentation: { slideIndex } });
       });
     }
@@ -598,14 +629,14 @@ socket.on('connect',function(){statusEl.textContent='Conectado';statusEl.classLi
 
 const remoteIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="118" fill="#5b42ea"/><path fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round" d="M136 206h240M136 306h160M365 303h12"/><rect x="112" y="153" width="288" height="206" rx="30" fill="none" stroke="#fff" stroke-width="25"/></svg>`;
 
-const serviceWorker = `self.addEventListener("install",()=>self.skipWaiting());self.addEventListener("activate",event=>event.waitUntil(self.clients.claim()));`;
+const serviceWorker = `const CACHE="fl-remoto-v2",SHELL=["/","/manifest.webmanifest","/remote-icon-192.png","/remote-icon-512.png"];self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));self.addEventListener("fetch",event=>{if(event.request.method!=="GET"||new URL(event.request.url).origin!==self.location.origin)return;event.respondWith(fetch(event.request).then(response=>{const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));return response}).catch(()=>caches.match(event.request).then(response=>response||caches.match("/"))))});`;
 
 const remoteHtml = String.raw`<!doctype html>
 <html lang="es"><head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#5b42ea"><meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FL Remoto">
-  <link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/remote-icon.svg">
+  <link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" sizes="192x192" href="/remote-icon-192.png">
   <title>FL Proyector Remoto</title>
   <style>
     :root{color-scheme:dark;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0c1018;color:#f5f7ff}
@@ -639,8 +670,6 @@ const remoteHtml = String.raw`<!doctype html>
   window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();deferredInstallPrompt=event;showInstallButton();});
   window.addEventListener("appinstalled",function(){deferredInstallPrompt=null;installButton.hidden=true;});
   installButton.onclick=function(){if(/android/i.test(navigator.userAgent)){window.location.href="/downloads/FL-Remoto.apk";return;}if(deferredInstallPrompt){deferredInstallPrompt.prompt();deferredInstallPrompt.userChoice.then(function(){deferredInstallPrompt=null;showInstallButton();});return;}var ios=/iphone|ipad|ipod/i.test(navigator.userAgent);alert(ios?"Para instalar FL Remoto en iPhone o iPad:\\n\\n1. Tocá Compartir (□↑) en Safari.\\n2. Elegí ‘Agregar a pantalla de inicio’.\\n3. Confirmá con ‘Agregar’.":"Para instalar FL Remoto, abrí el menú del navegador y elegí ‘Instalar aplicación’ o ‘Agregar a pantalla principal’.");};
-  // Web app only: Android and iPhone use the browser's normal install flow.
-  installButton.onclick=function(){if(deferredInstallPrompt){deferredInstallPrompt.prompt();deferredInstallPrompt.userChoice.then(function(){deferredInstallPrompt=null;showInstallButton();});return;}var ios=/iphone|ipad|ipod/i.test(navigator.userAgent);alert(ios?"Para instalar FL Remoto en iPhone o iPad:\n\n1. Tocá Compartir (□↑) en Safari.\n2. Elegí ‘Agregar a pantalla de inicio’.\n3. Confirmá con ‘Agregar’.":"Para instalar FL Remoto, abrí el menú del navegador y elegí ‘Instalar aplicación’ o ‘Agregar a pantalla principal’.");};
   showInstallButton();
   var wakeLock=null;function keepScreenAwake(){if(!("wakeLock" in navigator)||document.visibilityState!=="visible")return;navigator.wakeLock.request("screen").then(function(lock){wakeLock=lock;lock.addEventListener("release",function(){wakeLock=null;});}).catch(function(){});}document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")keepScreenAwake();});keepScreenAwake();
   function showView(view){document.body.dataset.view=view;home.hidden=view!=="home";bibleView.hidden=view!=="bible";mediaView.hidden=view!=="media";if(view==="bible"&&!versions.length)loadVersions().catch(function(){versesElement.innerHTML="<div class=\"empty\">No se pudo cargar la Biblia.</div>";});if(view==="media")loadMeetings();}
