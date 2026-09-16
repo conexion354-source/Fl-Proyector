@@ -125,6 +125,19 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.10",
+    title: "Proyección estable y aplicación móvil más confiable",
+    publishedAt: "2026-09-16T17:46:06Z",
+    changes: [
+      "La referencia bíblica reserva un espacio independiente y ya no queda cortada ni superpuesta con el versículo en pantallas Full HD.",
+      "Los cambios rápidos de diapositiva de PowerPoint se agrupan y ejecutan en modo presentación para evitar bloqueos o mostrar la interfaz del operador.",
+      "La salida de proyección se recupera automáticamente si su proceso deja de responder y permanece oculta durante desconexiones momentáneas del monitor.",
+      "Al cerrar FL Proyector también se cierran las salidas secundaria y tercera, la captura en vivo y las ventanas auxiliares.",
+      "FL Remoto incorpora manifiesto, iconos y caché PWA completos, además de un instalador Android directo cuando el navegador no admite la instalación web.",
+      "La navegación remota de PowerPoint acepta comandos mientras todavía se está detectando la cantidad total de diapositivas.",
+    ],
+  },
+  {
     version: "10.11.8",
     title: "Colaboración y lectura en vivo más completas",
     publishedAt: "2026-09-14T19:52:07Z",
