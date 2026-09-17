@@ -21,6 +21,11 @@ contextBridge.exposeInMainWorld("flProyector", {
   importMedia: (paths) => ipcRenderer.invoke("media:import", paths),
   chooseMediaFiles: () => ipcRenderer.invoke("media:choose"),
   chooseMeetingMedia: () => ipcRenderer.invoke("media:choose-for-meeting"),
+  getPexelsStatus: () => ipcRenderer.invoke("pexels:status"),
+  savePexelsApiKey: (apiKey) => ipcRenderer.invoke("pexels:save-key", apiKey),
+  searchPexels: (query, kind, orientation, page = 1) =>
+    ipcRenderer.invoke("pexels:search", query, kind, orientation, page),
+  importPexelsMedia: (item) => ipcRenderer.invoke("pexels:import", item),
   importDroppedFiles: (files) =>
     ipcRenderer.invoke(
       "media:import",

@@ -1,16 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Check,
+  Download,
+  ExternalLink,
   Film,
+  Globe2,
+  HardDrive,
+  Image as ImageIcon,
+  KeyRound,
   LoaderCircle,
   Plus,
   Search,
+  Server,
   Tag,
   Trash2,
   Upload,
+  Video,
   X,
 } from "lucide-react";
 import type {
   MediaItem,
+  PexelsMediaResult,
   ProjectionPatch,
   ProjectionState,
 } from "../../shared/types";
@@ -21,12 +31,37 @@ type Props = {
   update: (patch: ProjectionPatch) => void;
 };
 
+const readableError = (error: unknown, fallback: string) =>
+  error instanceof Error
+    ? error.message
+        .replace(/^(?:Error:\s*)+/, "")
+        .replace(/^Error invoking remote method '[^']+':\s*/, "")
+        .replace(/^(?:Error:\s*)+/, "")
+    : fallback;
+
 export function MediaLibrary({ state, update }: Props) {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [query, setQuery] = useState("");
   const [dragging, setDragging] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addMode, setAddMode] = useState<"disk" | "server">("disk");
+  const [pexelsConfigured, setPexelsConfigured] = useState(false);
+  const [editingPexelsKey, setEditingPexelsKey] = useState(false);
+  const [pexelsKeyDraft, setPexelsKeyDraft] = useState("");
+  const [pexelsQuery, setPexelsQuery] = useState("");
+  const [pexelsKind, setPexelsKind] = useState<"image" | "video">("image");
+  const [pexelsOrientation, setPexelsOrientation] = useState<
+    "all" | "landscape" | "portrait" | "square"
+  >("landscape");
+  const [pexelsResults, setPexelsResults] = useState<PexelsMediaResult[]>([]);
+  const [pexelsPage, setPexelsPage] = useState(1);
+  const [pexelsHasMore, setPexelsHasMore] = useState(false);
+  const [pexelsLoading, setPexelsLoading] = useState(false);
+  const [pexelsError, setPexelsError] = useState("");
+  const [importingPexelsId, setImportingPexelsId] = useState<number | null>(null);
+  const [importedPexelsIds, setImportedPexelsIds] = useState<Set<number>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<MediaItem | null>(null);
   const [editingTags, setEditingTags] = useState<MediaItem | null>(null);
   const [mediaNameDraft, setMediaNameDraft] = useState("");
@@ -72,12 +107,68 @@ export function MediaLibrary({ state, update }: Props) {
     setImportError("");
     try {
       setMedia(await window.flProyector.chooseMediaFiles());
+      setAddDialogOpen(false);
     } catch {
       setImportError(
         "No se pudo procesar uno de los archivos. Verificá que el video no esté dañado.",
       );
     } finally {
       setImporting(false);
+    }
+  };
+  const openAddDialog = async () => {
+    setAddDialogOpen(true);
+    setAddMode("disk");
+    setPexelsError("");
+    const status = await window.flProyector.getPexelsStatus();
+    setPexelsConfigured(status.configured);
+    setEditingPexelsKey(!status.configured);
+  };
+  const savePexelsKey = async () => {
+    if (!pexelsKeyDraft.trim()) return;
+    setPexelsLoading(true);
+    setPexelsError("");
+    try {
+      const status = await window.flProyector.savePexelsApiKey(pexelsKeyDraft);
+      setPexelsConfigured(status.configured);
+      setEditingPexelsKey(false);
+      setPexelsKeyDraft("");
+    } catch (error) {
+      setPexelsError(readableError(error, "No se pudo verificar la clave de Pexels."));
+    } finally {
+      setPexelsLoading(false);
+    }
+  };
+  const searchPexels = async (page = 1, append = false) => {
+    if (!pexelsQuery.trim()) return;
+    setPexelsLoading(true);
+    setPexelsError("");
+    try {
+      const result = await window.flProyector.searchPexels(
+        pexelsQuery,
+        pexelsKind,
+        pexelsOrientation,
+        page,
+      );
+      setPexelsResults((current) => append ? [...current, ...result.items] : result.items);
+      setPexelsPage(result.page);
+      setPexelsHasMore(result.hasMore);
+    } catch (error) {
+      setPexelsError(readableError(error, "No se pudo buscar en Pexels."));
+    } finally {
+      setPexelsLoading(false);
+    }
+  };
+  const importFromPexels = async (item: PexelsMediaResult) => {
+    setImportingPexelsId(item.externalId);
+    setPexelsError("");
+    try {
+      setMedia(await window.flProyector.importPexelsMedia(item));
+      setImportedPexelsIds((current) => new Set(current).add(item.externalId));
+    } catch (error) {
+      setPexelsError(readableError(error, "No se pudo guardar el fondo."));
+    } finally {
+      setImportingPexelsId(null);
     }
   };
   const importDropped = async (files: File[]) => {
@@ -171,7 +262,7 @@ export function MediaLibrary({ state, update }: Props) {
           <button
             className="add-backgrounds primary"
             disabled={importing}
-            onClick={chooseFiles}
+            onClick={() => void openAddDialog()}
           >
             {importing ? <LoaderCircle className="spin" /> : <Plus />}
             {importing ? "Procesando y guardando…" : "Agregar fondos"}
@@ -275,6 +366,198 @@ export function MediaLibrary({ state, update }: Props) {
           </div>
         )}
       </div>
+      {addDialogOpen && (
+        <div
+          className="modal-backdrop media-source-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setAddDialogOpen(false);
+          }}
+        >
+          <section
+            className="media-source-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="media-source-title"
+          >
+            <div className="media-tags-header">
+              <div>
+                <span className="eyebrow">AGREGAR FONDOS</span>
+                <h2 id="media-source-title">Elegí el origen</h2>
+              </div>
+              <button
+                type="button"
+                className="media-tags-close"
+                aria-label="Cerrar"
+                onClick={() => setAddDialogOpen(false)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="media-source-tabs" role="tablist">
+              <button
+                type="button"
+                className={addMode === "disk" ? "active" : ""}
+                onClick={() => setAddMode("disk")}
+              >
+                <HardDrive />
+                Disco
+              </button>
+              <button
+                type="button"
+                className={addMode === "server" ? "active" : ""}
+                onClick={() => setAddMode("server")}
+              >
+                <Server />
+                Servidor
+              </button>
+            </div>
+            {addMode === "disk" ? (
+              <div className="media-disk-source">
+                <span className="media-source-icon"><HardDrive /></span>
+                <h3>Archivos de esta computadora</h3>
+                <p>Elegí imágenes o videos. Se copiarán a la biblioteca local de FL Proyector.</p>
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={importing}
+                  onClick={() => void chooseFiles()}
+                >
+                  {importing ? <LoaderCircle className="spin" /> : <Upload />}
+                  {importing ? "Procesando…" : "Elegir archivos"}
+                </button>
+              </div>
+            ) : (
+              <div className="pexels-source">
+                {(!pexelsConfigured || editingPexelsKey) ? (
+                  <div className="pexels-key-card">
+                    <span className="media-source-icon"><KeyRound /></span>
+                    <h3>Conectar con Pexels</h3>
+                    <p>Ingresá una clave gratuita. Se guarda cifrada solamente en esta computadora.</p>
+                    <input
+                      type="password"
+                      autoFocus
+                      value={pexelsKeyDraft}
+                      onChange={(event) => setPexelsKeyDraft(event.target.value)}
+                      placeholder="Clave API de Pexels"
+                    />
+                    {pexelsError && <div className="pexels-error">{pexelsError}</div>}
+                    <div className="pexels-key-actions">
+                      <button
+                        type="button"
+                        onClick={() => window.flProyector.openExternal("https://www.pexels.com/api/new/")}
+                      >
+                        <ExternalLink /> Obtener clave
+                      </button>
+                      {pexelsConfigured && (
+                        <button type="button" onClick={() => setEditingPexelsKey(false)}>
+                          Cancelar
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="primary"
+                        disabled={!pexelsKeyDraft.trim() || pexelsLoading}
+                        onClick={() => void savePexelsKey()}
+                      >
+                        {pexelsLoading ? <LoaderCircle className="spin" /> : <Check />}
+                        Guardar clave
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="pexels-connected-row">
+                      <span><Globe2 /> Pexels conectado</span>
+                      <button type="button" onClick={() => setEditingPexelsKey(true)}>Cambiar clave</button>
+                    </div>
+                    <form
+                      className="pexels-search-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void searchPexels(1, false);
+                      }}
+                    >
+                      <label className="pexels-search-input">
+                        <Search />
+                        <input
+                          autoFocus
+                          value={pexelsQuery}
+                          onChange={(event) => setPexelsQuery(event.target.value)}
+                          placeholder="Ej. cielo, iglesia, naturaleza…"
+                        />
+                      </label>
+                      <select value={pexelsKind} onChange={(event) => setPexelsKind(event.target.value as "image" | "video")}>
+                        <option value="image">Imágenes</option>
+                        <option value="video">Videos</option>
+                      </select>
+                      <select value={pexelsOrientation} onChange={(event) => setPexelsOrientation(event.target.value as typeof pexelsOrientation)}>
+                        <option value="all">Cualquier formato</option>
+                        <option value="landscape">Horizontal</option>
+                        <option value="portrait">Vertical</option>
+                        <option value="square">Cuadrado</option>
+                      </select>
+                      <button className="primary" disabled={!pexelsQuery.trim() || pexelsLoading}>
+                        {pexelsLoading ? <LoaderCircle className="spin" /> : <Search />}
+                        Buscar
+                      </button>
+                    </form>
+                    {pexelsError && <div className="pexels-error">{pexelsError}</div>}
+                    <div className="pexels-results">
+                      {pexelsResults.map((item) => {
+                        const saved = importedPexelsIds.has(item.externalId);
+                        const downloading = importingPexelsId === item.externalId;
+                        return (
+                          <article key={`${item.kind}-${item.externalId}`} className="pexels-card">
+                            <div className="pexels-preview">
+                              <img src={item.previewUrl} alt="" />
+                              <span>{item.kind === "image" ? <ImageIcon /> : <Video />}</span>
+                            </div>
+                            <div className="pexels-card-copy">
+                              <button
+                                type="button"
+                                className="pexels-author"
+                                onClick={() => window.flProyector.openExternal(item.sourceUrl)}
+                                title="Abrir en Pexels"
+                              >
+                                {item.photographer} <ExternalLink />
+                              </button>
+                              <small>{item.width}×{item.height}{item.duration ? ` · ${item.duration}s` : ""}</small>
+                              <button
+                                type="button"
+                                className={saved ? "saved" : "primary"}
+                                disabled={saved || importingPexelsId !== null}
+                                onClick={() => void importFromPexels(item)}
+                              >
+                                {downloading ? <LoaderCircle className="spin" /> : saved ? <Check /> : <Download />}
+                                {downloading ? "Guardando…" : saved ? "Guardado" : "Guardar"}
+                              </button>
+                            </div>
+                          </article>
+                        );
+                      })}
+                      {!pexelsLoading && pexelsQuery && !pexelsResults.length && !pexelsError && (
+                        <div className="pexels-empty">No se encontraron fondos con esa búsqueda.</div>
+                      )}
+                    </div>
+                    {pexelsHasMore && pexelsResults.length > 0 && (
+                      <button
+                        type="button"
+                        className="pexels-more"
+                        disabled={pexelsLoading}
+                        onClick={() => void searchPexels(pexelsPage + 1, true)}
+                      >
+                        {pexelsLoading ? "Cargando…" : "Ver más resultados"}
+                      </button>
+                    )}
+                    <p className="pexels-credit">Fotos y videos proporcionados por Pexels. El crédito del autor se conserva en la biblioteca.</p>
+                  </>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
       {pendingDelete && (
         <ConfirmDeleteDialog
           title={`¿Eliminar “${pendingDelete.name}”?`}

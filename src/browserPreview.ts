@@ -149,6 +149,10 @@ if (!window.flProyector) {
       return media;
     },
     chooseMeetingMedia: async () => chooseBrowserMedia(),
+    getPexelsStatus: async () => ({ configured: false }),
+    savePexelsApiKey: async (apiKey: string) => ({ configured: Boolean(apiKey.trim()) }),
+    searchPexels: async () => ({ items: [], page: 1, totalResults: 0, hasMore: false }),
+    importPexelsMedia: async () => media,
     importDroppedFiles: async (files: File[]) => {
       importBrowserMedia(files);
       return media;

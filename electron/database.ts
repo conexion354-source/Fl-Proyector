@@ -494,6 +494,20 @@ export class AppDatabase {
       )
       .run(code.trim());
   }
+  getIntegrationSecret(key: string) {
+    return (
+      (this.db
+        .prepare("SELECT value FROM settings WHERE key=?")
+        .get(`integration:${key}`) as { value: string } | undefined)?.value ?? ""
+    );
+  }
+  saveIntegrationSecret(key: string, value: string) {
+    this.db
+      .prepare(
+        "INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      )
+      .run(`integration:${key}`, value);
+  }
 
   listMeetings(): Meeting[] {
     return this.db

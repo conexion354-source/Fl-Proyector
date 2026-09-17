@@ -8,6 +8,29 @@ export type MediaItem = {
   kind: "image" | "video";
 };
 
+export type PexelsMediaResult = {
+  provider: "Pexels";
+  externalId: number;
+  kind: "image" | "video";
+  title: string;
+  query: string;
+  previewUrl: string;
+  downloadUrl: string;
+  sourceUrl: string;
+  photographer: string;
+  photographerUrl: string;
+  width: number;
+  height: number;
+  duration: number | null;
+};
+
+export type PexelsSearchResponse = {
+  items: PexelsMediaResult[];
+  page: number;
+  totalResults: number;
+  hasMore: boolean;
+};
+
 export type SongCategory = { id: number; name: string; songCount: number };
 export type LyricsSearchResult = {
   provider: "LRCLIB";

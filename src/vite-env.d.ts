@@ -10,6 +10,8 @@ import type {
   DisplaySettings,
   DisplayInfo,
   MediaItem,
+  PexelsMediaResult,
+  PexelsSearchResponse,
   Meeting,
   MeetingItem,
   LiveAudienceStatus,
@@ -44,6 +46,15 @@ declare global {
       importMedia(paths: string[]): Promise<MediaItem[]>;
       chooseMediaFiles(): Promise<MediaItem[]>;
       chooseMeetingMedia(): Promise<MediaItem[]>;
+      getPexelsStatus(): Promise<{ configured: boolean }>;
+      savePexelsApiKey(apiKey: string): Promise<{ configured: boolean }>;
+      searchPexels(
+        query: string,
+        kind: "image" | "video",
+        orientation: "all" | "landscape" | "portrait" | "square",
+        page?: number,
+      ): Promise<PexelsSearchResponse>;
+      importPexelsMedia(item: PexelsMediaResult): Promise<MediaItem[]>;
       importDroppedFiles(files: File[]): Promise<MediaItem[]>;
       setFavorite(id: number, slot: number | null): Promise<void>;
       setTags(id: number, tags: string[]): Promise<void>;

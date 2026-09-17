@@ -8,10 +8,14 @@ import {
   net,
   dialog,
   shell,
+  safeStorage,
 } from "electron";
 import { join, basename, extname } from "node:path";
 import { pathToFileURL } from "node:url";
-import { mkdir, readdir, copyFile, readFile } from "node:fs/promises";
+import { mkdir, readdir, copyFile, readFile, rename, rm } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { networkInterfaces } from "node:os";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
@@ -29,6 +33,8 @@ import {
   type SongDisplaySettings,
   type MediaItem,
   type LyricsSearchResult,
+  type PexelsMediaResult,
+  type PexelsSearchResponse,
   type ReleaseHistoryEntry,
   type UpdateStatus,
 } from "../shared/types.js";
@@ -112,6 +118,10 @@ let churchAssetsDir = "";
 let updaterConfigured = false;
 let liveAudienceCaptureTimer: ReturnType<typeof setTimeout> | null = null;
 let liveAudienceCaptureRetryTimer: ReturnType<typeof setTimeout> | null = null;
+const pexelsSearchCache = new Map<
+  string,
+  { expiresAt: number; value: PexelsSearchResponse }
+>();
 let updateStatus: UpdateStatus = {
   state: app.isPackaged ? "idle" : "development",
   currentVersion: app.getVersion(),
@@ -1161,6 +1171,203 @@ async function importMediaFile(source: string) {
   return destination;
 }
 
+const pexelsSecretKey = "pexels-api-key";
+const pexelsDownloadHosts = new Set([
+  "images.pexels.com",
+  "videos.pexels.com",
+]);
+
+function readPexelsApiKey() {
+  const saved = database.getIntegrationSecret(pexelsSecretKey);
+  if (!saved) return "";
+  if (!saved.startsWith("encrypted:")) return saved.replace(/^plain:/, "");
+  try {
+    return safeStorage.decryptString(
+      Buffer.from(saved.slice("encrypted:".length), "base64"),
+    );
+  } catch {
+    return "";
+  }
+}
+
+function storePexelsApiKey(value: string) {
+  const key = value.trim();
+  if (!key) {
+    database.saveIntegrationSecret(pexelsSecretKey, "");
+    return;
+  }
+  const stored = safeStorage.isEncryptionAvailable()
+    ? `encrypted:${safeStorage.encryptString(key).toString("base64")}`
+    : `plain:${key}`;
+  database.saveIntegrationSecret(pexelsSecretKey, stored);
+}
+
+async function pexelsRequest(endpoint: URL, apiKey = readPexelsApiKey()) {
+  if (!apiKey)
+    throw new Error("Configurá tu clave gratuita de Pexels para buscar fondos.");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const response = await net.fetch(endpoint.toString(), {
+      signal: controller.signal,
+      headers: { Authorization: apiKey },
+    });
+    if (response.status === 401)
+      throw new Error("La clave de Pexels no es válida.");
+    if (response.status === 429)
+      throw new Error("Se alcanzó el límite de búsquedas de Pexels. Intentá más tarde.");
+    if (!response.ok)
+      throw new Error("Pexels no está disponible en este momento.");
+    return response;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function searchPexels(
+  query: string,
+  kind: "image" | "video",
+  orientation: "all" | "landscape" | "portrait" | "square",
+  page: number,
+): Promise<PexelsSearchResponse> {
+  const normalizedQuery = query.trim().replace(/\s+/g, " ");
+  if (!normalizedQuery) return { items: [], page: 1, totalResults: 0, hasMore: false };
+  const safePage = Math.max(1, Math.floor(page || 1));
+  const cacheKey = `${kind}:${orientation}:${safePage}:${normalizedQuery.toLocaleLowerCase("es-AR")}`;
+  const cached = pexelsSearchCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const endpoint = new URL(
+    kind === "image"
+      ? "https://api.pexels.com/v1/search"
+      : "https://api.pexels.com/videos/search",
+  );
+  endpoint.searchParams.set("query", normalizedQuery);
+  endpoint.searchParams.set("page", String(safePage));
+  endpoint.searchParams.set("per_page", "24");
+  if (orientation !== "all") endpoint.searchParams.set("orientation", orientation);
+  const payload = (await (await pexelsRequest(endpoint)).json()) as {
+    photos?: Array<Record<string, unknown>>;
+    videos?: Array<Record<string, unknown>>;
+    page?: number;
+    per_page?: number;
+    total_results?: number;
+    next_page?: string;
+  };
+  const records = kind === "image" ? payload.photos ?? [] : payload.videos ?? [];
+  const items = records.flatMap((record): PexelsMediaResult[] => {
+    const externalId = Number(record.id || 0);
+    const user = (record.user ?? {}) as Record<string, unknown>;
+    const photographer = String(record.photographer ?? user.name ?? "Pexels");
+    const sourceUrl = String(record.url || "https://www.pexels.com");
+    if (!externalId) return [];
+    if (kind === "image") {
+      const sources = (record.src ?? {}) as Record<string, unknown>;
+      const previewUrl = String(sources.medium || sources.small || "");
+      const downloadUrl = String(sources.original || sources.large2x || sources.large || "");
+      if (!previewUrl || !downloadUrl) return [];
+      return [{
+        provider: "Pexels",
+        externalId,
+        kind,
+        title: `${normalizedQuery} · ${photographer}`,
+        query: normalizedQuery,
+        previewUrl,
+        downloadUrl,
+        sourceUrl,
+        photographer,
+        photographerUrl: String(record.photographer_url || sourceUrl),
+        width: Number(record.width || 0),
+        height: Number(record.height || 0),
+        duration: null,
+      }];
+    }
+    const files = Array.isArray(record.video_files)
+      ? (record.video_files as Array<Record<string, unknown>>)
+          .filter((file) => String(file.file_type || "").includes("mp4") && file.link)
+          .sort((left, right) => {
+            const leftWidth = Number(left.width || 0);
+            const rightWidth = Number(right.width || 0);
+            const leftScore = leftWidth <= 1920 ? 10_000 + leftWidth : 1920 - leftWidth;
+            const rightScore = rightWidth <= 1920 ? 10_000 + rightWidth : 1920 - rightWidth;
+            return rightScore - leftScore;
+          })
+      : [];
+    const selectedFile = files[0];
+    const previewUrl = String(record.image || "");
+    const downloadUrl = String(selectedFile?.link || "");
+    if (!previewUrl || !downloadUrl) return [];
+    return [{
+      provider: "Pexels",
+      externalId,
+      kind,
+      title: `${normalizedQuery} · ${photographer}`,
+      query: normalizedQuery,
+      previewUrl,
+      downloadUrl,
+      sourceUrl,
+      photographer,
+      photographerUrl: String(user.url || sourceUrl),
+      width: Number(selectedFile?.width || record.width || 0),
+      height: Number(selectedFile?.height || record.height || 0),
+      duration: Number(record.duration || 0) || null,
+    }];
+  });
+  const totalResults = Number(payload.total_results || items.length);
+  const value = {
+    items,
+    page: Number(payload.page || safePage),
+    totalResults,
+    hasMore: Boolean(payload.next_page),
+  };
+  pexelsSearchCache.set(cacheKey, { expiresAt: Date.now() + 10 * 60_000, value });
+  return value;
+}
+
+async function importPexelsMedia(item: PexelsMediaResult) {
+  const remoteUrl = new URL(item.downloadUrl);
+  if (remoteUrl.protocol !== "https:" || !pexelsDownloadHosts.has(remoteUrl.hostname))
+    throw new Error("El archivo no proviene de un servidor válido de Pexels.");
+  const rawExtension = extname(remoteUrl.pathname).toLowerCase();
+  const extension = item.kind === "video"
+    ? ".mp4"
+    : imageExtensions.includes(rawExtension) ? rawExtension : ".jpg";
+  const destination = join(mediaDir, `pexels-${Math.max(0, Number(item.externalId))}${extension}`);
+  const temporaryDestination = `${destination}.download`;
+  const response = await net.fetch(remoteUrl.toString());
+  if (!response.ok || !response.body)
+    throw new Error("No se pudo descargar el fondo desde Pexels.");
+  try {
+    await pipeline(
+      Readable.fromWeb(response.body as never),
+      createWriteStream(temporaryDestination),
+    );
+    // Replace a previous copy only after the new download finished. This avoids
+    // registering truncated images or videos when the network is interrupted.
+    await rm(destination, { force: true });
+    await rename(temporaryDestination, destination);
+  } catch (error) {
+    await rm(temporaryDestination, { force: true }).catch(() => undefined);
+    throw error;
+  }
+  await syncMedia();
+  const imported = database
+    .listMedia(mediaUrl)
+    .find((media) => media.path === destination);
+  if (imported) {
+    const name = String(item.title || `Pexels ${item.externalId}`).trim();
+    const tags = [
+      "Pexels",
+      item.query,
+      item.kind === "image" ? "imagen" : "video",
+      item.width > item.height ? "horizontal" : item.height > item.width ? "vertical" : "cuadrado",
+      item.photographer,
+    ].filter(Boolean);
+    database.updateMediaDetails(imported.id, name, [...new Set(tags)]);
+  }
+  controlWindow?.webContents.send("media:changed");
+  return database.listMedia(mediaUrl);
+}
+
 if (hasSingleInstanceLock)
   app.whenReady().then(async () => {
     // Keep only the native title bar controls (minimize, maximize and close).
@@ -1445,6 +1652,36 @@ if (hasSingleInstanceLock)
         result.filePaths.filter(validMedia).map(importMeetingMediaFile),
       );
     });
+    ipcMain.handle("pexels:status", () => ({
+      configured: Boolean(readPexelsApiKey()),
+    }));
+    ipcMain.handle("pexels:save-key", async (_event, value: string) => {
+      const key = String(value || "").trim();
+      if (!key) {
+        storePexelsApiKey("");
+        pexelsSearchCache.clear();
+        return { configured: false };
+      }
+      const endpoint = new URL("https://api.pexels.com/v1/curated?per_page=1");
+      await pexelsRequest(endpoint, key);
+      storePexelsApiKey(key);
+      pexelsSearchCache.clear();
+      return { configured: true };
+    });
+    ipcMain.handle(
+      "pexels:search",
+      (
+        _event,
+        query: string,
+        kind: "image" | "video",
+        orientation: "all" | "landscape" | "portrait" | "square",
+        page = 1,
+      ) => searchPexels(query, kind, orientation, page),
+    );
+    ipcMain.handle(
+      "pexels:import",
+      (_event, item: PexelsMediaResult) => importPexelsMedia(item),
+    );
     ipcMain.handle(
       "media:favorite",
       (_event, id: number, slot: number | null) => {
