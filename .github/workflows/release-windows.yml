@@ -42,15 +42,11 @@ jobs:
 
       - name: Publicar versión en GitHub
         if: startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $version = (Get-Content package.json | ConvertFrom-Json).version
-          gh release create "$env:GITHUB_REF_NAME" `
-            "release/Fl-Proyector-$version-Setup.exe" `
-            "release/Fl-Proyector-$version-Setup.exe.blockmap" `
-            "release/latest.yml" `
-            --verify-tag `
-            --title "FL Proyector $version" `
-            --generate-notes
+        uses: softprops/action-gh-release@v2
+        with:
+          name: FL Proyector ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release/Fl-Proyector-*-Setup.exe
+            release/Fl-Proyector-*-Setup.exe.blockmap
+            release/latest.yml
