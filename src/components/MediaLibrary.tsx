@@ -448,7 +448,16 @@ export function MediaLibrary({ state, update }: Props) {
                     <div className="pexels-key-actions">
                       <button
                         type="button"
-                        onClick={() => window.flProyector.openExternal("https://www.pexels.com/api/new/")}
+                        onClick={async () => {
+                          const opened = await window.flProyector.openExternal(
+                            "https://www.pexels.com/api/new/",
+                          );
+                          if (!opened) {
+                            setPexelsError(
+                              "No se pudo abrir el navegador. Entrá manualmente a pexels.com/api/new/",
+                            );
+                          }
+                        }}
                       >
                         <ExternalLink /> Obtener clave
                       </button>

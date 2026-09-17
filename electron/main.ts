@@ -136,6 +136,16 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.13",
+    title: "Acceso directo a la clave de Pexels",
+    publishedAt: "2026-09-17T20:52:12Z",
+    changes: [
+      "El botón Obtener clave abre correctamente la página oficial de Pexels en el navegador predeterminado de Windows.",
+      "La lista segura de enlaces externos admite Pexels y sus subdominios sin permitir direcciones ajenas.",
+      "Si Windows no puede abrir el navegador, la pantalla informa la dirección que se debe visitar manualmente.",
+    ],
+  },
+  {
     version: "10.11.12",
     title: "Conexión con Pexels corregida en Windows",
     publishedAt: "2026-09-17T18:20:20Z",
@@ -1643,7 +1653,12 @@ if (hasSingleInstanceLock)
       if (typeof value !== "string") return false;
       try {
         const url = new URL(value);
-        if (url.protocol !== "https:" || url.hostname !== "wa.me") return false;
+        const hostname = url.hostname.toLowerCase();
+        const isAllowedHost =
+          hostname === "wa.me" ||
+          hostname === "pexels.com" ||
+          hostname.endsWith(".pexels.com");
+        if (url.protocol !== "https:" || !isAllowedHost) return false;
         await shell.openExternal(url.toString());
         return true;
       } catch {
