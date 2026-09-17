@@ -135,6 +135,19 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.11",
+    title: "Fondos desde Pexels integrados en la biblioteca",
+    publishedAt: "2026-09-17T16:18:22Z",
+    changes: [
+      "Agregar fondos ahora permite elegir entre archivos del disco o buscar recursos desde un servidor.",
+      "La integración con Pexels busca imágenes y videos y permite filtrar los resultados por orientación.",
+      "Cada resultado muestra vista previa, autor, resolución y duración antes de guardarlo.",
+      "Los recursos elegidos se descargan en la biblioteca local y reciben etiquetas automáticas para encontrarlos rápidamente.",
+      "La clave de Pexels se valida una sola vez y se guarda protegida localmente en la computadora.",
+      "Las descargas interrumpidas ya no pueden registrar imágenes o videos incompletos en la biblioteca.",
+    ],
+  },
+  {
     version: "10.11.10",
     title: "Proyección estable y aplicación móvil más confiable",
     publishedAt: "2026-09-16T17:46:06Z",
