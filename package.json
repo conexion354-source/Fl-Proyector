@@ -76,6 +76,7 @@
   "build": {
     "appId": "com.fliglesia.proyector",
     "productName": "Fl Proyector",
+    "compression": "maximum",
     "publish": [
       {
         "provider": "github",
@@ -94,6 +95,8 @@
       "dist-electron/**/*",
       "electron/preload.cjs",
       "assets/**/*",
+      "!assets/FlProyector.iconset/**/*",
+      "!assets/fl-proyector.icns",
       "package.json"
     ],
     "directories": {
