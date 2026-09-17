@@ -433,7 +433,10 @@ export function MediaLibrary({ state, update }: Props) {
                   <div className="pexels-key-card">
                     <span className="media-source-icon"><KeyRound /></span>
                     <h3>Conectar con Pexels</h3>
-                    <p>Ingresá una clave gratuita. Se guarda cifrada solamente en esta computadora.</p>
+                    <p>
+                      Pegá solamente el valor de <strong>API Key</strong>. Se valida y se guarda
+                      cifrado solamente en esta computadora.
+                    </p>
                     <input
                       type="password"
                       autoFocus

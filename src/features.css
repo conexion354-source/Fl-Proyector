@@ -3147,6 +3147,13 @@
   background: color-mix(in srgb, var(--fl-control, #171a21) 76%, transparent);
   text-align: center;
 }
+.pexels-key-card {
+  color: #f4f6fb;
+}
+.pexels-key-card h3,
+.pexels-key-card strong {
+  color: #fff;
+}
 .media-source-icon {
   display: grid;
   place-items: center;

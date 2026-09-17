@@ -16,6 +16,7 @@ import { mkdir, readdir, copyFile, readFile, rename, rm } from "node:fs/promises
 import { createWriteStream } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { request as httpsRequest } from "node:https";
 import { networkInterfaces } from "node:os";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
@@ -134,6 +135,18 @@ let updateStatus: UpdateStatus = {
 };
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
+  {
+    version: "10.11.12",
+    title: "Conexión con Pexels corregida en Windows",
+    publishedAt: "2026-09-17T18:20:20Z",
+    changes: [
+      "La validación de Pexels usa una conexión HTTPS nativa que conserva correctamente el encabezado de autorización en Windows.",
+      "Las claves pegadas con espacios invisibles, comillas, el prefijo Bearer o el encabezado Authorization se limpian automáticamente.",
+      "Los mensajes distinguen una clave rechazada, una cuenta sin acceso, el límite de consultas y los errores temporales del servidor.",
+      "La búsqueda de videos utiliza el endpoint vigente de Pexels para evitar incompatibilidades futuras.",
+      "La pantalla de configuración aclara exactamente qué parte de la clave debe copiarse.",
+    ],
+  },
   {
     version: "10.11.11",
     title: "Fondos desde Pexels integrados en la biblioteca",
@@ -1190,6 +1203,29 @@ const pexelsDownloadHosts = new Set([
   "videos.pexels.com",
 ]);
 
+function normalizePexelsApiKey(value: string) {
+  let normalized = String(value || "")
+    .normalize("NFKC")
+    .replace(/[\u00a0\u200b-\u200d\ufeff]/g, " ")
+    .trim();
+  const authorization = normalized.match(
+    /authorization\s*:\s*(?:bearer\s+)?["'`]?([a-z0-9._-]+)/i,
+  );
+  if (authorization?.[1]) normalized = authorization[1];
+  else {
+    normalized = normalized
+      .replace(/^bearer\s+/i, "")
+      .replace(/^["'`]+|["'`]+$/g, "")
+      .trim();
+    // Pasting the complete cURL example is a common mistake. In that case,
+    // select the longest key-like token instead of rejecting a valid key.
+    const candidates = normalized.match(/[a-z0-9._-]{30,}/gi);
+    if (candidates?.length)
+      normalized = candidates.sort((left, right) => right.length - left.length)[0];
+  }
+  return normalized.replace(/\s+/g, "");
+}
+
 function readPexelsApiKey() {
   const saved = database.getIntegrationSecret(pexelsSecretKey);
   if (!saved) return "";
@@ -1204,7 +1240,7 @@ function readPexelsApiKey() {
 }
 
 function storePexelsApiKey(value: string) {
-  const key = value.trim();
+  const key = normalizePexelsApiKey(value);
   if (!key) {
     database.saveIntegrationSecret(pexelsSecretKey, "");
     return;
@@ -1216,24 +1252,63 @@ function storePexelsApiKey(value: string) {
 }
 
 async function pexelsRequest(endpoint: URL, apiKey = readPexelsApiKey()) {
-  if (!apiKey)
+  const key = normalizePexelsApiKey(apiKey);
+  if (!key)
     throw new Error("Configurá tu clave gratuita de Pexels para buscar fondos.");
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
+  const response = await new Promise<{ status: number; body: string }>(
+    (resolve, reject) => {
+      const request = httpsRequest(
+        endpoint,
+        {
+          method: "GET",
+          headers: {
+            Authorization: key,
+            Accept: "application/json",
+            "User-Agent": `FL-Proyector/${app.getVersion()}`,
+          },
+        },
+        (incoming) => {
+          const chunks: Buffer[] = [];
+          let size = 0;
+          incoming.on("data", (chunk: Buffer) => {
+            size += chunk.length;
+            if (size > 12 * 1024 * 1024) {
+              request.destroy(new Error("La respuesta de Pexels es demasiado grande."));
+              return;
+            }
+            chunks.push(chunk);
+          });
+          incoming.on("end", () =>
+            resolve({
+              status: incoming.statusCode ?? 0,
+              body: Buffer.concat(chunks).toString("utf8"),
+            }),
+          );
+        },
+      );
+      request.setTimeout(15_000, () =>
+        request.destroy(new Error("Pexels tardó demasiado en responder.")),
+      );
+      request.on("error", reject);
+      request.end();
+    },
+  );
+  if (response.status === 401)
+    throw new Error(
+      "Pexels rechazó la clave. Copiá solamente el valor de API Key desde tu panel, sin ‘Authorization:’ ni ‘Bearer’.",
+    );
+  if (response.status === 403)
+    throw new Error(
+      "Pexels reconoce la solicitud, pero esta clave todavía no tiene acceso a la API.",
+    );
+  if (response.status === 429)
+    throw new Error("Se alcanzó el límite de búsquedas de Pexels. Intentá más tarde.");
+  if (response.status < 200 || response.status >= 300)
+    throw new Error(`Pexels no está disponible en este momento (código ${response.status}).`);
   try {
-    const response = await net.fetch(endpoint.toString(), {
-      signal: controller.signal,
-      headers: { Authorization: apiKey },
-    });
-    if (response.status === 401)
-      throw new Error("La clave de Pexels no es válida.");
-    if (response.status === 429)
-      throw new Error("Se alcanzó el límite de búsquedas de Pexels. Intentá más tarde.");
-    if (!response.ok)
-      throw new Error("Pexels no está disponible en este momento.");
-    return response;
-  } finally {
-    clearTimeout(timeout);
+    return JSON.parse(response.body) as Record<string, unknown>;
+  } catch {
+    throw new Error("Pexels respondió con datos que no se pudieron interpretar.");
   }
 }
 
@@ -1252,13 +1327,13 @@ async function searchPexels(
   const endpoint = new URL(
     kind === "image"
       ? "https://api.pexels.com/v1/search"
-      : "https://api.pexels.com/videos/search",
+      : "https://api.pexels.com/v1/videos/search",
   );
   endpoint.searchParams.set("query", normalizedQuery);
   endpoint.searchParams.set("page", String(safePage));
   endpoint.searchParams.set("per_page", "24");
   if (orientation !== "all") endpoint.searchParams.set("orientation", orientation);
-  const payload = (await (await pexelsRequest(endpoint)).json()) as {
+  const payload = (await pexelsRequest(endpoint)) as {
     photos?: Array<Record<string, unknown>>;
     videos?: Array<Record<string, unknown>>;
     page?: number;
@@ -1669,7 +1744,7 @@ if (hasSingleInstanceLock)
       configured: Boolean(readPexelsApiKey()),
     }));
     ipcMain.handle("pexels:save-key", async (_event, value: string) => {
-      const key = String(value || "").trim();
+      const key = normalizePexelsApiKey(String(value || ""));
       if (!key) {
         storePexelsApiKey("");
         pexelsSearchCache.clear();
