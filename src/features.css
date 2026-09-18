@@ -2979,9 +2979,31 @@
 .media-library > .media-import-error {
   flex: 0 0 auto;
 }
+.media-library > .media-library-toolbar {
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 12px;
+}
+.media-library-toolbar .library-tools {
+  display: grid;
+  grid-template-columns: max-content minmax(180px, 340px);
+  width: 100%;
+  min-width: 0;
+}
+.media-library-toolbar .library-tools .search {
+  width: 100%;
+  min-width: 0;
+}
+.media-library-toolbar .add-backgrounds {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .media-library .media-grid {
   flex: 1 1 auto;
   min-height: 0;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
   align-content: start;
   grid-auto-rows: max-content;
   overflow-x: hidden;
@@ -2992,7 +3014,20 @@
 }
 .media-library .media-card {
   content-visibility: auto;
-  contain-intrinsic-size: auto 220px;
+  contain-intrinsic-size: auto 180px;
+}
+.media-library .media-meta {
+  height: 52px;
+  padding: 7px 7px 6px 9px;
+}
+@media (max-width: 520px) {
+  .media-library-toolbar .library-tools {
+    grid-template-columns: 1fr;
+  }
+  .media-library-toolbar .add-backgrounds {
+    width: 100%;
+    justify-content: center;
+  }
 }
 .media-thumb img {
   width: 100%;

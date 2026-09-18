@@ -1541,7 +1541,13 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   box-sizing:border-box;
   width:min(100%,1080px);
   max-width:1080px;
+  height:100%;
+  min-height:0;
   padding:28px 32px 36px;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
 }
 .app-shell .remote-panel-page .section-title { margin:0 0 16px; }
 .app-shell .remote-panel-page .section-title h2 { margin-top:3px; }

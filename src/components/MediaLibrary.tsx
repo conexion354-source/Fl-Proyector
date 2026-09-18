@@ -228,11 +228,7 @@ export function MediaLibrary({ state, update }: Props) {
         await importDropped([...event.dataTransfer.files]);
       }}
     >
-      <div className="section-title">
-        <div>
-          <span className="eyebrow">BIBLIOTECA MULTIMEDIA</span>
-          <h2>Fondos</h2>
-        </div>
+      <div className="section-title media-library-toolbar" aria-label="Herramientas de fondos">
         <div className="library-tools">
           <button
             className="add-backgrounds primary"

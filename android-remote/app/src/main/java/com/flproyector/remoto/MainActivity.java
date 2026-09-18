@@ -65,6 +65,17 @@ public class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        if (webView != null) {
+            webView.onResume();
+            webView.resumeTimers();
+            // Android can suspend the WebView socket while the app is in the
+            // background. Ask the page to reconnect and refresh its current
+            // view without destroying the WebView or losing the user's place.
+            webView.evaluateJavascript(
+                "window.dispatchEvent(new Event('flremote:resume'))",
+                null
+            );
+        }
         // A phone can move from one Wi‑Fi network to another while the app
         // remains open. Re-probe the remembered server and automatically scan
         // the new local subnet when it is no longer reachable.
@@ -340,7 +351,20 @@ public class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) webView.goBack(); else showConnectionScreen();
+        if (webView == null) {
+            super.onBackPressed();
+            return;
+        }
+        // First close an internal remote section (Biblia, Multimedia or
+        // Canciones). From the remote home, send the app to the background
+        // while keeping the WebView and its socket alive.
+        webView.evaluateJavascript(
+            "(function(){return window.flRemoteBack ? window.flRemoteBack() : false})()",
+            value -> {
+                if (!"true".equals(value) && !isFinishing() && !isDestroyed())
+                    moveTaskToBack(true);
+            }
+        );
     }
 
     @Override protected void onDestroy() {

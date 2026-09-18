@@ -139,6 +139,18 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.16",
+    title: "Fondos compactos, videos compatibles y control remoto estable",
+    publishedAt: "2026-09-18T15:30:00Z",
+    changes: [
+      "La biblioteca de Fondos estrena un encabezado compacto, miniaturas más pequeñas y desplazamiento adaptable sin botones recortados.",
+      "Los videos MPG, AVI, MOV y otros formatos no compatibles se convierten automáticamente a MP4 al agregarlos a una reunión.",
+      "Los videos antiguos de reuniones se actualizan en segundo plano, conservando el archivo original.",
+      "La app remota mantiene mejor la conexión al volver desde segundo plano e incorpora navegación clara entre estrofas.",
+      "El modo colaborador se adapta a pantallas más pequeñas sin dejar controles fuera de alcance.",
+    ],
+  },
+  {
     version: "10.11.15",
     title: "Biblioteca de fondos preparada para colecciones grandes",
     publishedAt: "2026-09-18T13:05:00Z",
@@ -949,6 +961,51 @@ const validMedia = (name: string) =>
 const mediaUrl = (path: string) =>
   `fl-media://local/${encodeURIComponent(path)}`;
 
+const browserPlayableVideoExtensions = new Set([".mp4", ".webm"]);
+const needsVideoConversion = (extension: string) =>
+  videoExtensions.includes(extension) &&
+  !browserPlayableVideoExtensions.has(extension);
+
+async function transcodeVideoToMp4(source: string, destination: string) {
+  if (!ffmpegPath) {
+    throw new Error("FFmpeg no está disponible para convertir este video.");
+  }
+  const executable = app.isPackaged
+    ? ffmpegPath.replace("app.asar", "app.asar.unpacked")
+    : ffmpegPath;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const process = spawn(executable, [
+        "-y",
+        "-i",
+        source,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "20",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-movflags",
+        "+faststart",
+        destination,
+      ]);
+      process.once("error", reject);
+      process.once("close", (code) =>
+        code === 0
+          ? resolve()
+          : reject(new Error(`FFmpeg terminó con código ${code}`)),
+      );
+    });
+  } catch (error) {
+    await rm(destination, { force: true }).catch(() => undefined);
+    throw error;
+  }
+}
+
 const meetingMediaFromPayload = (payload: Record<string, unknown>) => {
   const embedded = payload.meetingMedia as MediaItem | undefined;
   if (embedded?.path && embedded.url) return embedded;
@@ -959,19 +1016,63 @@ const meetingMediaFromPayload = (payload: Record<string, unknown>) => {
 
 async function importMeetingMediaFile(source: string): Promise<MediaItem> {
   const extension = extname(source).toLowerCase();
-  const filename = `${Date.now()}-${basename(source)}`;
+  const filename = needsVideoConversion(extension)
+    ? `${Date.now()}-${basename(source, extension)}.mp4`
+    : `${Date.now()}-${basename(source)}`;
   const destination = join(meetingMediaDir, filename);
-  await copyFile(source, destination);
+  if (needsVideoConversion(extension)) {
+    await transcodeVideoToMp4(source, destination);
+  } else {
+    await copyFile(source, destination);
+  }
   return {
     // Meeting attachments intentionally don't belong to the global Fondos library.
     id: -Date.now(),
-    name: basename(source),
+    name: basename(destination),
     path: destination,
     url: mediaUrl(destination),
     tags: [],
     favoriteSlot: null,
     kind: imageExtensions.includes(extension) ? "image" : "video",
   };
+}
+
+async function migrateMeetingVideosToMp4() {
+  for (const meeting of database.listMeetings()) {
+    for (const item of database.listMeetingItems(meeting.id)) {
+      if (item.type !== "media") continue;
+      const embedded = item.payload.meetingMedia as MediaItem | undefined;
+      if (!embedded?.path) continue;
+      const extension = extname(embedded.path).toLowerCase();
+      if (!needsVideoConversion(extension)) continue;
+
+      const destination = join(
+        meetingMediaDir,
+        `${basename(embedded.path, extension)}.mp4`,
+      );
+      try {
+        await transcodeVideoToMp4(embedded.path, destination);
+        database.saveMeetingItem({
+          ...item,
+          payload: {
+            ...item.payload,
+            meetingMedia: {
+              ...embedded,
+              name: `${basename(embedded.name || embedded.path, extension)}.mp4`,
+              path: destination,
+              url: mediaUrl(destination),
+              kind: "video",
+            } satisfies MediaItem,
+          },
+        });
+      } catch (error) {
+        console.warn(
+          `No se pudo convertir el video de la reunión: ${embedded.path}`,
+          error,
+        );
+      }
+    }
+  }
 }
 
 function localNetworkAddresses() {
@@ -1190,41 +1291,9 @@ async function syncMedia() {
 
 async function importMediaFile(source: string) {
   const extension = extname(source).toLowerCase();
-  if (
-    videoExtensions.includes(extension) &&
-    ![".mp4", ".webm"].includes(extension) &&
-    ffmpegPath
-  ) {
+  if (needsVideoConversion(extension)) {
     const destination = join(mediaDir, `${basename(source, extension)}.mp4`);
-    await new Promise<void>((resolve, reject) => {
-      const executable = app.isPackaged
-        ? ffmpegPath.replace("app.asar", "app.asar.unpacked")
-        : ffmpegPath;
-      const process = spawn(executable, [
-        "-y",
-        "-i",
-        source,
-        "-c:v",
-        "libx264",
-        "-preset",
-        "fast",
-        "-crf",
-        "20",
-        "-pix_fmt",
-        "yuv420p",
-        "-c:a",
-        "aac",
-        "-movflags",
-        "+faststart",
-        destination,
-      ]);
-      process.once("error", reject);
-      process.once("close", (code) =>
-        code === 0
-          ? resolve()
-          : reject(new Error(`FFmpeg terminó con código ${code}`)),
-      );
-    });
+    await transcodeVideoToMp4(source, destination);
     return destination;
   }
   const destination = join(mediaDir, basename(source));
@@ -2083,6 +2152,16 @@ if (hasSingleInstanceLock)
       shell.openPath(path),
     );
     await createControlWindow();
+    // Existing MPG/AVI/MOV attachments are upgraded in the background so a
+    // large meeting cannot delay the opening of the control window.
+    void migrateMeetingVideosToMp4()
+      .then(() => {
+        if (controlWindow && !controlWindow.isDestroyed())
+          controlWindow.webContents.send("library:changed", "meetings");
+      })
+      .catch((error) =>
+        console.warn("No se pudieron revisar los videos de las reuniones.", error),
+      );
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createControlWindow();
     });
