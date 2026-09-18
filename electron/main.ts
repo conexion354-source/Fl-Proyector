@@ -1221,6 +1221,43 @@ function finishVideoPlayback() {
   });
 }
 
+function clearProjectionContent() {
+  const remoteRestore = remoteReturnState;
+  const restoredBackground = remoteRestore?.background ?? videoReturnBackground;
+  const background = restoredBackground
+    ? { ...restoredBackground }
+    : { ...state.background };
+  const backgroundIsVideo = background.kind === "video";
+  const restoredVideo = remoteRestore?.video;
+  const resumeLoopingBackground =
+    backgroundIsVideo &&
+    (restoredBackground ? restoredVideo?.playing !== false : state.video.loop);
+  remoteActiveMediaItemId = null;
+  remoteReturnState = null;
+  videoReturnBackground = null;
+  mergeState({
+    background,
+    blackout: false,
+    logo: false,
+    text: { visible: false, html: "" },
+    lowerThird: { visible: false },
+    presentation: { visible: false },
+    alert: { visible: false },
+    video: {
+      ...(restoredVideo ?? {}),
+      playing: resumeLoopingBackground,
+      loop: true,
+      seekTime: resumeLoopingBackground
+        ? Number(restoredVideo?.seekTime ?? state.video.seekTime ?? 0)
+        : 0,
+      currentTime: resumeLoopingBackground
+        ? Number(restoredVideo?.currentTime ?? state.video.currentTime ?? 0)
+        : 0,
+      commandId: state.video.commandId + 1,
+    },
+  });
+}
+
 function projectRemoteMultimedia(itemId: number) {
   const item = database
     .listMeetings()
@@ -1682,6 +1719,7 @@ if (hasSingleInstanceLock)
     });
 
     ipcMain.handle("projection:get-state", () => state);
+    ipcMain.handle("projection:clear-content", clearProjectionContent);
     ipcMain.handle("app:open-external", async (_event, value: unknown) => {
       if (typeof value !== "string") return false;
       try {

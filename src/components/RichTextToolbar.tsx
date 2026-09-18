@@ -100,6 +100,7 @@ export function RichTextToolbar({
         </label>
       )}
       <button
+        type="button"
         className={editor?.isActive("bold") ? "active" : ""}
         onClick={() => editor?.chain().focus().toggleBold().run()}
         title="Negrita"
@@ -107,6 +108,7 @@ export function RichTextToolbar({
         <Bold />
       </button>
       <button
+        type="button"
         className={editor?.isActive("italic") ? "active" : ""}
         onClick={() => editor?.chain().focus().toggleItalic().run()}
         title="Cursiva"
@@ -117,6 +119,7 @@ export function RichTextToolbar({
       <div className="inline-color-menus">
         <div className="toolbar-color-menu">
           <button
+            type="button"
             className={open === "text" ? "active" : ""}
             title="Color del texto"
             aria-label="Color del texto"
@@ -132,6 +135,7 @@ export function RichTextToolbar({
               <div>
                 {richTextColors.map((color) => (
                   <button
+                    type="button"
                     className="format-swatch"
                     style={{ "--swatch": color } as CSSProperties}
                     title={color}
@@ -145,6 +149,7 @@ export function RichTextToolbar({
         </div>
         <div className="toolbar-color-menu">
           <button
+            type="button"
             className={open === "highlight" ? "active" : ""}
             title="Resaltado"
             aria-label="Resaltado"
@@ -160,6 +165,7 @@ export function RichTextToolbar({
               <div>
                 {richHighlightColors.map((color) => (
                   <button
+                    type="button"
                     className="format-swatch highlight"
                     style={{ "--swatch": color } as CSSProperties}
                     title={color}
@@ -169,6 +175,7 @@ export function RichTextToolbar({
                 ))}
               </div>
               <button
+                type="button"
                 className="clear-highlight"
                 onClick={() => {
                   editor?.chain().focus().unsetHighlight().run();
@@ -183,6 +190,7 @@ export function RichTextToolbar({
         {shadow && onShadowChange && (
           <div className="toolbar-color-menu">
             <button
+              type="button"
               className={open === "shadow" || shadow.enabled ? "active" : ""}
               title="Sombra del texto"
               aria-label="Sombra del texto"
@@ -215,6 +223,7 @@ export function RichTextToolbar({
                   {["#000000", "#111827", "#312e81", "#7f1d1d", "#ffffff"].map(
                     (color) => (
                       <button
+                        type="button"
                         className={`format-swatch ${shadow.color === color ? "selected" : ""}`}
                         style={{ "--swatch": color } as CSSProperties}
                         title={color}

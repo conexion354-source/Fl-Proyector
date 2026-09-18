@@ -29,6 +29,7 @@ declare global {
     flProyector: {
       getState(): Promise<ProjectionState>;
       updateState(patch: ProjectionPatch): Promise<void>;
+      clearProjectionContent(): Promise<void>;
       finishVideoPlayback(): Promise<void>;
       onState(callback: (state: ProjectionState) => void): () => void;
       openProjection(): Promise<void>;

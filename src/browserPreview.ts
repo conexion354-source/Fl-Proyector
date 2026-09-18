@@ -88,6 +88,19 @@ if (!window.flProyector) {
       };
       stateListeners.forEach((listener) => listener(state));
     },
+    clearProjectionContent: async () => {
+      state = {
+        ...state,
+        blackout: false,
+        logo: false,
+        text: { ...state.text, visible: false, html: "" },
+        lowerThird: { ...state.lowerThird, visible: false },
+        presentation: { ...state.presentation, visible: false },
+        alert: { ...state.alert, visible: false },
+        video: { ...state.video, playing: false, loop: true },
+      };
+      stateListeners.forEach((listener) => listener(state));
+    },
     onState: (listener: any) => {
       stateListeners.push(listener);
       return () => {
@@ -200,6 +213,7 @@ if (!window.flProyector) {
     },
     deleteSong: async () => {},
     createSongCategory: async () => 1,
+    onLibraryChanged: () => () => {},
     listBibleVersions: async () => [
       { id: 1, code: "RV1909", name: "Reina-Valera 1909", language: "es", enabled: true },
       { id: 2, code: "DHH", name: "Biblia Dios Habla Hoy", language: "es", enabled: true },

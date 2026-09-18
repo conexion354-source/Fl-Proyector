@@ -3709,7 +3709,7 @@
 }
 .toolbar-palette {
   position: absolute;
-  z-index: 30;
+  z-index: 80;
   top: 35px;
   right: 0;
   width: 184px;
@@ -3718,6 +3718,11 @@
   border: 1px solid #3b4250;
   border-radius: 9px;
   box-shadow: 0 14px 38px #000b;
+}
+.announcement-toolbar {
+  position: relative;
+  z-index: 40;
+  overflow: visible;
 }
 .toolbar-palette strong {
   display: block;

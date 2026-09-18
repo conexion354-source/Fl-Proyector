@@ -517,15 +517,9 @@ export function App() {
                 <small aria-hidden="true">{liveAudienceStatus.viewers} conectado{liveAudienceStatus.viewers === 1 ? "" : "s"}</small>
               </button>
               <button
-                aria-label="Limpiar textos de la proyección"
-                title="Oculta Biblia, canciones, anuncios y alertas; conserva el fondo"
-                onClick={() =>
-                  update({
-                    text: { visible: false, html: "" },
-                    lowerThird: { visible: false },
-                    alert: { visible: false },
-                  })
-                }
+                aria-label="Limpiar contenido de la proyección"
+                title="Quita textos, videos, imágenes, PowerPoint y alertas; conserva el fondo global"
+                onClick={() => window.flProyector.clearProjectionContent()}
               >
                 <Eraser aria-hidden="true" />
                 Limpiar texto

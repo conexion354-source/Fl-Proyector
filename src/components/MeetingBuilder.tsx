@@ -280,6 +280,10 @@ export function MeetingBuilder({
   const [pendingMeetingDelete, setPendingMeetingDelete] =
     useState<Meeting | null>(null);
   const [renamingMeeting, setRenamingMeeting] = useState<Meeting | null>(null);
+  // Make the newest rich-editor payload available to Guardar immediately,
+  // even when blur and click occur in the same Windows event cycle.
+  const selectedRef = useRef<MeetingItem | null>(selected);
+  selectedRef.current = selected;
   const [meetingListWidth, setMeetingListWidth] = useState(() =>
     clampColumnWidth(
       storedColumnWidth("fl-layout-meeting-list", 220),
@@ -575,11 +579,12 @@ export function MeetingBuilder({
     }
   };
   const saveEditor = async () => {
-    if (!selected) return;
+    const editorItem = selectedRef.current;
+    if (!editorItem) return;
     await withSaveNotification(async () => {
-      if (selected.type === "song" && songDraft) {
+      if (editorItem.type === "song" && songDraft) {
         const song = songs.find(
-          (value) => value.id === Number((selected.payload as any).songId),
+          (value) => value.id === Number((editorItem.payload as any).songId),
         );
         const title = songDraft.title.trim() || "Canción sin título";
         if (song)
@@ -591,29 +596,30 @@ export function MeetingBuilder({
             shadowColor: songDraft.shadowColor,
             shadowBlur: songDraft.shadowBlur,
           });
-        const changed = { ...selected, title };
+        const changed = { ...editorItem, title };
         await window.flProyector.saveMeetingItem(changed);
         setSelected(changed);
+        selectedRef.current = changed;
         setSongs(await window.flProyector.listSongs());
         await reloadItems();
-      } else if (selected.type === "announcement") {
+      } else if (editorItem.type === "announcement") {
         // Keep the rich editor fully uncontrolled while the operator types.
         // Normalizing/paginating on every keystroke removes trailing spaces
         // and can reset Chromium's composition/caret on Windows.
-        const pages = announcementPages(selected.payload).flatMap((page) =>
+        const pages = announcementPages(editorItem.payload).flatMap((page) =>
           splitAnnouncementPages(page),
         );
         const announcementPage = Math.max(
           0,
           Math.min(
-            Number(selected.payload.announcementPage || 0),
+            Number(editorItem.payload.announcementPage || 0),
             pages.length - 1,
           ),
         );
         const changed = {
-          ...selected,
+          ...editorItem,
           payload: {
-            ...selected.payload,
+            ...editorItem.payload,
             html: pages[0],
             announcementPages: pages,
             announcementPage,
@@ -621,8 +627,12 @@ export function MeetingBuilder({
         };
         await window.flProyector.saveMeetingItem(changed);
         setSelected(changed);
+        selectedRef.current = changed;
         await reloadItems();
-      } else await save();
+      } else {
+        await window.flProyector.saveMeetingItem(editorItem);
+        await reloadItems();
+      }
       setDraftItemId(null);
       setEditing(false);
     }, "El elemento de la reunión fue guardado.");
@@ -709,9 +719,17 @@ export function MeetingBuilder({
     if (selected?.id === item.id) setSelected(changed);
     setBackgroundTarget(null);
   };
-  const setPayload = (patch: Record<string, unknown>) =>
-    selected &&
-    setSelected({ ...selected, payload: { ...selected.payload, ...patch } });
+  const setPayload = (patch: Record<string, unknown>) => {
+    setSelected((current) => {
+      if (!current) return current;
+      const changed = {
+        ...current,
+        payload: { ...current.payload, ...patch },
+      };
+      selectedRef.current = changed;
+      return changed;
+    });
+  };
   const mediaById = (id: unknown) =>
     media.find((item) => item.id === Number(id));
   const backgroundVideoState = (background?: MediaItem) =>
@@ -730,6 +748,32 @@ export function MeetingBuilder({
       meetingVideoReturnBackground.current ?? globalBackground.current;
     meetingVideoReturnBackground.current = null;
     return background;
+  };
+  const isItemOnAir = (item: MeetingItem) => {
+    if (onAirItemId === item.id) return true;
+    const payload = item.payload as Record<string, unknown>;
+    if (item.type === "presentation")
+      return (
+        state.presentation.visible &&
+        state.presentation.path === String(payload.path || "")
+      );
+    if (item.type === "media") {
+      const source =
+        (payload.meetingMedia as MediaItem | undefined) ??
+        mediaById(payload.mediaId);
+      if (!source) return false;
+      if (source.kind === "image")
+        return (
+          state.presentation.visible &&
+          state.presentation.url === source.url
+        );
+      return (
+        state.background.kind === "video" &&
+        state.background.url === source.url &&
+        !state.video.loop
+      );
+    }
+    return false;
   };
 
   useEffect(() => {
@@ -767,6 +811,24 @@ export function MeetingBuilder({
       setOnAirItemId(null);
     }
   }, [items, media, onAirItemId, state.video.playing, state.video.loop]);
+  useEffect(() => {
+    if (onAirItemId === null) return;
+    const hasForegroundContent =
+      state.text.visible ||
+      state.lowerThird.visible ||
+      state.presentation.visible ||
+      (state.background.kind === "video" && !state.video.loop);
+    if (hasForegroundContent) return;
+    meetingVideoReturnBackground.current = null;
+    setOnAirItemId(null);
+  }, [
+    onAirItemId,
+    state.text.visible,
+    state.lowerThird.visible,
+    state.presentation.visible,
+    state.background.kind,
+    state.video.loop,
+  ]);
 
   const fireSongStanza = (item: MeetingItem, index: number) => {
     const payload = item.payload as any;
@@ -979,7 +1041,7 @@ export function MeetingBuilder({
   }, [selected, editing, picker, songs, activeStanza, state.presentation]);
 
   const fire = async (item: MeetingItem) => {
-    if (onAirItemId === item.id) {
+    if (isItemOnAir(item)) {
       const restoredBackground = releaseMeetingVideoBackground();
       setOnAirItemId(null);
       update({
@@ -1309,6 +1371,7 @@ export function MeetingBuilder({
         <div className="rundown-list">
           {items.map((item, index) => {
             const Icon = itemIcons[item.type];
+            const itemOnAir = isItemOnAir(item);
             return (
               <article
                 style={
@@ -1329,7 +1392,7 @@ export function MeetingBuilder({
                 }}
                 className={[
                   selected?.id === item.id ? "selected" : "",
-                  onAirItemId === item.id ? "on-air-item" : "",
+                  itemOnAir ? "on-air-item" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
@@ -1345,14 +1408,14 @@ export function MeetingBuilder({
                   <span>{itemLabels[item.type]}</span>
                 </div>
                 <button
-                  className={onAirItemId === item.id ? "on-air" : ""}
+                  className={itemOnAir ? "on-air" : ""}
                   onClick={(event) => {
                     event.stopPropagation();
                     setSelected(item);
                     fire(item);
                   }}
                 >
-                  {onAirItemId === item.id ? (
+                  {itemOnAir ? (
                     <>
                       <X />
                       QUITAR
@@ -1395,7 +1458,7 @@ export function MeetingBuilder({
             media={media}
             projection={state}
             activeStanza={activeStanza}
-            isOnAir={onAirItemId === selected.id}
+            isOnAir={isItemOnAir(selected)}
             onStanza={(index) =>
               selected.type === "bible"
                 ? fireBibleSection(selected, index)
@@ -2517,6 +2580,7 @@ function AnnouncementPagesEditor({
         </div>
       )}
       <RichAnnouncementEditor
+        key={`announcement-page-${current}`}
         html={pages[current]}
         fontSize={Number(payload.fontSize || 64)}
         onFontSize={(fontSize) => setPayload({ fontSize })}
@@ -2562,7 +2626,6 @@ function RichAnnouncementEditor({
   }) => void;
   onChange: (html: string) => void;
 }) {
-  const localHtml = useRef(withoutLegacyEditorPrompt(html, "announcement"));
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -2573,22 +2636,13 @@ function RichAnnouncementEditor({
     ],
     content: withoutLegacyEditorPrompt(html, "announcement"),
     editorProps: {
-      attributes: { "data-placeholder": "Escribí el anuncio aquí…" },
+      attributes: {
+        "data-placeholder": "Escribí el anuncio aquí…",
+        spellcheck: "true",
+      },
     },
-    onUpdate: ({ editor }) => {
-      const content = editor.getHTML();
-      localHtml.current = content;
-      onChange(content);
-    },
+    onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
-  useEffect(() => {
-    const content = withoutLegacyEditorPrompt(html, "announcement");
-    if (!editor || content === localHtml.current) return;
-    if (editor.getHTML() !== content) {
-      localHtml.current = content;
-      editor.commands.setContent(content, { emitUpdate: false });
-    }
-  }, [editor, html]);
   return (
     <div className="announcement-rich">
       <span className="field-label">Contenido del anuncio</span>
@@ -2602,6 +2656,9 @@ function RichAnnouncementEditor({
       <EditorContent
         editor={editor}
         className="announcement-editor"
+        onBlur={() => {
+          if (editor) onChange(editor.getHTML());
+        }}
         style={{
           textShadow: shadow.enabled
             ? `0 3px ${shadow.blur}px ${shadow.color}`

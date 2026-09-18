@@ -444,6 +444,13 @@
   color: #edf0f5;
   font-size: 14px;
   line-height: 1.5;
+  cursor: text;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+.announcement-editor .tiptap * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 .announcement-editor .tiptap p {
   margin: 0.25em 0;
