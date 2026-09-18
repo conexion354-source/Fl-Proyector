@@ -596,6 +596,32 @@ export function MeetingBuilder({
         setSelected(changed);
         setSongs(await window.flProyector.listSongs());
         await reloadItems();
+      } else if (selected.type === "announcement") {
+        // Keep the rich editor fully uncontrolled while the operator types.
+        // Normalizing/paginating on every keystroke removes trailing spaces
+        // and can reset Chromium's composition/caret on Windows.
+        const pages = announcementPages(selected.payload).flatMap((page) =>
+          splitAnnouncementPages(page),
+        );
+        const announcementPage = Math.max(
+          0,
+          Math.min(
+            Number(selected.payload.announcementPage || 0),
+            pages.length - 1,
+          ),
+        );
+        const changed = {
+          ...selected,
+          payload: {
+            ...selected.payload,
+            html: pages[0],
+            announcementPages: pages,
+            announcementPage,
+          },
+        };
+        await window.flProyector.saveMeetingItem(changed);
+        setSelected(changed);
+        await reloadItems();
       } else await save();
       setDraftItemId(null);
       setEditing(false);
@@ -2461,8 +2487,10 @@ function AnnouncementPagesEditor({
   };
   const changePageContent = (html: string) => {
     const nextPages = [...pages];
-    const replacement = splitAnnouncementPages(html);
-    nextPages.splice(current, 1, ...replacement);
+    // Preserve the exact HTML emitted by TipTap while typing. In particular,
+    // do not trim a trailing space or split the active paragraph mid-input:
+    // both operations can interrupt the Windows text composition session.
+    nextPages[current] = html;
     const next = {
       ...payload,
       html: nextPages[0],
@@ -2534,6 +2562,7 @@ function RichAnnouncementEditor({
   }) => void;
   onChange: (html: string) => void;
 }) {
+  const localHtml = useRef(withoutLegacyEditorPrompt(html, "announcement"));
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -2546,12 +2575,19 @@ function RichAnnouncementEditor({
     editorProps: {
       attributes: { "data-placeholder": "Escribí el anuncio aquí…" },
     },
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    onUpdate: ({ editor }) => {
+      const content = editor.getHTML();
+      localHtml.current = content;
+      onChange(content);
+    },
   });
   useEffect(() => {
     const content = withoutLegacyEditorPrompt(html, "announcement");
-    if (editor && editor.getHTML() !== content)
+    if (!editor || content === localHtml.current) return;
+    if (editor.getHTML() !== content) {
+      localHtml.current = content;
       editor.commands.setContent(content, { emitUpdate: false });
+    }
   }, [editor, html]);
   return (
     <div className="announcement-rich">

@@ -40,6 +40,14 @@ import {
 } from "../shared/types.js";
 import { splitSongStanzas } from "../shared/songSections.js";
 
+// A projector window must keep decoding motion backgrounds even when Windows
+// considers it occluded or unfocused behind the operator window.
+if (process.platform === "win32") {
+  app.commandLine.appendSwitch("disable-renderer-backgrounding");
+  app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+  app.commandLine.appendSwitch("disable-background-timer-throttling");
+}
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "fl-media",

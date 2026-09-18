@@ -54,6 +54,16 @@ const backgroundColors = [
   "#9a3412",
   "#9f1239",
 ];
+const defaultSongPanelColor = "#1f2937";
+
+function isTransparentColor(color: string) {
+  const normalized = color.replace(/\s/g, "").toLowerCase();
+  return (
+    normalized === "transparent" ||
+    normalized === "rgba(0,0,0,0)" ||
+    normalized === "#00000000"
+  );
+}
 const referenceDesigns: Array<{
   value: BibleDisplaySettings["referenceStyle"];
   label: string;
@@ -284,7 +294,30 @@ export function SettingsPanel({
   const saveSongStyle = async () => {
     await withSaveNotification(async () => {
       await window.flProyector.saveSongDisplaySettings(songStyle);
-      update({ songStyle });
+      update({
+        songStyle,
+        ...(state.text.kind === "canto"
+          ? {
+              text: {
+                ...state.text,
+                fontSize: songStyle.fontSize,
+                fontFamily: songStyle.fontFamily,
+                color: songStyle.textColor,
+                backgroundColor: songStyle.backgroundColor,
+                position: songStyle.position,
+                align: songStyle.align,
+                borderRadius: songStyle.borderRadius,
+                template: songStyle.template,
+                title: songStyle.showTitle ? state.text.title : "",
+                titlePosition: songStyle.titlePosition,
+                titleColor: songStyle.titleColor,
+                titleBackground: songStyle.titleBackground,
+                titleFontSize: songStyle.titleFontSize,
+                titleStyle: songStyle.titleStyle,
+              },
+            }
+          : {}),
+      });
     }, "El diseño de canciones fue guardado.");
   };
   const importBible = async () => {
@@ -772,13 +805,19 @@ export function SettingsPanel({
                     Diseño de fondo
                     <select
                       value={songStyle.template}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const template = e.target
+                          .value as SongDisplaySettings["template"];
                         setSongStyle((value) => ({
                           ...value,
-                          template: e.target
-                            .value as SongDisplaySettings["template"],
-                        }))
-                      }
+                          template,
+                          backgroundColor:
+                            template !== "plain" &&
+                            isTransparentColor(value.backgroundColor)
+                              ? defaultSongPanelColor
+                              : value.backgroundColor,
+                        }));
+                      }}
                     >
                       <option value="plain">Sin fondo</option>
                       <option value="classic">Clásico</option>
@@ -799,7 +838,7 @@ export function SettingsPanel({
                       }
                     />
                   )}
-                  <button className="save-settings primary song-theme-save" onClick={saveSongStyle}>
+                  <button type="button" className="save-settings primary song-theme-save" onClick={saveSongStyle}>
                     <Save size={17} />Guardar
                   </button>
                 </div>

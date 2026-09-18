@@ -717,8 +717,23 @@ function VideoLayer({
   const ref = useRef<HTMLVideoElement>(null);
   const finishNotified = useRef(false);
   const resumeAfterSeek = useRef(false);
+  const restartBackgroundLoop = (video: HTMLVideoElement) => {
+    if (!playback.loop || !playback.playing) return false;
+    try {
+      video.currentTime = 0;
+    } catch {}
+    video.play().catch(() => undefined);
+    return true;
+  };
   const notifyPlaybackEnded = (video: HTMLVideoElement) => {
-    if (preview || playback.loop || finishNotified.current) return;
+    // Chromium occasionally leaves a looping video paused at its final frame
+    // in a secondary Windows projection window. Restart it explicitly instead
+    // of relying only on the native `loop` attribute.
+    if (playback.loop) {
+      restartBackgroundLoop(video);
+      return;
+    }
+    if (preview || finishNotified.current) return;
     finishNotified.current = true;
     onEnded?.();
   };
@@ -754,12 +769,21 @@ function VideoLayer({
     const video = ref.current;
     if (!video) return;
     const keepPlaying = () => {
-      if (preview || !playback.playing || !video.paused || video.ended) return;
+      if (preview || !playback.playing || !video.paused) return;
+      if (
+        playback.loop &&
+        (video.ended ||
+          (video.duration > 0 && video.duration - video.currentTime <= 0.25))
+      ) {
+        restartBackgroundLoop(video);
+        return;
+      }
       video.play().catch(() => {});
     };
     const restart = () => {
-      if (!preview && playback.playing && !video.ended)
-        video.play().catch(() => {});
+      if (preview || !playback.playing) return;
+      if (video.ended && playback.loop) restartBackgroundLoop(video);
+      else if (!video.ended) video.play().catch(() => {});
     };
     // Some codecs can pause after a stall or at a loop boundary in a
     // background/projection window. Keep the motion layer alive without
@@ -774,7 +798,7 @@ function VideoLayer({
       video.removeEventListener("waiting", restart);
       video.removeEventListener("canplay", restart);
     };
-  }, [playback.playing, preview, url]);
+  }, [playback.playing, playback.loop, preview, url]);
   return (
     <video
       ref={ref}
@@ -814,6 +838,15 @@ function VideoLayer({
       }}
       onPause={(event) => {
         const video = event.currentTarget;
+        if (
+          playback.loop &&
+          playback.playing &&
+          (video.ended ||
+            (video.duration > 0 && video.duration - video.currentTime <= 0.25))
+        ) {
+          restartBackgroundLoop(video);
+          return;
+        }
         if (
           playback.playing &&
           video.duration > 0 &&
