@@ -881,7 +881,10 @@ export function SettingsPanel({
                     style={{ backgroundColor: church.logoBackgroundColor }}
                   >
                     {church.logoUrl ? (
-                      <img src={church.logoUrl} />
+                      <img
+                        src={church.logoUrl}
+                        alt={church.name.trim() || "Logo de la iglesia"}
+                      />
                     ) : (
                       <div>
                         <Building2 />

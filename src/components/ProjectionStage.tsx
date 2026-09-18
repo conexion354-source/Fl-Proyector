@@ -503,7 +503,11 @@ export function ProjectionStage({
         style={{ backgroundColor: state.church.logoBackgroundColor }}
       >
         {state.church.logoUrl ? (
-          <img className="church-logo" src={state.church.logoUrl} />
+          <img
+            className="church-logo"
+            src={state.church.logoUrl}
+            alt={state.church.name.trim() || "Logo de la iglesia"}
+          />
         ) : (
           <div className="logo-mark">FL</div>
         )}

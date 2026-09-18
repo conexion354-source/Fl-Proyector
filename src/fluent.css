@@ -1894,6 +1894,16 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   color:var(--fl-text)!important;
   background:var(--fl-hover)!important;
 }
+/* Palette samples are real colors, not ordinary toolbar buttons. Keep this
+   more specific than the Fluent button bridge so Windows does not repaint
+   every text/highlight swatch with the current surface color. */
+.app-shell .announcement-toolbar .toolbar-palette button.format-swatch,
+.app-shell .announcement-toolbar .toolbar-palette button.format-swatch:hover,
+.app-shell .announcement-toolbar .toolbar-palette button.format-swatch:focus-visible {
+  background-color:var(--swatch)!important;
+  background-image:none!important;
+  border-color:rgb(255 255 255 / 42%)!important;
+}
 .app-shell .item-context-menu > button.remove { color:var(--fl-danger)!important; }
 .app-shell .item-context-menu > button.remove:hover { background:var(--fl-danger-soft)!important; }
 .app-shell .item-context-menu > strong,
