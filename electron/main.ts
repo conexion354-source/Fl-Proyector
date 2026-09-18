@@ -139,6 +139,16 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.15",
+    title: "Biblioteca de fondos preparada para colecciones grandes",
+    publishedAt: "2026-09-18T13:05:00Z",
+    changes: [
+      "La grilla de Fondos utiliza todo el alto disponible y puede desplazarse correctamente al importar carpetas con muchos archivos.",
+      "El encabezado, el buscador y el botón para agregar fondos permanecen accesibles mientras se recorre la colección.",
+      "Las tarjetas que todavía están fuera de pantalla se renderizan de forma diferida para mantener fluida la biblioteca.",
+    ],
+  },
+  {
     version: "10.11.14",
     title: "Control total móvil y fondos libres sin claves",
     publishedAt: "2026-09-18T12:30:00Z",

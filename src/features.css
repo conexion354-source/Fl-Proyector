@@ -2971,8 +2971,28 @@
   font-size: 8px;
   line-height: 1.45;
 }
+.media-library {
+  min-height: 0;
+  overflow: hidden;
+}
+.media-library > .section-title,
+.media-library > .media-import-error {
+  flex: 0 0 auto;
+}
 .media-library .media-grid {
-  padding-bottom: 20px;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: start;
+  grid-auto-rows: max-content;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-bottom: 28px;
+}
+.media-library .media-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 220px;
 }
 .media-thumb img {
   width: 100%;
