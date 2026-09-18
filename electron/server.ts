@@ -12,6 +12,7 @@ import {
 } from "../shared/bibleLayout.js";
 import {
   normalizeSongSectionTypes,
+  songSectionLabel,
   splitSongStanzas,
 } from "../shared/songSections.js";
 import type {
@@ -108,6 +109,9 @@ export function startRemoteServer(
   let livePayload: LiveAudiencePayload | null = null;
   let liveFrame: { hash: string; jpeg: Buffer } | null = null;
   let liveViewerAnnouncementTimer: ReturnType<typeof setTimeout> | null = null;
+  // This permission is intentionally memory-only. Every desktop restart puts
+  // the phone back in the safer Biblia + Multimedia mode.
+  let fullControlEnabled = false;
   const liveRoom = () => (liveCode ? `live:${liveCode}` : null);
   const liveViewerCount = () => {
     const room = liveRoom();
@@ -226,8 +230,16 @@ export function startRemoteServer(
     if (collaboratorSession(request)) return next();
     return response.status(401).json({ error: "Acceso no autorizado" });
   };
+  const fullControlOnly: express.RequestHandler = (_request, response, next) => {
+    if (fullControlEnabled) return next();
+    return response.status(403).json({
+      error: "El operador debe habilitar App · Control total desde FL Proyector.",
+    });
+  };
 
-  app.get("/", (_req, res) => res.type("html").send(remoteHtml));
+  app.get("/", (_req, res) =>
+    res.set("Cache-Control", "no-store").type("html").send(remoteHtml),
+  );
   app.get("/api/discovery", (_req, res) =>
     res
       .set("X-FL-Proyector", "1")
@@ -295,7 +307,10 @@ export function startRemoteServer(
     return res.download(remoteApkPath, "FL-Remoto.apk");
   });
   app.get("/sw.js", (_req, res) =>
-    res.type("application/javascript").send(serviceWorker),
+    res
+      .set("Cache-Control", "no-store")
+      .type("application/javascript")
+      .send(serviceWorker),
   );
   app.get("/api/state", (_req, res) => res.json(getState()));
   app.get("/api/collaborator/session", (request, response) =>
@@ -441,6 +456,52 @@ export function startRemoteServer(
   app.get("/api/remote/meetings", (_req, res) =>
     res.json(multimedia.listMeetings().map(({ id, name, itemCount }) => ({ id, name, itemCount }))),
   );
+  app.get("/api/remote/capabilities", (_req, res) =>
+    res.json({ fullControlEnabled }),
+  );
+  app.get("/api/remote/songs/:meetingId", fullControlOnly, (req, res) => {
+    const meetingId = Number(req.params.meetingId);
+    if (!Number.isInteger(meetingId)) return res.json([]);
+    const songs = new Map(collaborator.listSongs().map((song) => [song.id, song]));
+    return res.json(
+      collaborator
+        .listMeetingItems(meetingId)
+        .filter((item) => item.type === "song")
+        .flatMap((item) => {
+          const song = songs.get(Number(item.payload?.songId));
+          if (!song) return [];
+          const sections = splitSongStanzas(song.content);
+          const sectionTypes = normalizeSongSectionTypes(
+            song.sectionTypes,
+            sections.length,
+          );
+          return [{
+            itemId: item.id,
+            songId: song.id,
+            title: song.title,
+            sections: sections.map((html, index) => ({
+              index,
+              html,
+              text: html
+                .replace(/<br\s*\/?\s*>/gi, "\n")
+                .replace(/<\/p>\s*<p[^>]*>/gi, "\n")
+                .replace(/<[^>]+>/g, "")
+                .replace(/&nbsp;/gi, " ")
+                .trim(),
+              label: songSectionLabel(sectionTypes, index),
+            })),
+            active:
+              getState().text.kind === "canto" &&
+              getState().text.sourceSongId === song.id,
+            activeSection:
+              getState().text.kind === "canto" &&
+              getState().text.sourceSongId === song.id
+                ? Number(getState().text.sourceSectionIndex ?? 0)
+                : null,
+          }];
+        }),
+    );
+  });
   app.get("/api/remote/multimedia/:meetingId", (req, res) => {
     const meetingId = Number(req.params.meetingId);
     const activeItemId = multimedia.activeItemId();
@@ -495,6 +556,70 @@ export function startRemoteServer(
     }
     res.status(204).end();
   });
+  app.post("/api/remote/song-section", fullControlOnly, (req, res) => {
+    const meetingId = Number(req.body?.meetingId);
+    const itemId = Number(req.body?.itemId);
+    const requestedIndex = Number(req.body?.sectionIndex);
+    const meetingItem = Number.isInteger(meetingId)
+      ? collaborator
+          .listMeetingItems(meetingId)
+          .find((item) => item.id === itemId && item.type === "song")
+      : undefined;
+    const song = meetingItem
+      ? collaborator
+          .listSongs()
+          .find((entry) => entry.id === Number(meetingItem.payload?.songId))
+      : undefined;
+    if (!meetingItem || !song)
+      return res.status(404).json({ error: "No se encontró la canción en esta reunión." });
+    const sections = splitSongStanzas(song.content);
+    if (!sections.length)
+      return res.status(409).json({ error: "La canción no tiene estrofas para proyectar." });
+    const sectionIndex = Math.max(
+      0,
+      Math.min(
+        Number.isInteger(requestedIndex) ? requestedIndex : 0,
+        sections.length - 1,
+      ),
+    );
+    // A song replaces foreground multimedia while retaining the current
+    // background, exactly like song projection from the desktop workspace.
+    multimedia.clear();
+    const state = getState();
+    const style = state.songStyle;
+    applyPatch({
+      blackout: false,
+      logo: false,
+      presentation: { visible: false },
+      lowerThird: { visible: false },
+      text: {
+        html: sections[sectionIndex],
+        kind: "canto",
+        sourceSongId: song.id,
+        sourceSectionIndex: sectionIndex,
+        visible: true,
+        position: style.position,
+        fontSize: style.fontSize,
+        fontFamily: style.fontFamily,
+        color: style.textColor,
+        backgroundColor: style.backgroundColor,
+        align: style.align,
+        borderRadius: style.borderRadius,
+        template: style.template,
+        animation: "fade",
+        shadowEnabled: song.shadowEnabled,
+        shadowColor: song.shadowColor,
+        shadowBlur: song.shadowBlur,
+        title: style.showTitle ? song.title : "",
+        titlePosition: style.titlePosition,
+        titleColor: style.titleColor,
+        titleBackground: style.titleBackground,
+        titleFontSize: style.titleFontSize,
+        titleStyle: style.titleStyle,
+      },
+    });
+    return res.status(204).end();
+  });
 
   io.on("connection", (socket) => {
     const role = socket.handshake.query.role;
@@ -502,6 +627,7 @@ export function startRemoteServer(
     if (controller) {
       socket.join("projection-controllers");
       socket.emit("projection:state", getState());
+      socket.emit("remote:capabilities", { fullControlEnabled });
       socket.on("projection:patch", (patch: ProjectionPatch) => applyPatch(patch));
       socket.on("remote:project-multimedia", (itemId: number) => {
         if (Number.isInteger(itemId)) multimedia.project(itemId);
@@ -600,6 +726,14 @@ export function startRemoteServer(
         url: `/live-assets/${liveCode}/${hash}.jpg`,
       });
     },
+    getFullControlStatus: () => ({ fullControlEnabled }),
+    setFullControlEnabled: (enabled: boolean) => {
+      fullControlEnabled = Boolean(enabled);
+      io.to("projection-controllers").emit("remote:capabilities", {
+        fullControlEnabled,
+      });
+      return { fullControlEnabled };
+    },
     isAvailable: () => available,
   };
 }
@@ -629,7 +763,7 @@ socket.on('connect',function(){statusEl.textContent='Conectado';statusEl.classLi
 
 const remoteIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="118" fill="#5b42ea"/><path fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round" d="M136 206h240M136 306h160M365 303h12"/><rect x="112" y="153" width="288" height="206" rx="30" fill="none" stroke="#fff" stroke-width="25"/></svg>`;
 
-const serviceWorker = `const CACHE="fl-remoto-v2",SHELL=["/","/manifest.webmanifest","/remote-icon-192.png","/remote-icon-512.png"];self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));self.addEventListener("fetch",event=>{if(event.request.method!=="GET"||new URL(event.request.url).origin!==self.location.origin)return;event.respondWith(fetch(event.request).then(response=>{const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));return response}).catch(()=>caches.match(event.request).then(response=>response||caches.match("/"))))});`;
+const serviceWorker = `const CACHE="fl-remoto-v3",ASSETS=["/manifest.webmanifest","/remote-icon.svg","/remote-icon-192.png","/remote-icon-512.png"];self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));self.addEventListener("fetch",event=>{if(event.request.method!=="GET")return;const url=new URL(event.request.url);if(url.origin!==self.location.origin||url.pathname.startsWith("/api/")||url.pathname.startsWith("/socket.io/"))return;if(event.request.mode==="navigate"){event.respondWith(fetch(event.request,{cache:"no-store"}).catch(()=>new Response("<!doctype html><meta name=viewport content='width=device-width'><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0c1018;color:#fff;font:16px system-ui;text-align:center;padding:30px}b{font-size:22px}</style><div><b>FL Proyector no está disponible</b><p>Abrí el programa en la PC y verificá que ambos equipos estén en la misma red Wi-Fi.</p></div>",{headers:{"Content-Type":"text/html;charset=utf-8"}})));return}event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(response.ok)caches.open(CACHE).then(cache=>cache.put(event.request,response.clone()));return response})))})`;
 
 const remoteHtml = String.raw`<!doctype html>
 <html lang="es"><head>
@@ -644,13 +778,13 @@ const remoteHtml = String.raw`<!doctype html>
     .app{position:fixed;inset:0;width:min(680px,100%);height:auto;min-height:0;margin:auto;padding:calc(12px + env(safe-area-inset-top)) 16px max(4px,env(safe-area-inset-bottom));display:flex;flex-direction:column;overflow:hidden}
     [hidden]{display:none!important}header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px}.brand{display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:.045em;font-size:13px}.logo{width:32px;height:32px;border-radius:10px;background:#6046ec url('/remote-icon.svg') center/80% no-repeat;box-shadow:0 6px 16px #5b42ea55}.header-actions{display:flex;align-items:center;gap:9px}.install-app{border:1px solid #8b7bff;border-radius:9px;padding:7px 10px;background:#332b68;color:#fff;font:800 11px inherit;white-space:nowrap}.status{font-size:12px;color:#aeb7cc;white-space:nowrap}.status:before{content:"";display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:50%;background:#f04d5d}.status.online:before{background:#37d67a;box-shadow:0 0 10px #37d67a}
     h1{font-size:26px;line-height:1.1;margin:0 0 6px}.sub{color:#aab3c7;font-size:14px;line-height:1.45;margin:0 0 16px}.picker{display:grid;grid-template-columns:1fr 1.15fr .6fr;gap:9px;padding:11px;background:#181d2a;border:1px solid #30394b;border-radius:16px;box-shadow:0 12px 30px #0002;z-index:2}.field{min-width:0}.field label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:#939db3;margin:0 0 5px}select{width:100%;appearance:none;border:1px solid #3a455a;border-radius:10px;background:#111622;color:#f5f7ff;padding:10px 28px 10px 10px;font:600 14px inherit;background-image:linear-gradient(45deg,transparent 50%,#aeb7cc 50%),linear-gradient(135deg,#aeb7cc 50%,transparent 50%);background-position:calc(100% - 14px) 50%,calc(100% - 10px) 50%;background-size:4px 4px,4px 4px;background-repeat:no-repeat}select:focus{outline:2px solid #7967ff;border-color:transparent}.hint{display:flex;align-items:center;justify-content:space-between;margin:16px 2px 9px;color:#aab3c7;font-size:13px}.hint strong{color:#f5f7ff}.hint span{font-size:11px;color:#8994aa}.verses{min-height:0;flex:1;display:grid;align-content:start;gap:9px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 2px 8px}.verse{width:100%;text-align:left;color:#edf0f9;background:#171c28;border:1px solid #30394b;border-radius:14px;padding:15px 16px;touch-action:pan-y;font:inherit;transition:transform .14s,border-color .14s,background .14s;user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}.verse:active{transform:scale(.985)}.verse.selected{background:#27204a;border-color:#7560ff;box-shadow:0 0 0 1px #7560ff55}.ref{display:block;color:#a99cff;font-size:12px;font-weight:800;margin-bottom:7px;user-select:none}.text{display:block;font-size:16px;line-height:1.42;user-select:text;-webkit-user-select:text}.empty,.loading{padding:28px 16px;text-align:center;color:#aab3c7;background:#171c28;border:1px dashed #39445a;border-radius:14px}.toast{position:fixed;left:50%;bottom:max(20px,env(safe-area-inset-bottom));transform:translate(-50%,130px);background:#ecebff;color:#19152d;border-radius:999px;padding:10px 16px;font-size:13px;font-weight:750;box-shadow:0 10px 30px #0005;transition:transform .22s;white-space:nowrap}.toast.show{transform:translate(-50%,0)}
-    .home{display:grid;gap:13px;margin:auto 0}.home h1{font-size:30px;margin:0}.home .sub{margin:0 0 10px}.mode{display:flex;align-items:center;gap:15px;width:100%;padding:20px;text-align:left;color:#f5f7ff;background:#171c28;border:1px solid #30394b;border-radius:17px;font:inherit}.mode i{display:grid;place-items:center;width:44px;height:44px;border-radius:13px;font-style:normal;font-size:23px;background:#5b42ea}.mode b,.mode span{display:block}.mode span{margin-top:4px;color:#aab3c7;font-size:13px;font-weight:500}.view-toolbar{display:flex;align-items:center;gap:8px;flex:0 0 auto;min-height:42px;margin:0 0 10px}.view-toolbar-title{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f5f7ff;font-size:14px;font-weight:800}.back{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:86px;height:38px;padding:0 11px;color:#ded9ff;background:#191d2a;border:1px solid #343c50;border-radius:10px;font:750 14px inherit;touch-action:manipulation}.back:active,.clear-live:active{transform:scale(.95)}.clear-live{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;padding:0;color:#ffb8bf;background:#351c24;border:1px solid #73313d;border-radius:10px;touch-action:manipulation}.clear-live svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.media-picker{display:flex;gap:8px;margin:0 0 14px}.media-picker select{flex:1}.media-list{display:grid;align-content:start;grid-auto-rows:min-content;gap:9px;overflow:auto;min-height:0;flex:1;padding:0 2px}.media-item{overflow:hidden;text-align:left;color:#f5f7ff;background:#171c28;border:1px solid #30394b;border-radius:14px;font:inherit}.media-launch{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:68px;padding:14px 15px;text-align:left;color:inherit;background:transparent;border:0;font:inherit}.media-item b,.media-item span{display:block}.media-item span{color:#aab3c7;font-size:12px;margin-top:4px}.badge{padding:5px 7px;border-radius:7px;background:#2d2752;color:#c8c1ff;font-size:10px;font-weight:800}.media-item.live{background:#123526;border-color:#37d67a;box-shadow:0 0 0 1px #37d67a55}.media-item.live .badge{background:#1c6b43;color:#eafff1}.item-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 12px}.item-controls button{color:#fff;background:#2c6544;border:1px solid #4aa971;border-radius:9px;padding:10px;font:700 12px inherit}.item-video-controls{border-top:1px solid #37d67a44;padding-top:11px}.seek-label,.volume-label{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:0 12px 10px;color:#b8d6c4;font-size:11px;font-weight:700}.volume-label{grid-template-columns:auto 1fr}.seek-label input,.volume-label input{width:100%;accent-color:#37d67a}.transport{margin-top:14px;padding:13px;background:#171c28;border:1px solid #30394b;border-radius:14px}.transport-title{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#aab3c7;margin-bottom:11px}.transport-row{display:flex;gap:8px}.transport button{flex:1;color:#fff;background:#332b68;border:1px solid #5549a1;border-radius:10px;padding:11px;font:700 13px inherit}.transport input{width:100%;margin-top:5px}.highlight-menu{position:fixed;z-index:20;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:8px;padding:8px;background:#eef0f8;border:1px solid #fff;border-radius:999px;box-shadow:0 12px 32px #0008}.highlight-menu button{width:30px;height:30px;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 5px #0005}.highlight-menu .clear-highlight{width:auto;padding:0 11px;border:0;border-radius:999px;background:#252b38;color:#fff;font:700 12px inherit}body[data-view="bible"] header,body[data-view="media"] header{display:none}body[data-view="bible"] #bible-view>h1,body[data-view="bible"] #bible-view>.sub,body[data-view="media"] #media-view>h1,body[data-view="media"] #media-view>.sub{display:none}
-    #bible-view,#media-view{min-height:0;flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .home{display:grid;gap:13px;margin:auto 0}.home h1{font-size:30px;margin:0}.home .sub{margin:0 0 10px}.mode{display:flex;align-items:center;gap:15px;width:100%;padding:20px;text-align:left;color:#f5f7ff;background:#171c28;border:1px solid #30394b;border-radius:17px;font:inherit}.mode i{display:grid;place-items:center;width:44px;height:44px;border-radius:13px;font-style:normal;font-size:23px;background:#5b42ea}.mode b,.mode span{display:block}.mode span{margin-top:4px;color:#aab3c7;font-size:13px;font-weight:500}.view-toolbar{display:flex;align-items:center;gap:8px;flex:0 0 auto;min-height:42px;margin:0 0 10px}.view-toolbar-title{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f5f7ff;font-size:14px;font-weight:800}.back{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:86px;height:38px;padding:0 11px;color:#ded9ff;background:#191d2a;border:1px solid #343c50;border-radius:10px;font:750 14px inherit;touch-action:manipulation}.back:active,.clear-live:active{transform:scale(.95)}.clear-live{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;padding:0;color:#ffb8bf;background:#351c24;border:1px solid #73313d;border-radius:10px;touch-action:manipulation}.clear-live svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.media-picker{display:flex;gap:8px;margin:0 0 14px}.media-picker select{flex:1}.media-list{display:grid;align-content:start;grid-auto-rows:min-content;gap:9px;overflow:auto;min-height:0;flex:1;padding:0 2px}.media-item{overflow:hidden;text-align:left;color:#f5f7ff;background:#171c28;border:1px solid #30394b;border-radius:14px;font:inherit}.media-launch{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:68px;padding:14px 15px;text-align:left;color:inherit;background:transparent;border:0;font:inherit}.media-item b,.media-item span{display:block}.media-item span{color:#aab3c7;font-size:12px;margin-top:4px}.badge{padding:5px 7px;border-radius:7px;background:#2d2752;color:#c8c1ff;font-size:10px;font-weight:800}.media-item.live{background:#123526;border-color:#37d67a;box-shadow:0 0 0 1px #37d67a55}.media-item.live .badge{background:#1c6b43;color:#eafff1}.item-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 12px}.item-controls button{color:#fff;background:#2c6544;border:1px solid #4aa971;border-radius:9px;padding:10px;font:700 12px inherit}.item-video-controls{border-top:1px solid #37d67a44;padding-top:11px}.seek-label,.volume-label{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:0 12px 10px;color:#b8d6c4;font-size:11px;font-weight:700}.volume-label{grid-template-columns:auto 1fr}.seek-label input,.volume-label input{width:100%;accent-color:#37d67a}.transport{margin-top:14px;padding:13px;background:#171c28;border:1px solid #30394b;border-radius:14px}.transport-title{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#aab3c7;margin-bottom:11px}.transport-row{display:flex;gap:8px}.transport button{flex:1;color:#fff;background:#332b68;border:1px solid #5549a1;border-radius:10px;padding:11px;font:700 13px inherit}.transport input{width:100%;margin-top:5px}.song-list{display:grid;align-content:start;gap:9px;overflow:auto;min-height:0;flex:1;padding:0 2px 8px}.song-card{overflow:hidden;border:1px solid #30394b;border-radius:14px;background:#171c28}.song-card>button{display:flex;align-items:center;justify-content:space-between;width:100%;padding:15px;color:#f5f7ff;background:transparent;border:0;text-align:left;font:inherit}.song-card small{display:block;margin-top:4px;color:#aab3c7}.song-card.live{border-color:#37d67a}.song-sections{display:grid;gap:8px;padding:0 11px 11px}.song-section{display:block;width:100%;padding:12px;text-align:left;color:#edf0f9;background:#111622;border:1px solid #343e52;border-radius:10px;font:inherit}.song-section b{display:block;margin-bottom:6px;color:#a99cff;font-size:11px;text-transform:uppercase}.song-section span{display:-webkit-box;overflow:hidden;color:#c5ccda;font-size:13px;line-height:1.35;-webkit-line-clamp:3;-webkit-box-orient:vertical}.song-section.active{border-color:#37d67a;background:#123526}.highlight-menu{position:fixed;z-index:20;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:8px;padding:8px;background:#eef0f8;border:1px solid #fff;border-radius:999px;box-shadow:0 12px 32px #0008}.highlight-menu button{width:30px;height:30px;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 5px #0005}.highlight-menu .clear-highlight{width:auto;padding:0 11px;border:0;border-radius:999px;background:#252b38;color:#fff;font:700 12px inherit}body[data-view="bible"] header,body[data-view="media"] header,body[data-view="songs"] header{display:none}body[data-view="bible"] #bible-view>h1,body[data-view="bible"] #bible-view>.sub,body[data-view="media"] #media-view>h1,body[data-view="media"] #media-view>.sub,body[data-view="songs"] #songs-view>h1,body[data-view="songs"] #songs-view>.sub{display:none}
+    #bible-view,#media-view,#songs-view{min-height:0;flex:1;display:flex;flex-direction:column;overflow:hidden}
     @media(max-width:430px){.app{padding-left:12px;padding-right:12px}.picker{grid-template-columns:1fr 1.1fr}.field.chapter{grid-column:1/-1}.verse{padding:14px}.text{font-size:15px}}
   </style>
 </head><body><main class="app">
   <header><div class="brand"><span class="logo"></span><span>FL PROYECTOR</span></div><div class="header-actions"><button id="install-app" class="install-app" hidden>Instalar app</button><span id="status" class="status">Conectando</span></div></header>
-  <section id="remote-home" class="home"><h1>Control remoto</h1><p class="sub">Elegí qué querés controlar.</p><button id="open-bible" class="mode"><i>▤</i><span><b>Biblia</b><span>Versión, libro, capítulo y versículos.</span></span></button><button id="open-media" class="mode"><i>▶</i><span><b>Multimedia</b><span>Videos, imágenes y PowerPoints de una reunión.</span></span></button></section>
+  <section id="remote-home" class="home"><h1>Control remoto</h1><p class="sub">Elegí qué querés controlar.</p><button id="open-bible" class="mode"><i>▤</i><span><b>Biblia</b><span>Versión, libro, capítulo y versículos.</span></span></button><button id="open-media" class="mode"><i>▶</i><span><b>Multimedia</b><span>Videos, imágenes y PowerPoints de una reunión.</span></span></button><button id="open-songs" class="mode" hidden><i>♫</i><span><b>Canciones del culto</b><span>Elegí una canción y proyectá sus estrofas.</span></span></button></section>
   <section id="bible-view" hidden><div class="view-toolbar"><button class="back" aria-label="Volver al inicio">← Volver</button><span class="view-toolbar-title">Biblia</span><button id="clear-live" class="clear-live" aria-label="Quitar versículo del aire" title="Quitar del aire"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="m8 9 8 8M16 9l-8 8M9 21h6"/></svg></button></div><h1>Biblia</h1><p class="sub">Elegí el pasaje y tocá un versículo para proyectarlo.</p>
   <section class="picker" aria-label="Selector de pasaje">
     <div class="field"><label for="version">Versión</label><select id="version"></select></div>
@@ -659,8 +793,9 @@ const remoteHtml = String.raw`<!doctype html>
   </section>
   <div class="hint"><strong id="heading">Versículos</strong><span>Toque para proyectar</span></div><section id="verses" class="verses"><div class="loading">Cargando Biblia…</div></section></section>
   <section id="media-view" hidden><div class="view-toolbar"><button class="back" aria-label="Volver al inicio">← Volver</button><span class="view-toolbar-title">Multimedia</span></div><h1>Multimedia</h1><p class="sub">Videos, imágenes y PowerPoints de una reunión.</p><div class="media-picker"><select id="media-meeting"></select></div><section id="media-list" class="media-list"><div class="loading">Cargando reuniones…</div></section><div id="transport"></div></section>
+  <section id="songs-view" hidden><div class="view-toolbar"><button class="back" aria-label="Volver al inicio">← Volver</button><span class="view-toolbar-title">Canciones del culto</span><button id="clear-song" class="clear-live" aria-label="Quitar canción del aire" title="Quitar del aire"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="m8 9 8 8M16 9l-8 8M9 21h6"/></svg></button></div><h1>Canciones</h1><p class="sub">Elegí la reunión, la canción y la estrofa.</p><div class="media-picker"><select id="song-meeting"></select></div><section id="song-list" class="song-list"><div class="loading">Cargando canciones…</div></section></section>
 </main><div id="highlight-menu" class="highlight-menu" hidden><button data-highlight="#fff176" style="background:#fff176" aria-label="Resaltador amarillo"></button><button data-highlight="#a7f3d0" style="background:#a7f3d0" aria-label="Resaltador verde"></button><button data-highlight="#bfdbfe" style="background:#bfdbfe" aria-label="Resaltador celeste"></button><button data-highlight="#fbcfe8" style="background:#fbcfe8" aria-label="Resaltador rosa"></button><button class="clear-highlight" data-highlight="">Quitar</button></div><div id="toast" class="toast" role="status"></div><script src="/socket.io/socket.io.js"></script><script>
-  var socket=io({timeout:5000,reconnectionDelay:500,reconnectionDelayMax:2500}), projectionState=null, versions=[], books=[], verses=[], selectedVerse=-1, selectedHighlight=null, verseHighlights={}, activeMediaItemId=null, deferredInstallPrompt=null, status=document.getElementById("status"), installButton=document.getElementById("install-app"), versionSelect=document.getElementById("version"), bookSelect=document.getElementById("book"), chapterSelect=document.getElementById("chapter"), versesElement=document.getElementById("verses"), heading=document.getElementById("heading"), toast=document.getElementById("toast"), toastTimer, home=document.getElementById("remote-home"), bibleView=document.getElementById("bible-view"), mediaView=document.getElementById("media-view"), mediaMeeting=document.getElementById("media-meeting"), mediaList=document.getElementById("media-list"), transport=document.getElementById("transport"), highlightMenu=document.getElementById("highlight-menu");
+  var socket=io({timeout:5000,reconnectionDelay:500,reconnectionDelayMax:2500}), projectionState=null, versions=[], books=[], verses=[], selectedVerse=-1, selectedHighlight=null, verseHighlights={}, activeMediaItemId=null, fullControlEnabled=false, songs=[], deferredInstallPrompt=null, status=document.getElementById("status"), installButton=document.getElementById("install-app"), versionSelect=document.getElementById("version"), bookSelect=document.getElementById("book"), chapterSelect=document.getElementById("chapter"), versesElement=document.getElementById("verses"), heading=document.getElementById("heading"), toast=document.getElementById("toast"), toastTimer, home=document.getElementById("remote-home"), bibleView=document.getElementById("bible-view"), mediaView=document.getElementById("media-view"), songsView=document.getElementById("songs-view"), mediaMeeting=document.getElementById("media-meeting"), mediaList=document.getElementById("media-list"), songMeeting=document.getElementById("song-meeting"), songList=document.getElementById("song-list"), openSongs=document.getElementById("open-songs"), transport=document.getElementById("transport"), highlightMenu=document.getElementById("highlight-menu");
   function escapeHtml(value){return String(value).replace(/[&<>"']/g,function(character){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[character];});}
   function options(select,items,value,label){select.innerHTML=items.map(function(item){var itemValue=value(item), selected=String(itemValue)===String(select.dataset.value||"")?" selected":"";return "<option value=\""+escapeHtml(itemValue)+"\""+selected+">"+escapeHtml(label(item))+"</option>";}).join("");}
   function request(path){return fetch(path).then(function(response){if(!response.ok)throw new Error("No se pudo cargar el contenido");return response.json();});}function command(path,body){return fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}).then(function(response){if(!response.ok)throw new Error("No se pudo enviar el comando");});}
@@ -672,11 +807,14 @@ const remoteHtml = String.raw`<!doctype html>
   installButton.onclick=function(){if(/android/i.test(navigator.userAgent)){window.location.href="/downloads/FL-Remoto.apk";return;}if(deferredInstallPrompt){deferredInstallPrompt.prompt();deferredInstallPrompt.userChoice.then(function(){deferredInstallPrompt=null;showInstallButton();});return;}var ios=/iphone|ipad|ipod/i.test(navigator.userAgent);alert(ios?"Para instalar FL Remoto en iPhone o iPad:\\n\\n1. Tocá Compartir (□↑) en Safari.\\n2. Elegí ‘Agregar a pantalla de inicio’.\\n3. Confirmá con ‘Agregar’.":"Para instalar FL Remoto, abrí el menú del navegador y elegí ‘Instalar aplicación’ o ‘Agregar a pantalla principal’.");};
   showInstallButton();
   var wakeLock=null;function keepScreenAwake(){if(!("wakeLock" in navigator)||document.visibilityState!=="visible")return;navigator.wakeLock.request("screen").then(function(lock){wakeLock=lock;lock.addEventListener("release",function(){wakeLock=null;});}).catch(function(){});}document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")keepScreenAwake();});keepScreenAwake();
-  function showView(view){document.body.dataset.view=view;home.hidden=view!=="home";bibleView.hidden=view!=="bible";mediaView.hidden=view!=="media";if(view==="bible"&&!versions.length)loadVersions().catch(function(){versesElement.innerHTML="<div class=\"empty\">No se pudo cargar la Biblia.</div>";});if(view==="media")loadMeetings();}
+  function showView(view){if(view==="songs"&&!fullControlEnabled)view="home";document.body.dataset.view=view;home.hidden=view!=="home";bibleView.hidden=view!=="bible";mediaView.hidden=view!=="media";songsView.hidden=view!=="songs";if(view==="bible"&&!versions.length)loadVersions().catch(function(){versesElement.innerHTML="<div class=\"empty\">No se pudo cargar la Biblia.</div>";});if(view==="media")loadMeetings();if(view==="songs")loadSongMeetings();}
   function loadMeetings(){return request("/api/remote/meetings").then(function(data){mediaMeeting.innerHTML=data.map(function(meeting){return "<option value=\""+meeting.id+"\">"+escapeHtml(meeting.name)+"</option>";}).join("");if(!data.length){mediaList.innerHTML="<div class=\"empty\">No hay reuniones creadas.</div>";return;}loadMedia();}).catch(function(){mediaList.innerHTML="<div class=\"empty\">No se pudieron cargar las reuniones.</div>";});}
   function itemControls(item){if(Number(item.id)!==Number(activeMediaItemId))return "";if(item.kind==="presentation")return "<div class=\"item-controls\"><button data-presentation=\"-1\" aria-label=\"Diapositiva anterior\">← Anterior</button><button data-presentation=\"1\" aria-label=\"Diapositiva siguiente\">Siguiente →</button></div>";if(item.kind!=="video")return "";var video=projectionState&&projectionState.video||{},duration=Math.max(0,Number(video.duration||0)),current=Math.min(Number(video.currentTime||video.seekTime||0),duration||Number(video.currentTime||video.seekTime||0)),max=Math.max(duration,1);return "<div class=\"item-video-controls\"><div class=\"item-controls\"><button data-video=\"play\">"+(video.playing?"❚❚ Pausar":"▶ Reproducir")+"</button><button data-video=\"mute\">"+(video.muted?"🔊 Activar sonido":"🔇 Silenciar")+"</button></div><label class=\"seek-label\">"+formatTime(current)+" <input data-video=\"seek\" type=\"range\" min=\"0\" max=\""+max+"\" step=\"0.1\" value=\""+current+"\"> "+formatTime(duration)+"</label><label class=\"volume-label\">Volumen <input data-video=\"volume\" type=\"range\" min=\"0\" max=\"1\" step=\"0.05\" value=\""+(video.volume==null?1:video.volume)+"\"></label></div>";}
   function formatTime(value){value=Math.max(0,Math.floor(Number(value)||0));return Math.floor(value/60)+":"+String(value%60).padStart(2,"0");}
   function loadMedia(){var id=mediaMeeting.value;if(!id)return;mediaList.innerHTML="<div class=\"loading\">Cargando contenido…</div>";request("/api/remote/multimedia/"+encodeURIComponent(id)).then(function(items){var activeItem=items.find(function(item){return item.active;});activeMediaItemId=activeItem?activeItem.id:null;if(!items.length){mediaList.innerHTML="<div class=\"empty\">Esta reunión no tiene contenido.</div>";return;}mediaList.innerHTML=items.map(function(item){var label=item.kind==="presentation"?"PowerPoint":item.kind==="video"?"Video":item.kind==="announcement"?"Anuncio":"Imagen",live=Number(item.id)===Number(activeMediaItemId);return "<article class=\"media-item"+(live?" live":"")+"\" data-id=\""+item.id+"\"><button class=\"media-launch\" data-launch=\"1\"><span><b>"+escapeHtml(item.title)+"</b><span>"+(live?"En vivo · tocá para quitar":label)+"</span></span><i class=\"badge\">"+(live?"EN VIVO":label)+"</i></button>"+itemControls(item)+"</article>";}).join("");}).catch(function(){mediaList.innerHTML="<div class=\"empty\">No se pudo cargar el contenido.</div>";});}
+  function loadSongMeetings(){if(!fullControlEnabled)return Promise.resolve();return request("/api/remote/meetings").then(function(data){var previous=songMeeting.value;songMeeting.innerHTML=data.map(function(meeting){return "<option value=\""+meeting.id+"\">"+escapeHtml(meeting.name)+"</option>";}).join("");if(data.some(function(meeting){return String(meeting.id)===previous;}))songMeeting.value=previous;if(!data.length){songList.innerHTML="<div class=\"empty\">No hay reuniones creadas.</div>";return;}return loadSongs();}).catch(function(){songList.innerHTML="<div class=\"empty\">No se pudieron cargar las reuniones.</div>";});}
+  function loadSongs(){var meetingId=songMeeting.value;if(!meetingId||!fullControlEnabled)return Promise.resolve();songList.innerHTML="<div class=\"loading\">Cargando canciones…</div>";return request("/api/remote/songs/"+encodeURIComponent(meetingId)).then(function(data){songs=data;if(!songs.length){songList.innerHTML="<div class=\"empty\">Esta reunión no tiene canciones.</div>";return;}songList.innerHTML=songs.map(function(song){return "<article class=\"song-card"+(song.active?" live":"")+"\" data-item=\""+song.itemId+"\"><button data-song-toggle=\"1\"><span><b>"+escapeHtml(song.title)+"</b><small>"+song.sections.length+" parte"+(song.sections.length===1?"":"s")+"</small></span><i class=\"badge\">"+(song.active?"EN VIVO":"CANCIÓN")+"</i></button><div class=\"song-sections\">"+song.sections.map(function(section){var active=song.active&&Number(song.activeSection)===Number(section.index);return "<button class=\"song-section"+(active?" active":"")+"\" data-song-section=\""+section.index+"\"><b>"+escapeHtml(section.label)+(active?" · EN VIVO":"")+"</b><span>"+escapeHtml(section.text)+"</span></button>";}).join("")+"</div></article>";}).join("");}).catch(function(error){songList.innerHTML="<div class=\"empty\">"+escapeHtml(error.message||"No se pudieron cargar las canciones.")+"</div>";});}
+  function setCapabilities(capabilities){fullControlEnabled=Boolean(capabilities&&capabilities.fullControlEnabled);openSongs.hidden=!fullControlEnabled;if(!fullControlEnabled&&document.body.dataset.view==="songs"){showView("home");notify("El operador desactivó Control total");}}
   function renderTransport(){transport.innerHTML="";}
   function selectedVersion(){return versions.find(function(item){return String(item.id)===versionSelect.value;});}
   function selectedBook(){return books.find(function(item){return item.book===bookSelect.value;});}
@@ -714,8 +852,8 @@ const remoteHtml = String.raw`<!doctype html>
   }
   function showHighlightMenu(){var selection=window.getSelection(), text=(selection&&selection.toString()||"").replace(/\s+/g," ").trim(), range=selection&&selection.rangeCount?selection.getRangeAt(0):null, target=range&&range.commonAncestorContainer.nodeType===1?range.commonAncestorContainer:range&&range.commonAncestorContainer.parentElement, verseButton=target&&target.closest?target.closest(".verse"):null;if(!text||!verseButton||!versesElement.contains(verseButton))return;var index=Number(verseButton.dataset.index), verse=verses[index];if(!verse||verse.text.indexOf(text)<0)return;selectedHighlight={index:index,text:text};highlightMenu.hidden=false;}
   function clearHighlightMenu(){highlightMenu.hidden=true;selectedHighlight=null;window.getSelection&&window.getSelection().removeAllRanges();}
-  versionSelect.onchange=function(){loadBooks();};bookSelect.onchange=function(){loadChapters();};chapterSelect.onchange=loadVerses;versesElement.onclick=function(event){if(selectedHighlight||(window.getSelection&&window.getSelection().toString().trim()))return;var button=event.target.closest(".verse");if(button)sendVerse(Number(button.dataset.index));};versesElement.addEventListener("mouseup",function(){setTimeout(showHighlightMenu,0);});versesElement.addEventListener("touchend",function(){setTimeout(showHighlightMenu,120);},{passive:true});versesElement.addEventListener("contextmenu",function(event){event.preventDefault();setTimeout(showHighlightMenu,0);});document.addEventListener("selectionchange",function(){var selection=window.getSelection();if(selection&&selection.toString().trim())setTimeout(showHighlightMenu,120);});highlightMenu.onclick=function(event){var button=event.target.closest("button");if(!button||!selectedHighlight)return;sendVerse(selectedHighlight.index,{text:selectedHighlight.text,color:button.dataset.highlight||""});clearHighlightMenu();};function connected(){localStorage.setItem("fl-remote-server",location.origin);status.textContent="Conectado";status.classList.add("online");}socket.on("connect",connected);socket.on("connect_error",function(){if(!projectionState){status.textContent="Buscando PC…";status.classList.remove("online");}});socket.on("disconnect",function(){if(!projectionState){status.textContent="Reconectando…";status.classList.remove("online");}});socket.on("projection:state",function(next){projectionState=next;connected();});request("/api/state").then(function(next){projectionState=next;connected();renderTransport();}).catch(function(){status.textContent="Sin conexión";});if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(function(){});
-  document.getElementById("open-bible").onclick=function(){showView("bible");};document.getElementById("open-media").onclick=function(){showView("media");};document.querySelectorAll(".back").forEach(function(button){button.onclick=function(){showView("home");};});mediaMeeting.onchange=loadMedia;mediaList.onclick=function(event){var button=event.target.closest("button");if(!button)return;if(button.dataset.presentation){command("/api/remote/presentation",{direction:Number(button.dataset.presentation)});return;}if(button.dataset.video==="play"){command("/api/remote/video",{playing:!(projectionState.video||{}).playing}).then(loadMedia);return;}if(button.dataset.video==="mute"){command("/api/remote/video",{muted:!(projectionState.video||{}).muted}).then(loadMedia);return;}if(!button.dataset.launch)return;var item=button.closest(".media-item"),itemId=Number(item&&item.dataset.id);if(itemId===Number(activeMediaItemId)){command("/api/remote/clear").then(function(){activeMediaItemId=null;loadMedia();notify("Solo fondo en pantalla");});return;}command("/api/remote/multimedia/"+itemId).then(function(){activeMediaItemId=itemId;loadMedia();notify("Contenido enviado a pantalla");});};function seekRemoteVideo(input){var value=Number(input.value),commandId=Number((projectionState.video||{}).commandId||0)+1;projectionState.video=Object.assign({},projectionState.video,{seekTime:value,currentTime:value,commandId:commandId});command("/api/remote/video",{seekTime:value,commandId:commandId,currentTime:value});}mediaList.oninput=function(event){var input=event.target;if(!input.dataset.video)return;var value=Number(input.value);if(input.dataset.video==="volume")command("/api/remote/video",{volume:value,muted:false});};mediaList.onchange=function(event){var input=event.target;if(input.dataset.video==="seek")seekRemoteVideo(input);};socket.on("projection:state",function(next){projectionState=next;renderTransport();});
+  versionSelect.onchange=function(){loadBooks();};bookSelect.onchange=function(){loadChapters();};chapterSelect.onchange=loadVerses;versesElement.onclick=function(event){if(selectedHighlight||(window.getSelection&&window.getSelection().toString().trim()))return;var button=event.target.closest(".verse");if(button)sendVerse(Number(button.dataset.index));};versesElement.addEventListener("mouseup",function(){setTimeout(showHighlightMenu,0);});versesElement.addEventListener("touchend",function(){setTimeout(showHighlightMenu,120);},{passive:true});versesElement.addEventListener("contextmenu",function(event){event.preventDefault();setTimeout(showHighlightMenu,0);});document.addEventListener("selectionchange",function(){var selection=window.getSelection();if(selection&&selection.toString().trim())setTimeout(showHighlightMenu,120);});highlightMenu.onclick=function(event){var button=event.target.closest("button");if(!button||!selectedHighlight)return;sendVerse(selectedHighlight.index,{text:selectedHighlight.text,color:button.dataset.highlight||""});clearHighlightMenu();};function connected(){localStorage.setItem("fl-remote-server",location.origin);status.textContent="Conectado";status.classList.add("online");}socket.on("connect",connected);socket.on("connect_error",function(){if(!projectionState){status.textContent="Buscando PC…";status.classList.remove("online");}});socket.on("disconnect",function(){if(!projectionState){status.textContent="Reconectando…";status.classList.remove("online");}});socket.on("projection:state",function(next){projectionState=next;connected();if(document.body.dataset.view==="songs"&&fullControlEnabled)loadSongs();});socket.on("remote:capabilities",setCapabilities);request("/api/state").then(function(next){projectionState=next;connected();renderTransport();}).catch(function(){status.textContent="Sin conexión";});request("/api/remote/capabilities").then(setCapabilities).catch(function(){setCapabilities({fullControlEnabled:false});});if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(function(){});
+  document.getElementById("open-bible").onclick=function(){showView("bible");};document.getElementById("open-media").onclick=function(){showView("media");};openSongs.onclick=function(){showView("songs");};document.querySelectorAll(".back").forEach(function(button){button.onclick=function(){showView("home");};});mediaMeeting.onchange=loadMedia;songMeeting.onchange=loadSongs;songList.onclick=function(event){var button=event.target.closest(".song-section");if(!button)return;var card=button.closest(".song-card"),itemId=Number(card&&card.dataset.item),sectionIndex=Number(button.dataset.songSection);command("/api/remote/song-section",{meetingId:Number(songMeeting.value),itemId:itemId,sectionIndex:sectionIndex}).then(function(){notify("Estrofa enviada a pantalla");return loadSongs();}).catch(function(){notify("No se pudo proyectar la estrofa");});};document.getElementById("clear-song").onclick=function(){command("/api/remote/clear").then(function(){notify("Canción quitada del aire");loadSongs();});};mediaList.onclick=function(event){var button=event.target.closest("button");if(!button)return;if(button.dataset.presentation){command("/api/remote/presentation",{direction:Number(button.dataset.presentation)});return;}if(button.dataset.video==="play"){command("/api/remote/video",{playing:!(projectionState.video||{}).playing}).then(loadMedia);return;}if(button.dataset.video==="mute"){command("/api/remote/video",{muted:!(projectionState.video||{}).muted}).then(loadMedia);return;}if(!button.dataset.launch)return;var item=button.closest(".media-item"),itemId=Number(item&&item.dataset.id);if(itemId===Number(activeMediaItemId)){command("/api/remote/clear").then(function(){activeMediaItemId=null;loadMedia();notify("Solo fondo en pantalla");});return;}command("/api/remote/multimedia/"+itemId).then(function(){activeMediaItemId=itemId;loadMedia();notify("Contenido enviado a pantalla");});};function seekRemoteVideo(input){var value=Number(input.value),commandId=Number((projectionState.video||{}).commandId||0)+1;projectionState.video=Object.assign({},projectionState.video,{seekTime:value,currentTime:value,commandId:commandId});command("/api/remote/video",{seekTime:value,commandId:commandId,currentTime:value});}mediaList.oninput=function(event){var input=event.target;if(!input.dataset.video)return;var value=Number(input.value);if(input.dataset.video==="volume")command("/api/remote/video",{volume:value,muted:false});};mediaList.onchange=function(event){var input=event.target;if(input.dataset.video==="seek")seekRemoteVideo(input);};socket.on("projection:state",function(next){projectionState=next;renderTransport();});
   versesElement.style.scrollBehavior="smooth";highlightMenu.addEventListener("click",function(event){var button=event.target.closest("button");if(button&&selectedHighlight){var key=verseKey(selectedHighlight.index),list=highlightsFor(selectedHighlight.index);if(button.dataset.highlight){list.push({text:selectedHighlight.text,color:button.dataset.highlight});verseHighlights[key]=list;}else{verseHighlights[key]=list.filter(function(value){return value.text!==selectedHighlight.text;});}renderVerses();}},true);
   highlightMenu.onclick=function(event){var button=event.target.closest("button");if(!button||!selectedHighlight)return;sendVerse(selectedHighlight.index,highlightsFor(selectedHighlight.index));clearHighlightMenu();};
   var initialShowView=showView;showView=function(view){initialShowView(view);if(view==="bible")setTimeout(function(){renderVerses();var active=versesElement.querySelector(".verse.selected");if(active)active.scrollIntoView({block:"center",behavior:"smooth"});},0);};

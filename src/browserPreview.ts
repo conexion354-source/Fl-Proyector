@@ -129,6 +129,10 @@ if (!window.flProyector) {
           : [],
     }),
     enableWindowsRemoteAccess: async () => true,
+    getRemoteFullControlStatus: async () => ({ fullControlEnabled: false }),
+    setRemoteFullControlEnabled: async (enabled: boolean) => ({
+      fullControlEnabled: enabled,
+    }),
     getLiveAudienceStatus: async () => liveAudience,
     startLiveAudience: async () => {
       liveAudience = {
@@ -149,10 +153,8 @@ if (!window.flProyector) {
       return media;
     },
     chooseMeetingMedia: async () => chooseBrowserMedia(),
-    getPexelsStatus: async () => ({ configured: false }),
-    savePexelsApiKey: async (apiKey: string) => ({ configured: Boolean(apiKey.trim()) }),
-    searchPexels: async () => ({ items: [], page: 1, totalResults: 0, hasMore: false }),
-    importPexelsMedia: async () => media,
+    searchOpenverse: async () => ({ items: [], page: 1, totalResults: 0, hasMore: false }),
+    importOpenverseMedia: async () => media,
     importDroppedFiles: async (files: File[]) => {
       importBrowserMedia(files);
       return media;

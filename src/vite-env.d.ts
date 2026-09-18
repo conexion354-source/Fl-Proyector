@@ -10,8 +10,8 @@ import type {
   DisplaySettings,
   DisplayInfo,
   MediaItem,
-  PexelsMediaResult,
-  PexelsSearchResponse,
+  OpenverseMediaResult,
+  OpenverseSearchResponse,
   Meeting,
   MeetingItem,
   LiveAudienceStatus,
@@ -39,6 +39,10 @@ declare global {
         remoteUrls: string[];
       }>;
       enableWindowsRemoteAccess(): Promise<boolean>;
+      getRemoteFullControlStatus(): Promise<{ fullControlEnabled: boolean }>;
+      setRemoteFullControlEnabled(
+        enabled: boolean,
+      ): Promise<{ fullControlEnabled: boolean }>;
       getLiveAudienceStatus(): Promise<LiveAudienceStatus>;
       startLiveAudience(): Promise<LiveAudienceStatus>;
       stopLiveAudience(): Promise<LiveAudienceStatus>;
@@ -46,15 +50,12 @@ declare global {
       importMedia(paths: string[]): Promise<MediaItem[]>;
       chooseMediaFiles(): Promise<MediaItem[]>;
       chooseMeetingMedia(): Promise<MediaItem[]>;
-      getPexelsStatus(): Promise<{ configured: boolean }>;
-      savePexelsApiKey(apiKey: string): Promise<{ configured: boolean }>;
-      searchPexels(
+      searchOpenverse(
         query: string,
-        kind: "image" | "video",
         orientation: "all" | "landscape" | "portrait" | "square",
         page?: number,
-      ): Promise<PexelsSearchResponse>;
-      importPexelsMedia(item: PexelsMediaResult): Promise<MediaItem[]>;
+      ): Promise<OpenverseSearchResponse>;
+      importOpenverseMedia(item: OpenverseMediaResult): Promise<MediaItem[]>;
       importDroppedFiles(files: File[]): Promise<MediaItem[]>;
       setFavorite(id: number, slot: number | null): Promise<void>;
       setTags(id: number, tags: string[]): Promise<void>;

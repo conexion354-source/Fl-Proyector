@@ -8,7 +8,6 @@ import {
   net,
   dialog,
   shell,
-  safeStorage,
 } from "electron";
 import { join, basename, extname } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -34,8 +33,8 @@ import {
   type SongDisplaySettings,
   type MediaItem,
   type LyricsSearchResult,
-  type PexelsMediaResult,
-  type PexelsSearchResponse,
+  type OpenverseMediaResult,
+  type OpenverseSearchResponse,
   type ReleaseHistoryEntry,
   type UpdateStatus,
 } from "../shared/types.js";
@@ -119,9 +118,13 @@ let churchAssetsDir = "";
 let updaterConfigured = false;
 let liveAudienceCaptureTimer: ReturnType<typeof setTimeout> | null = null;
 let liveAudienceCaptureRetryTimer: ReturnType<typeof setTimeout> | null = null;
-const pexelsSearchCache = new Map<
+const openverseSearchCache = new Map<
   string,
-  { expiresAt: number; value: PexelsSearchResponse }
+  { expiresAt: number; value: OpenverseSearchResponse }
+>();
+const openverseResultCache = new Map<
+  string,
+  { expiresAt: number; value: OpenverseMediaResult }
 >();
 let updateStatus: UpdateStatus = {
   state: app.isPackaged ? "idle" : "development",
@@ -135,6 +138,18 @@ let updateStatus: UpdateStatus = {
 };
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
+  {
+    version: "10.11.14",
+    title: "Control total móvil y fondos libres sin claves",
+    publishedAt: "2026-09-18T12:30:00Z",
+    changes: [
+      "App · Control total habilita temporalmente las canciones del orden del culto en el teléfono, con selección de estrofas y control en vivo.",
+      "El permiso de canciones se valida en el servidor, se actualiza inmediatamente en los teléfonos conectados y vuelve a quedar apagado al reiniciar FL Proyector.",
+      "La búsqueda de fondos usa Openverse sin cuentas ni claves y permite guardar imágenes grandes con licencias libres y sus datos de atribución.",
+      "El APK Android corrige la pantalla negra mediante aceleración gráfica, navegación WebView estable y caché renovada.",
+      "La aplicación web remota evita páginas antiguas almacenadas y muestra un aviso claro cuando la computadora no está disponible.",
+    ],
+  },
   {
     version: "10.11.13",
     title: "Acceso directo a la clave de Pexels",
@@ -1207,64 +1222,7 @@ async function importMediaFile(source: string) {
   return destination;
 }
 
-const pexelsSecretKey = "pexels-api-key";
-const pexelsDownloadHosts = new Set([
-  "images.pexels.com",
-  "videos.pexels.com",
-]);
-
-function normalizePexelsApiKey(value: string) {
-  let normalized = String(value || "")
-    .normalize("NFKC")
-    .replace(/[\u00a0\u200b-\u200d\ufeff]/g, " ")
-    .trim();
-  const authorization = normalized.match(
-    /authorization\s*:\s*(?:bearer\s+)?["'`]?([a-z0-9._-]+)/i,
-  );
-  if (authorization?.[1]) normalized = authorization[1];
-  else {
-    normalized = normalized
-      .replace(/^bearer\s+/i, "")
-      .replace(/^["'`]+|["'`]+$/g, "")
-      .trim();
-    // Pasting the complete cURL example is a common mistake. In that case,
-    // select the longest key-like token instead of rejecting a valid key.
-    const candidates = normalized.match(/[a-z0-9._-]{30,}/gi);
-    if (candidates?.length)
-      normalized = candidates.sort((left, right) => right.length - left.length)[0];
-  }
-  return normalized.replace(/\s+/g, "");
-}
-
-function readPexelsApiKey() {
-  const saved = database.getIntegrationSecret(pexelsSecretKey);
-  if (!saved) return "";
-  if (!saved.startsWith("encrypted:")) return saved.replace(/^plain:/, "");
-  try {
-    return safeStorage.decryptString(
-      Buffer.from(saved.slice("encrypted:".length), "base64"),
-    );
-  } catch {
-    return "";
-  }
-}
-
-function storePexelsApiKey(value: string) {
-  const key = normalizePexelsApiKey(value);
-  if (!key) {
-    database.saveIntegrationSecret(pexelsSecretKey, "");
-    return;
-  }
-  const stored = safeStorage.isEncryptionAvailable()
-    ? `encrypted:${safeStorage.encryptString(key).toString("base64")}`
-    : `plain:${key}`;
-  database.saveIntegrationSecret(pexelsSecretKey, stored);
-}
-
-async function pexelsRequest(endpoint: URL, apiKey = readPexelsApiKey()) {
-  const key = normalizePexelsApiKey(apiKey);
-  if (!key)
-    throw new Error("Configurá tu clave gratuita de Pexels para buscar fondos.");
+async function openverseRequest(endpoint: URL) {
   const response = await new Promise<{ status: number; body: string }>(
     (resolve, reject) => {
       const request = httpsRequest(
@@ -1272,9 +1230,8 @@ async function pexelsRequest(endpoint: URL, apiKey = readPexelsApiKey()) {
         {
           method: "GET",
           headers: {
-            Authorization: key,
             Accept: "application/json",
-            "User-Agent": `FL-Proyector/${app.getVersion()}`,
+            "User-Agent": `FL-Proyector/${app.getVersion()} (https://github.com/conexion354-source/Fl-Proyector)`,
           },
         },
         (incoming) => {
@@ -1283,7 +1240,7 @@ async function pexelsRequest(endpoint: URL, apiKey = readPexelsApiKey()) {
           incoming.on("data", (chunk: Buffer) => {
             size += chunk.length;
             if (size > 12 * 1024 * 1024) {
-              request.destroy(new Error("La respuesta de Pexels es demasiado grande."));
+              request.destroy(new Error("La respuesta de Openverse es demasiado grande."));
               return;
             }
             chunks.push(chunk);
@@ -1297,143 +1254,127 @@ async function pexelsRequest(endpoint: URL, apiKey = readPexelsApiKey()) {
         },
       );
       request.setTimeout(15_000, () =>
-        request.destroy(new Error("Pexels tardó demasiado en responder.")),
+        request.destroy(new Error("Openverse tardó demasiado en responder.")),
       );
       request.on("error", reject);
       request.end();
     },
   );
-  if (response.status === 401)
-    throw new Error(
-      "Pexels rechazó la clave. Copiá solamente el valor de API Key desde tu panel, sin ‘Authorization:’ ni ‘Bearer’.",
-    );
-  if (response.status === 403)
-    throw new Error(
-      "Pexels reconoce la solicitud, pero esta clave todavía no tiene acceso a la API.",
-    );
   if (response.status === 429)
-    throw new Error("Se alcanzó el límite de búsquedas de Pexels. Intentá más tarde.");
+    throw new Error("Openverse recibió demasiadas búsquedas. Esperá un momento e intentá nuevamente.");
   if (response.status < 200 || response.status >= 300)
-    throw new Error(`Pexels no está disponible en este momento (código ${response.status}).`);
+    throw new Error(`Openverse no está disponible en este momento (código ${response.status}).`);
   try {
     return JSON.parse(response.body) as Record<string, unknown>;
   } catch {
-    throw new Error("Pexels respondió con datos que no se pudieron interpretar.");
+    throw new Error("Openverse respondió con datos que no se pudieron interpretar.");
   }
 }
 
-async function searchPexels(
+async function searchOpenverse(
   query: string,
-  kind: "image" | "video",
   orientation: "all" | "landscape" | "portrait" | "square",
   page: number,
-): Promise<PexelsSearchResponse> {
+): Promise<OpenverseSearchResponse> {
   const normalizedQuery = query.trim().replace(/\s+/g, " ");
   if (!normalizedQuery) return { items: [], page: 1, totalResults: 0, hasMore: false };
   const safePage = Math.max(1, Math.floor(page || 1));
-  const cacheKey = `${kind}:${orientation}:${safePage}:${normalizedQuery.toLocaleLowerCase("es-AR")}`;
-  const cached = pexelsSearchCache.get(cacheKey);
+  const cacheKey = `${orientation}:${safePage}:${normalizedQuery.toLocaleLowerCase("es-AR")}`;
+  const cached = openverseSearchCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const endpoint = new URL(
-    kind === "image"
-      ? "https://api.pexels.com/v1/search"
-      : "https://api.pexels.com/v1/videos/search",
-  );
-  endpoint.searchParams.set("query", normalizedQuery);
+  const endpoint = new URL("https://api.openverse.org/v1/images/");
+  endpoint.searchParams.set("q", normalizedQuery);
   endpoint.searchParams.set("page", String(safePage));
-  endpoint.searchParams.set("per_page", "24");
-  if (orientation !== "all") endpoint.searchParams.set("orientation", orientation);
-  const payload = (await pexelsRequest(endpoint)) as {
-    photos?: Array<Record<string, unknown>>;
-    videos?: Array<Record<string, unknown>>;
+  endpoint.searchParams.set("page_size", "24");
+  endpoint.searchParams.set("mature", "false");
+  endpoint.searchParams.set("size", "large");
+  endpoint.searchParams.set("license", "cc0,pdm,by,by-sa");
+  if (orientation !== "all") {
+    endpoint.searchParams.set(
+      "aspect_ratio",
+      orientation === "landscape" ? "wide" : orientation === "portrait" ? "tall" : "square",
+    );
+  }
+  const payload = (await openverseRequest(endpoint)) as {
+    results?: Array<Record<string, unknown>>;
     page?: number;
-    per_page?: number;
-    total_results?: number;
-    next_page?: string;
+    page_count?: number;
+    result_count?: number;
   };
-  const records = kind === "image" ? payload.photos ?? [] : payload.videos ?? [];
-  const items = records.flatMap((record): PexelsMediaResult[] => {
-    const externalId = Number(record.id || 0);
-    const user = (record.user ?? {}) as Record<string, unknown>;
-    const photographer = String(record.photographer ?? user.name ?? "Pexels");
-    const sourceUrl = String(record.url || "https://www.pexels.com");
+  const items = (payload.results ?? []).flatMap((record): OpenverseMediaResult[] => {
+    const externalId = String(record.id || "").trim();
+    const creator = String(record.creator || "Autor no informado").trim();
+    const previewUrl = String(record.thumbnail || "").trim();
+    const downloadUrl = String(record.url || "").trim();
+    const width = Number(record.width || 0);
+    const height = Number(record.height || 0);
     if (!externalId) return [];
-    if (kind === "image") {
-      const sources = (record.src ?? {}) as Record<string, unknown>;
-      const previewUrl = String(sources.medium || sources.small || "");
-      const downloadUrl = String(sources.original || sources.large2x || sources.large || "");
-      if (!previewUrl || !downloadUrl) return [];
-      return [{
-        provider: "Pexels",
-        externalId,
-        kind,
-        title: `${normalizedQuery} · ${photographer}`,
-        query: normalizedQuery,
-        previewUrl,
-        downloadUrl,
-        sourceUrl,
-        photographer,
-        photographerUrl: String(record.photographer_url || sourceUrl),
-        width: Number(record.width || 0),
-        height: Number(record.height || 0),
-        duration: null,
-      }];
-    }
-    const files = Array.isArray(record.video_files)
-      ? (record.video_files as Array<Record<string, unknown>>)
-          .filter((file) => String(file.file_type || "").includes("mp4") && file.link)
-          .sort((left, right) => {
-            const leftWidth = Number(left.width || 0);
-            const rightWidth = Number(right.width || 0);
-            const leftScore = leftWidth <= 1920 ? 10_000 + leftWidth : 1920 - leftWidth;
-            const rightScore = rightWidth <= 1920 ? 10_000 + rightWidth : 1920 - rightWidth;
-            return rightScore - leftScore;
-          })
-      : [];
-    const selectedFile = files[0];
-    const previewUrl = String(record.image || "");
-    const downloadUrl = String(selectedFile?.link || "");
     if (!previewUrl || !downloadUrl) return [];
-    return [{
-      provider: "Pexels",
+    const item: OpenverseMediaResult = {
+      provider: "Openverse",
       externalId,
-      kind,
-      title: `${normalizedQuery} · ${photographer}`,
+      kind: "image",
+      title: String(record.title || `${normalizedQuery} · ${creator}`).trim(),
       query: normalizedQuery,
       previewUrl,
       downloadUrl,
-      sourceUrl,
-      photographer,
-      photographerUrl: String(user.url || sourceUrl),
-      width: Number(selectedFile?.width || record.width || 0),
-      height: Number(selectedFile?.height || record.height || 0),
-      duration: Number(record.duration || 0) || null,
-    }];
+      sourceUrl: `https://openverse.org/image/${encodeURIComponent(externalId)}`,
+      creator,
+      creatorUrl: String(record.creator_url || "").trim(),
+      width,
+      height,
+      license: [String(record.license || "").toUpperCase(), record.license_version]
+        .filter(Boolean)
+        .join(" "),
+      licenseUrl: String(record.license_url || "").trim(),
+      source: String(record.source || "Openverse").trim(),
+    };
+    openverseResultCache.set(externalId, {
+      expiresAt: Date.now() + 2 * 60 * 60_000,
+      value: item,
+    });
+    return [item];
   });
-  const totalResults = Number(payload.total_results || items.length);
+  const totalResults = Number(payload.result_count || items.length);
+  const currentPage = Number(payload.page || safePage);
+  const pageCount = Number(payload.page_count || currentPage);
   const value = {
     items,
-    page: Number(payload.page || safePage),
+    page: currentPage,
     totalResults,
-    hasMore: Boolean(payload.next_page),
+    hasMore: currentPage < pageCount,
   };
-  pexelsSearchCache.set(cacheKey, { expiresAt: Date.now() + 10 * 60_000, value });
+  openverseSearchCache.set(cacheKey, { expiresAt: Date.now() + 10 * 60_000, value });
   return value;
 }
 
-async function importPexelsMedia(item: PexelsMediaResult) {
+async function importOpenverseMedia(candidate: OpenverseMediaResult) {
+  const cached = openverseResultCache.get(String(candidate.externalId || ""));
+  if (!cached || cached.expiresAt <= Date.now())
+    throw new Error("Este resultado venció. Realizá nuevamente la búsqueda antes de guardarlo.");
+  const item = cached.value;
   const remoteUrl = new URL(item.downloadUrl);
-  if (remoteUrl.protocol !== "https:" || !pexelsDownloadHosts.has(remoteUrl.hostname))
-    throw new Error("El archivo no proviene de un servidor válido de Pexels.");
+  const hostname = remoteUrl.hostname.toLowerCase();
+  if (
+    remoteUrl.protocol !== "https:" ||
+    hostname === "localhost" ||
+    hostname.endsWith(".local") ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1"
+  ) throw new Error("Openverse devolvió una dirección de descarga no permitida.");
   const rawExtension = extname(remoteUrl.pathname).toLowerCase();
-  const extension = item.kind === "video"
-    ? ".mp4"
-    : imageExtensions.includes(rawExtension) ? rawExtension : ".jpg";
-  const destination = join(mediaDir, `pexels-${Math.max(0, Number(item.externalId))}${extension}`);
+  const extension = imageExtensions.includes(rawExtension) ? rawExtension : ".jpg";
+  const destination = join(mediaDir, `openverse-${item.externalId}${extension}`);
   const temporaryDestination = `${destination}.download`;
   const response = await net.fetch(remoteUrl.toString());
   if (!response.ok || !response.body)
-    throw new Error("No se pudo descargar el fondo desde Pexels.");
+    throw new Error("No se pudo descargar el fondo desde Openverse.");
+  const contentType = response.headers.get("content-type") || "";
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (!contentType.toLowerCase().startsWith("image/"))
+    throw new Error("El resultado seleccionado no contiene una imagen válida.");
+  if (contentLength > 100 * 1024 * 1024)
+    throw new Error("La imagen supera el límite de descarga de 100 MB.");
   try {
     await pipeline(
       Readable.fromWeb(response.body as never),
@@ -1452,13 +1393,15 @@ async function importPexelsMedia(item: PexelsMediaResult) {
     .listMedia(mediaUrl)
     .find((media) => media.path === destination);
   if (imported) {
-    const name = String(item.title || `Pexels ${item.externalId}`).trim();
+    const name = String(item.title || `Openverse ${item.externalId}`).trim();
     const tags = [
-      "Pexels",
+      "Openverse",
       item.query,
-      item.kind === "image" ? "imagen" : "video",
+      "imagen",
       item.width > item.height ? "horizontal" : item.height > item.width ? "vertical" : "cuadrado",
-      item.photographer,
+      item.creator,
+      item.license,
+      item.source,
     ].filter(Boolean);
     database.updateMediaDetails(imported.id, name, [...new Set(tags)]);
   }
@@ -1479,6 +1422,9 @@ if (hasSingleInstanceLock)
     database = new AppDatabase(
       join(app.getPath("userData"), "fl-proyector.sqlite"),
     );
+    // Openverse does not require credentials. Remove the obsolete Pexels key
+    // left by versions 10.11.11–10.11.13.
+    database.saveIntegrationSecret("pexels-api-key", "");
     database.removeBundledDemoMeeting();
     state.church = hydrateChurch(database.getChurchSettings());
     state.bibleStyle = database.getBibleDisplaySettings();
@@ -1656,8 +1602,8 @@ if (hasSingleInstanceLock)
         const hostname = url.hostname.toLowerCase();
         const isAllowedHost =
           hostname === "wa.me" ||
-          hostname === "pexels.com" ||
-          hostname.endsWith(".pexels.com");
+          hostname === "openverse.org" ||
+          hostname.endsWith(".openverse.org");
         if (url.protocol !== "https:" || !isAllowedHost) return false;
         await shell.openExternal(url.toString());
         return true;
@@ -1695,6 +1641,12 @@ if (hasSingleInstanceLock)
       };
     });
     ipcMain.handle("remote:enable-windows-access", enableWindowsRemoteAccess);
+    ipcMain.handle("remote:full-control:get", () =>
+      remoteServer.getFullControlStatus(),
+    );
+    ipcMain.handle("remote:full-control:set", (_event, enabled: boolean) =>
+      remoteServer.setFullControlEnabled(Boolean(enabled)),
+    );
     ipcMain.handle("live-audience:status", () =>
       remoteServer.getLiveAudienceStatus(),
     );
@@ -1755,35 +1707,18 @@ if (hasSingleInstanceLock)
         result.filePaths.filter(validMedia).map(importMeetingMediaFile),
       );
     });
-    ipcMain.handle("pexels:status", () => ({
-      configured: Boolean(readPexelsApiKey()),
-    }));
-    ipcMain.handle("pexels:save-key", async (_event, value: string) => {
-      const key = normalizePexelsApiKey(String(value || ""));
-      if (!key) {
-        storePexelsApiKey("");
-        pexelsSearchCache.clear();
-        return { configured: false };
-      }
-      const endpoint = new URL("https://api.pexels.com/v1/curated?per_page=1");
-      await pexelsRequest(endpoint, key);
-      storePexelsApiKey(key);
-      pexelsSearchCache.clear();
-      return { configured: true };
-    });
     ipcMain.handle(
-      "pexels:search",
+      "openverse:search",
       (
         _event,
         query: string,
-        kind: "image" | "video",
         orientation: "all" | "landscape" | "portrait" | "square",
         page = 1,
-      ) => searchPexels(query, kind, orientation, page),
+      ) => searchOpenverse(query, orientation, page),
     );
     ipcMain.handle(
-      "pexels:import",
-      (_event, item: PexelsMediaResult) => importPexelsMedia(item),
+      "openverse:import",
+      (_event, item: OpenverseMediaResult) => importOpenverseMedia(item),
     );
     ipcMain.handle(
       "media:favorite",

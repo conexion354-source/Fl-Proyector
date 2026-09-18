@@ -11,6 +11,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceError;
 import android.webkit.WebView;
 import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
@@ -177,22 +178,37 @@ public class MainActivity extends Activity {
     }
 
     private void showSearching() {
-        webView = null;
+        destroyWebView();
         connectionOverlay = buildLoadingOverlay();
         setContentView(connectionOverlay);
     }
 
+    private void destroyWebView() {
+        if (webView == null) return;
+        webView.stopLoading();
+        webView.setWebChromeClient(null);
+        webView.setWebViewClient(null);
+        webView.destroy();
+        webView = null;
+    }
+
     @SuppressLint("SetJavaScriptEnabled") private void openProjector(String url) {
         activeUrl = url;
+        destroyWebView();
         webView = new WebView(this);
         webView.setBackgroundColor(Color.rgb(12, 16, 24));
-        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        // Hardware acceleration is required by current Android System WebView
+        // versions. The previous forced software layer could render a fully
+        // black surface even though the remote page had loaded correctly.
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setDomStorageEnabled(true);
         webView.getSettings().setDatabaseEnabled(true);
         webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
         webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+        webView.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
         webView.getSettings().setLoadWithOverviewMode(true);
         webView.getSettings().setUseWideViewPort(true);
         webView.getSettings().setBuiltInZoomControls(false);
@@ -202,8 +218,12 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                view.loadUrl(request.getUrl().toString());
-                return true;
+                Uri requested = request.getUrl();
+                String scheme = requested.getScheme();
+                // Let WebView perform normal HTTP navigation. Calling
+                // loadUrl() again from this callback caused a reload loop on
+                // some older Android devices and left the surface black.
+                return !("http".equals(scheme) || "https".equals(scheme));
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) showUnavailable();
@@ -251,7 +271,7 @@ public class MainActivity extends Activity {
     }
 
     private void showUnavailable() {
-        webView = null;
+        destroyWebView();
         connectionOverlay = null;
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -327,7 +347,7 @@ public class MainActivity extends Activity {
         connectionAttempt++;
         connectionWorker.shutdownNow();
         if (scanPool != null) scanPool.shutdownNow();
-        if (webView != null) webView.destroy();
+        destroyWebView();
         super.onDestroy();
     }
 }

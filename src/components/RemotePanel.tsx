@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { Copy, QrCode, ShieldCheck, Smartphone } from "lucide-react";
+import { Copy, Music2, Power, QrCode, ShieldCheck, Smartphone } from "lucide-react";
 import { withSaveNotification } from "./SaveNotification";
 
 export function RemotePanel({
@@ -17,11 +17,16 @@ export function RemotePanel({
   const [savedCode, setSavedCode] = useState("");
   const [firewallBusy, setFirewallBusy] = useState(false);
   const [firewallResult, setFirewallResult] = useState<"success" | "error" | null>(null);
+  const [fullControlEnabled, setFullControlEnabled] = useState(false);
+  const [fullControlBusy, setFullControlBusy] = useState(false);
   const collaboratorUrl = url ? `${url}/colaborador` : "";
   useEffect(() => {
     window.flProyector.getCollaboratorCode().then((code) => {
       setCollaboratorCode(code);
       setSavedCode(code);
+    });
+    window.flProyector.getRemoteFullControlStatus().then((status) => {
+      setFullControlEnabled(status.fullControlEnabled);
     });
   }, []);
   useEffect(() => {
@@ -49,6 +54,17 @@ export function RemotePanel({
     const enabled = await window.flProyector.enableWindowsRemoteAccess();
     setFirewallBusy(false);
     setFirewallResult(enabled ? "success" : "error");
+  };
+  const toggleFullControl = async () => {
+    setFullControlBusy(true);
+    try {
+      const status = await window.flProyector.setRemoteFullControlEnabled(
+        !fullControlEnabled,
+      );
+      setFullControlEnabled(status.fullControlEnabled);
+    } finally {
+      setFullControlBusy(false);
+    }
   };
   return (
     <section className="remote-panel-page">
@@ -108,6 +124,32 @@ export function RemotePanel({
         <article><b>Biblia</b><span>Elegí versión, libro y capítulo para proyectar versículos.</span></article>
         <article><b>Multimedia</b><span>Elegí una reunión y enviá videos, imágenes o PowerPoints.</span></article>
       </div>
+
+      <section className={`remote-full-control ${fullControlEnabled ? "enabled" : ""}`}>
+        <div className="remote-full-control-icon"><Music2 /></div>
+        <div>
+          <span className="eyebrow">PERMISO TEMPORAL</span>
+          <h3>App · Control total</h3>
+          <p>
+            Habilita en el teléfono las canciones del orden del culto, sus
+            estrofas y el control en vivo. Se desactiva al cerrar el programa.
+          </p>
+        </div>
+        <button
+          type="button"
+          className={fullControlEnabled ? "danger" : ""}
+          disabled={fullControlBusy}
+          onClick={toggleFullControl}
+          aria-pressed={fullControlEnabled}
+        >
+          <Power size={16} />
+          {fullControlBusy
+            ? "Aplicando…"
+            : fullControlEnabled
+              ? "Desactivar"
+              : "Activar"}
+        </button>
+      </section>
 
       <section className="collaborator-section">
         <header className="collaborator-heading">

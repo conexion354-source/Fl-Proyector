@@ -8,24 +8,26 @@ export type MediaItem = {
   kind: "image" | "video";
 };
 
-export type PexelsMediaResult = {
-  provider: "Pexels";
-  externalId: number;
-  kind: "image" | "video";
+export type OpenverseMediaResult = {
+  provider: "Openverse";
+  externalId: string;
+  kind: "image";
   title: string;
   query: string;
   previewUrl: string;
   downloadUrl: string;
   sourceUrl: string;
-  photographer: string;
-  photographerUrl: string;
+  creator: string;
+  creatorUrl: string;
   width: number;
   height: number;
-  duration: number | null;
+  license: string;
+  licenseUrl: string;
+  source: string;
 };
 
-export type PexelsSearchResponse = {
-  items: PexelsMediaResult[];
+export type OpenverseSearchResponse = {
+  items: OpenverseMediaResult[];
   page: number;
   totalResults: number;
   hasMore: boolean;

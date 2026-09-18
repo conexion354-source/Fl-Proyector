@@ -1637,6 +1637,14 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
 .app-shell .remote-feature-grid article { padding:12px 14px; }
 .app-shell .remote-feature-grid article b { color:var(--fl-text); font-size:13px; }
 .app-shell .remote-feature-grid article span { margin-top:3px; font-size:12px; }
+.app-shell .remote-full-control { border-radius:8px; background:var(--fl-surface); box-shadow:var(--fl-shadow); }
+.app-shell .remote-full-control.enabled { border-color:#16a34a88; background:color-mix(in srgb,#16a34a 7%,var(--fl-surface)); }
+.app-shell .remote-full-control-icon { border-radius:8px; color:var(--fl-accent); background:var(--fl-accent-soft); }
+.app-shell .remote-full-control h3 { color:var(--fl-text); }
+.app-shell .remote-full-control p { color:var(--fl-muted); }
+.app-shell .remote-full-control button { border-radius:4px; background:var(--fl-accent); }
+.app-shell .remote-full-control button:hover { background:var(--fl-accent-hover); }
+.app-shell .remote-full-control button.danger { border-color:var(--fl-danger); background:var(--fl-danger); }
 .app-shell .live-audience-section { margin-top:22px; }
 .app-shell .live-audience-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; margin-bottom:10px; }
 .app-shell .live-audience-heading h3 { margin:3px 0 2px; font-size:19px; }
