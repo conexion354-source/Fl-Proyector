@@ -147,6 +147,16 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.20",
+    title: "Actualizaciones visibles y fondos Openverse más confiables",
+    publishedAt: "2026-09-19T00:00:00Z",
+    changes: [
+      "El sistema comprueba actualizaciones al iniciar y muestra un aviso flotante con acceso directo al actualizador cuando hay una versión pendiente.",
+      "La búsqueda de fondos en Openverse reintenta automáticamente las conexiones anónimas rechazadas temporalmente, sin pedir cuentas ni claves.",
+      "Se mantienen las mejoras de versículos largos, anuncios y controles de reuniones incluidas en esta actualización.",
+    ],
+  },
+  {
     version: "10.11.16",
     title: "Fondos compactos, videos compatibles y control remoto estable",
     publishedAt: "2026-09-18T15:30:00Z",
@@ -1347,7 +1357,7 @@ async function importMediaFile(source: string) {
 }
 
 async function openverseRequest(endpoint: URL) {
-  const response = await new Promise<{ status: number; body: string }>(
+  const requestWithNode = (includeIdentity: boolean) => new Promise<{ status: number; body: string }>(
     (resolve, reject) => {
       const request = httpsRequest(
         endpoint,
@@ -1355,7 +1365,11 @@ async function openverseRequest(endpoint: URL) {
           method: "GET",
           headers: {
             Accept: "application/json",
-            "User-Agent": `FL-Proyector/${app.getVersion()} (https://github.com/conexion354-source/Fl-Proyector)`,
+            ...(includeIdentity
+              ? {
+                  "User-Agent": `FL-Proyector/${app.getVersion()} (https://github.com/conexion354-source/Fl-Proyector)`,
+                }
+              : {}),
           },
         },
         (incoming) => {
@@ -1384,8 +1398,16 @@ async function openverseRequest(endpoint: URL) {
       request.end();
     },
   );
+  let response = await requestWithNode(true);
+  // Openverse supports anonymous requests. Some Windows network filters have
+  // nevertheless returned a spurious 401 for the identified request. Retry
+  // once as a completely anonymous client instead of asking the user for a
+  // key that Openverse does not require.
+  if (response.status === 401) response = await requestWithNode(false);
   if (response.status === 429)
     throw new Error("Openverse recibió demasiadas búsquedas. Esperá un momento e intentá nuevamente.");
+  if (response.status === 401)
+    throw new Error("Openverse rechazó temporalmente la conexión. Volvé a intentar en unos segundos.");
   if (response.status < 200 || response.status >= 300)
     throw new Error(`Openverse no está disponible en este momento (código ${response.status}).`);
   try {

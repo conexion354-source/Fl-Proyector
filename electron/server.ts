@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { collaboratorHtml } from "./collaboratorPage.js";
 import {
-  isLongBibleVerse,
+  shouldSplitBibleVerse,
   splitBibleVerse,
 } from "../shared/bibleLayout.js";
 import {
@@ -436,7 +436,7 @@ export function startRemoteServer(
       return res.json(verses);
     return res.json(
       verses.flatMap<unknown>((verse) => {
-        if (!isLongBibleVerse(verse.text, bibleStyle, getState().outputViewport))
+        if (!shouldSplitBibleVerse(verse.text, bibleStyle, getState().outputViewport))
           return [verse];
         const parts = splitBibleVerse(
           verse.text,

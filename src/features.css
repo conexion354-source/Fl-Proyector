@@ -2881,6 +2881,27 @@
 .long-verse-controls label { display: grid; gap: 6px; color: #8f97a6; font-size: 10px; }
 .long-verse-controls select,.long-verse-controls input { width: 100%; height: 36px; padding: 0 9px; border: 1px solid #303642; border-radius: 7px; background: #12151c; color: #fff; }
 .long-verse-settings .setting-note { display: block; margin-top: 9px; }
+.bible-size-guidance {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, #22c55e 48%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, #22c55e 10%, transparent);
+  color: var(--fl-text, #dfe5ee);
+}
+.bible-size-guidance strong { font-size: 11px; }
+.bible-size-guidance span {
+  color: var(--fl-muted, #8f98a8);
+  font-size: 9px;
+  line-height: 1.45;
+}
+.bible-size-guidance.warning {
+  border-color: color-mix(in srgb, #f59e0b 58%, transparent);
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+}
+.bible-size-guidance.warning strong { color: #d97706; }
 .bible-fill-card .bible-margin-grid input {
   height: 30px;
 }

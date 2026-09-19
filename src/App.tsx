@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import QRCode from "qrcode";
 import {
   MonitorPlay,
+  Download,
   BellRing,
   BookOpenText,
   CalendarRange,
@@ -48,6 +49,7 @@ import {
   type DisplayInfo,
   type DisplaySettings,
   type LiveAudienceStatus,
+  type UpdateStatus,
 } from "../shared/types";
 
 type Tab = "reuniones" | "canciones" | "fondos" | "biblia" | "remoto" | "ajustes";
@@ -97,6 +99,9 @@ export function App() {
   const [settingsPreview, setSettingsPreview] = useState<ReturnType<typeof useProjectionState>["state"] | null>(null);
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(initialDisplaySettings);
   const [displayPreviewSettings, setDisplayPreviewSettings] = useState<DisplaySettings | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
+  const [updateNoticeDismissed, setUpdateNoticeDismissed] = useState(false);
+  const [openVersionSectionSignal, setOpenVersionSectionSignal] = useState(0);
   const [livePanelWidths, setLivePanelWidths] = useState<Record<Tab, number>>(
     () =>
       Object.fromEntries(
@@ -135,6 +140,33 @@ export function App() {
       clearInterval(timer);
     };
   }, []);
+  useEffect(() => {
+    let active = true;
+    const receive = (next: UpdateStatus) => {
+      if (!active) return;
+      setUpdateStatus(next);
+    };
+    const unsubscribe = window.flProyector.onUpdateStatus(receive);
+    void window.flProyector.getUpdateStatus().then(async (initial) => {
+      if (!active) return;
+      receive(initial);
+      if (
+        initial.packaged &&
+        (initial.state === "idle" ||
+          initial.state === "current" ||
+          initial.state === "error")
+      ) {
+        receive(await window.flProyector.checkForUpdates());
+      }
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+  useEffect(() => {
+    if (updateStatus?.availableVersion) setUpdateNoticeDismissed(false);
+  }, [updateStatus?.availableVersion]);
   useEffect(() => {
     localStorage.setItem("fl-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
   }, [sidebarCollapsed]);
@@ -443,6 +475,7 @@ export function App() {
               displays={status.displays}
               onPreviewChange={setSettingsPreview}
               onDisplayPreviewChange={setDisplayPreviewSettings}
+              openVersionSectionSignal={openVersionSectionSignal}
             />
           )}
         </main>
@@ -700,6 +733,43 @@ export function App() {
         />
       )}
       <HelpDialog open={showHelp} onClose={() => setShowHelp(false)} />
+      {!updateNoticeDismissed &&
+        updateStatus &&
+        ["available", "downloading", "downloaded"].includes(updateStatus.state) && (
+          <div className="update-floating-notice" role="status" aria-live="polite">
+            <button
+              type="button"
+              className="update-floating-main"
+              onClick={() => {
+                setTab("ajustes");
+                setOpenVersionSectionSignal((value) => value + 1);
+              }}
+            >
+              <span className="update-floating-icon"><Download /></span>
+              <span>
+                <strong>
+                  {updateStatus.state === "downloaded"
+                    ? "Actualización lista para instalar"
+                    : `Actualización ${updateStatus.availableVersion || "nueva"} disponible`}
+                </strong>
+                <small>
+                  {updateStatus.state === "downloading"
+                    ? `Descargando… ${updateStatus.progress ?? 0}%`
+                    : "Hacé clic para abrir el actualizador."}
+                </small>
+              </span>
+              <ChevronRight aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="update-floating-close"
+              aria-label="Cerrar aviso de actualización"
+              onClick={() => setUpdateNoticeDismissed(true)}
+            >
+              <X />
+            </button>
+          </div>
+        )}
       <SaveNotificationHost />
     </div>
   );

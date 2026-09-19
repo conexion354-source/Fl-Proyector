@@ -4,7 +4,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Color from "@tiptap/extension-color";
 import FontFamily from "@tiptap/extension-font-family";
 import Highlight from "@tiptap/extension-highlight";
-import { TextStyle } from "@tiptap/extension-text-style";
+import { FontSize, TextStyle } from "@tiptap/extension-text-style";
 import {
   BookOpenText,
   CalendarDays,
@@ -144,6 +144,22 @@ function announcementPages(payload: Record<string, unknown>) {
   return splitAnnouncementPages(
     withoutLegacyEditorPrompt(String(payload.html || ""), "announcement"),
   );
+}
+
+function announcementListTitle(pages: string[]) {
+  const holder = document.createElement("div");
+  holder.innerHTML = pages.join(" ");
+  const text = (holder.textContent || "").replace(/\s+/g, " ").trim();
+  if (!text) return "Nuevo anuncio";
+  if (text.length <= 58) return text;
+  const shortened = text.slice(0, 58).replace(/\s+\S*$/, "").trim();
+  return `${shortened || text.slice(0, 55).trim()}…`;
+}
+
+function announcementHasAutomaticTitle(item: MeetingItem) {
+  const mode = String(item.payload.announcementTitleMode || "");
+  if (mode === "manual") return false;
+  return mode === "auto" || !item.title.trim() || /^nuevo anuncio$/i.test(item.title.trim());
 }
 
 function legacyBibleText(html: string) {
@@ -499,6 +515,7 @@ export function MeetingBuilder({
             shadowColor: "#000000",
             shadowBlur: 14,
             backgroundId: null,
+            announcementTitleMode: "auto",
           }
         : {};
     const id = await window.flProyector.saveMeetingItem({
@@ -618,11 +635,17 @@ export function MeetingBuilder({
         );
         const changed = {
           ...editorItem,
+          title: announcementHasAutomaticTitle(editorItem)
+            ? announcementListTitle(pages)
+            : editorItem.title,
           payload: {
             ...editorItem.payload,
             html: pages[0],
             announcementPages: pages,
             announcementPage,
+            announcementTitleMode: announcementHasAutomaticTitle(editorItem)
+              ? "auto"
+              : "manual",
           },
         };
         await window.flProyector.saveMeetingItem(changed);
@@ -1541,7 +1564,10 @@ export function MeetingBuilder({
           ariaLabel="Acciones del elemento"
           items={!contextMenu.palette ? [
             {
-              label: "Editar elemento",
+              label:
+                contextMenu.item.type === "announcement"
+                  ? "Sobrescribir anuncio"
+                  : "Editar elemento",
               icon: <Edit3 />,
               onClick: () => {
                 setSelected(contextMenu.item);
@@ -2441,7 +2467,14 @@ function ItemEditor({
             <input
               value={item.title}
               onChange={(event) =>
-                setItem({ ...item, title: event.target.value })
+                setItem({
+                  ...item,
+                  title: event.target.value,
+                  payload:
+                    item.type === "announcement"
+                      ? { ...item.payload, announcementTitleMode: "manual" }
+                      : item.payload,
+                })
               }
             />
           </label>
@@ -2630,6 +2663,7 @@ function RichAnnouncementEditor({
     extensions: [
       StarterKit,
       TextStyle,
+      FontSize,
       Color,
       FontFamily,
       Highlight.configure({ multicolor: true }),
@@ -2666,8 +2700,8 @@ function RichAnnouncementEditor({
         }}
       />
       <small>
-        Seleccioná una palabra o frase antes de aplicarle formato. El tamaño
-        modifica todo el anuncio.
+        Seleccioná una palabra o frase para cambiar solamente esa parte. Sin
+        selección, el tamaño modifica todo el anuncio.
       </small>
     </div>
   );

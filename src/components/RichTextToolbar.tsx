@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   Bold,
@@ -53,10 +53,27 @@ export function RichTextToolbar({
   const [open, setOpen] = useState<"text" | "highlight" | "shadow" | null>(
     null,
   );
+  const [sizeInput, setSizeInput] = useState(fontSize ?? 64);
+  useEffect(() => {
+    if (fontSize !== undefined) setSizeInput(fontSize);
+  }, [fontSize]);
   const choose = (type: "text" | "highlight", color: string) => {
     if (type === "text") editor?.chain().focus().setColor(color).run();
     else editor?.chain().focus().toggleHighlight({ color }).run();
     setOpen(null);
+  };
+  const changeFontSize = (value: number) => {
+    const next = Math.max(18, Math.min(140, value));
+    if (editor && !editor.state.selection.empty && fontSize) {
+      const relative = Math.max(0.45, Math.min(2.4, next / fontSize));
+      editor
+        .chain()
+        .focus()
+        .setFontSize(`${relative.toFixed(3)}em`)
+        .run();
+      return;
+    }
+    onFontSize?.(next);
   };
   return (
     <div
@@ -90,12 +107,15 @@ export function RichTextToolbar({
             type="number"
             min="18"
             max="140"
-            value={fontSize}
-            onChange={(event) =>
-              onFontSize(
-                Math.max(18, Math.min(140, Number(event.target.value))),
-              )
-            }
+            value={sizeInput}
+            onChange={(event) => {
+              const value = Math.max(
+                18,
+                Math.min(140, Number(event.target.value) || 18),
+              );
+              setSizeInput(value);
+              changeFontSize(value);
+            }}
           />
         </label>
       )}

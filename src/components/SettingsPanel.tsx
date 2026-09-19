@@ -29,6 +29,7 @@ import {
   type SongDisplaySettings,
   type UpdateStatus,
 } from "../../shared/types";
+import { recommendedBibleFontSize } from "../../shared/bibleLayout";
 import { buildBibleSlides } from "../bibleDisplay";
 import { projectionFonts } from "../fonts";
 import { ExpanderRow } from "./ui/ExpanderRow";
@@ -177,12 +178,14 @@ export function SettingsPanel({
   displays,
   onPreviewChange,
   onDisplayPreviewChange,
+  openVersionSectionSignal = 0,
 }: {
   state: ProjectionState;
   update: (patch: ProjectionPatch) => void;
   displays: DisplayInfo[];
   onPreviewChange: (preview: ProjectionState | null) => void;
   onDisplayPreviewChange: (settings: DisplaySettings | null) => void;
+  openVersionSectionSignal?: number;
 }) {
   const [section, setSection] = useState<
     "iglesia" | "pantalla" | "biblias" | "canciones" | "tema" | "version"
@@ -222,6 +225,9 @@ export function SettingsPanel({
     window.flProyector.getUpdateStatus().then(setUpdateStatus);
     return window.flProyector.onUpdateStatus(setUpdateStatus);
   }, []);
+  useEffect(() => {
+    if (openVersionSectionSignal > 0) setSection("version");
+  }, [openVersionSectionSignal]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("fl-interface-theme", theme);
@@ -330,6 +336,20 @@ export function SettingsPanel({
     bible,
     state.outputViewport,
   )[0];
+  const recommendedBibleSize = recommendedBibleFontSize(
+    bible,
+    state.outputViewport,
+  );
+  const bibleViewportRatio =
+    state.outputViewport.width / Math.max(1, state.outputViewport.height);
+  const bibleFormatLabel =
+    Math.abs(bibleViewportRatio - 4 / 3) < 0.08
+      ? "4:3"
+      : Math.abs(bibleViewportRatio - 16 / 10) < 0.08
+        ? "16:10"
+        : "16:9";
+  const bibleSizeAboveRecommendation =
+    bible.textFontSize > recommendedBibleSize;
   const previewState: ProjectionState = {
     ...state,
     bibleStyle: bible,
@@ -1252,6 +1272,19 @@ export function SettingsPanel({
                         }
                       />
                     </label>
+                  </div>
+                  <div
+                    className={`bible-size-guidance ${bibleSizeAboveRecommendation ? "warning" : "safe"}`}
+                    role="status"
+                  >
+                    <strong>
+                      Recomendado para {bibleFormatLabel}: hasta {recommendedBibleSize}px
+                    </strong>
+                    <span>
+                      {bibleSizeAboveRecommendation
+                        ? `El tamaño elegido supera la zona estable por ${bible.textFontSize - recommendedBibleSize}px y puede producir cambios notorios en versículos largos.`
+                        : "El tamaño elegido mantiene una transición pareja entre versículos cortos y largos."}
+                    </span>
                   </div>
                   <label className="toggle-row bible-fit-toggle">
                     <input

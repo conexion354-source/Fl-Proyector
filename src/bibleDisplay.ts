@@ -1,6 +1,6 @@
 import type { BibleDisplaySettings } from "../shared/types";
 import {
-  isLongBibleVerse,
+  shouldSplitBibleVerse,
   splitBibleVerse,
   type ProjectionDimensions,
 } from "../shared/bibleLayout";
@@ -36,7 +36,7 @@ export function buildBibleSlides(
   // size. It is divided once; the renderer handles any final safety reduction.
   const pieces =
     settings.longVerseMode !== "auto-fit" &&
-    isLongBibleVerse(text, settings, viewport) &&
+    shouldSplitBibleVerse(text, settings, viewport) &&
     text.trim().split(/\s+/).length > 1
       ? splitBibleVerse(text, settings, viewport)
       : [text];

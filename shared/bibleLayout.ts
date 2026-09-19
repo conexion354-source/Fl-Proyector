@@ -137,20 +137,99 @@ export function isLongBibleVerse(
   return bibleTextLines(trimmed, settings, viewport).length > maximumLines;
 }
 
+/**
+ * Returns the largest size that can keep a passage on one screen. This uses
+ * the same word wrapping and reference reserve as the A/B decision, so the
+ * operator, phone and settings guidance all agree.
+ */
+export function fittedBibleFontSize(
+  text: string,
+  settings: BibleDisplaySettings,
+  viewport?: ProjectionDimensions,
+  minimum = 12,
+) {
+  const ceiling = Math.max(minimum, settings.textFontSize);
+  let low = Math.max(8, Math.min(minimum, ceiling));
+  let high = ceiling;
+  let best = low;
+  for (let step = 0; step < 12; step += 1) {
+    const middle = (low + high) / 2;
+    const candidate = { ...settings, textFontSize: middle };
+    if (!isLongBibleVerse(text, candidate, viewport)) {
+      best = middle;
+      low = middle;
+    } else high = middle;
+  }
+  return Math.min(ceiling, best);
+}
+
+/** A/B is reserved for passages that need more than a subtle 12% reduction. */
+export function shouldSplitBibleVerse(
+  text: string,
+  settings: BibleDisplaySettings,
+  viewport?: ProjectionDimensions,
+) {
+  if (!isLongBibleVerse(text, settings, viewport)) return false;
+  const subtleFloor = Math.max(12, settings.textFontSize * 0.88);
+  return fittedBibleFontSize(text, settings, viewport, 12) < subtleFloor;
+}
+
+const recommendationSample =
+  "Porque de tal manera amó Dios al mundo, que ha dado a su Hijo unigénito, para que todo aquel que en él cree no se pierda, mas tenga vida eterna.";
+
+export function recommendedBibleFontSize(
+  settings: BibleDisplaySettings,
+  viewport?: ProjectionDimensions,
+) {
+  const testSettings = { ...settings, textFontSize: 200 };
+  return Math.max(
+    24,
+    Math.floor(
+      fittedBibleFontSize(recommendationSample, testSettings, viewport, 24),
+    ),
+  );
+}
+
 export function splitBibleVerse(
   text: string,
   settings: BibleDisplaySettings,
   viewport?: ProjectionDimensions,
 ) {
+  if (!shouldSplitBibleVerse(text, settings, viewport)) return [text];
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length < 2) return [text];
   const maximumLines = bibleTextCapacity(settings, viewport).lines;
-  const renderedLines = bibleTextLines(text, settings, viewport);
-  if (renderedLines.length <= maximumLines) return [text];
-  // Long passages are divided once, into two balanced screens. If either half
-  // remains unusually long, ProjectionStage's safety fit reduces its type just
-  // enough to keep it inside the safe area; it must never create C or D.
-  const splitAfterLine = Math.ceil(renderedLines.length / 2);
+  let bestIndex = Math.ceil(words.length / 2);
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < words.length; index += 1) {
+    const ratio = index / words.length;
+    if (ratio < 0.24 || ratio > 0.76) continue;
+    const left = words.slice(0, index).join(" ");
+    const right = words.slice(index).join(" ");
+    const leftLines = bibleTextLines(left, settings, viewport).length;
+    const rightLines = bibleTextLines(right, settings, viewport).length;
+    const overflow =
+      Math.max(0, leftLines - maximumLines) +
+      Math.max(0, rightLines - maximumLines);
+    const punctuation = /[.!?][”"')\]]?$/.test(words[index - 1])
+      ? 0
+      : /[,;:][”"')\]]?$/.test(words[index - 1])
+        ? 1
+        : 3;
+    const score =
+      overflow * 100 +
+      Math.abs(leftLines - rightLines) * 6 +
+      Math.abs(0.5 - ratio) * 18 +
+      punctuation;
+    if (score < bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  }
+  // It is always exactly A/B. If a particularly long half still needs help,
+  // the renderer performs the final small safety reduction without clipping.
   return [
-    renderedLines.slice(0, splitAfterLine).join(" "),
-    renderedLines.slice(splitAfterLine).join(" "),
+    words.slice(0, bestIndex).join(" "),
+    words.slice(bestIndex).join(" "),
   ].filter(Boolean);
 }
