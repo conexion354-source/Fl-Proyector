@@ -13,6 +13,7 @@ import {
   Upload,
   X,
   Sun,
+  Keyboard,
 } from "lucide-react";
 import {
   initialBibleDisplaySettings,
@@ -29,11 +30,18 @@ import {
   type SongDisplaySettings,
   type UpdateStatus,
 } from "../../shared/types";
-import { recommendedBibleFontSize } from "../../shared/bibleLayout";
 import { buildBibleSlides } from "../bibleDisplay";
 import { projectionFonts } from "../fonts";
 import { ExpanderRow } from "./ui/ExpanderRow";
 import { withSaveNotification } from "./SaveNotification";
+import { recommendedBibleFontSize } from "../../shared/bibleLayout";
+import {
+  defaultShortcuts,
+  loadShortcuts,
+  shortcutLabels,
+  shortcutStorageKey,
+  type ShortcutAction,
+} from "../keyboardShortcuts";
 
 const textColors = [
   "#ffffff",
@@ -188,7 +196,7 @@ export function SettingsPanel({
   openVersionSectionSignal?: number;
 }) {
   const [section, setSection] = useState<
-    "iglesia" | "pantalla" | "biblias" | "canciones" | "tema" | "version"
+    "iglesia" | "pantalla" | "biblias" | "canciones" | "tema" | "atajos" | "version"
   >("pantalla");
   const [theme, setTheme] = useState<"dark" | "light">(() =>
     localStorage.getItem("fl-fluent-theme-v1") &&
@@ -211,6 +219,7 @@ export function SettingsPanel({
   const [releaseHistory, setReleaseHistory] = useState<ReleaseHistoryEntry[]>([]);
   const [releaseHistoryOpen, setReleaseHistoryOpen] = useState(false);
   const [releaseHistoryLoading, setReleaseHistoryLoading] = useState(false);
+  const [shortcuts, setShortcuts] = useState<Record<ShortcutAction, string>>(() => loadShortcuts());
   const [referenceDesignOpen, setReferenceDesignOpen] = useState(false);
   const reloadVersions = () =>
     window.flProyector.listBibleVersions().then(setVersions);
@@ -240,6 +249,12 @@ export function SettingsPanel({
     (display) =>
       !display.primary && display.id !== effectiveMainDisplay?.id,
   );
+  const availablePreviewDisplays = displays.filter(
+    (display) =>
+      !display.primary &&
+      display.id !== effectiveMainDisplay?.id &&
+      display.id !== (settings.thirdDisplayEnabled ? settings.thirdDisplayId : null),
+  );
   useEffect(() => {
     if (
       !settings.thirdDisplayEnabled ||
@@ -259,6 +274,14 @@ export function SettingsPanel({
     settings.thirdDisplayId,
     displays,
   ]);
+  useEffect(() => {
+    if (
+      !settings.previewEnabled ||
+      settings.previewDisplayId === null ||
+      availablePreviewDisplays.some((display) => display.id === settings.previewDisplayId)
+    ) return;
+    setSettings((value) => ({ ...value, previewDisplayId: null }));
+  }, [settings.previewEnabled, settings.previewDisplayId, availablePreviewDisplays]);
   const saveDisplay = async () => {
     await withSaveNotification(
       () => {
@@ -270,6 +293,14 @@ export function SettingsPanel({
         )
           throw new Error(
             "Elegí una tercera pantalla externa distinta de la salida principal.",
+          );
+        if (
+          settings.previewEnabled &&
+          settings.previewDisplayId !== null &&
+          !availablePreviewDisplays.some((display) => display.id === settings.previewDisplayId)
+        )
+          throw new Error(
+            "Elegí un monitor de vista previa distinto de las salidas principales.",
           );
         return window.flProyector.saveDisplaySettings(settings);
       },
@@ -336,20 +367,6 @@ export function SettingsPanel({
     bible,
     state.outputViewport,
   )[0];
-  const recommendedBibleSize = recommendedBibleFontSize(
-    bible,
-    state.outputViewport,
-  );
-  const bibleViewportRatio =
-    state.outputViewport.width / Math.max(1, state.outputViewport.height);
-  const bibleFormatLabel =
-    Math.abs(bibleViewportRatio - 4 / 3) < 0.08
-      ? "4:3"
-      : Math.abs(bibleViewportRatio - 16 / 10) < 0.08
-        ? "16:10"
-        : "16:9";
-  const bibleSizeAboveRecommendation =
-    bible.textFontSize > recommendedBibleSize;
   const previewState: ProjectionState = {
     ...state,
     bibleStyle: bible,
@@ -402,6 +419,10 @@ export function SettingsPanel({
     blackout: false,
     logo: false,
   };
+  const recommendedBibleSize = recommendedBibleFontSize(bible, state.outputViewport);
+  const bibleViewportRatio = state.outputViewport.width / Math.max(1, state.outputViewport.height);
+  const bibleFormatLabel = Math.abs(bibleViewportRatio - 4 / 3) < 0.08 ? "4:3" : Math.abs(bibleViewportRatio - 16 / 10) < 0.08 ? "16:10" : "16:9";
+  const bibleSizeAboveRecommendation = bible.textFontSize > recommendedBibleSize;
 
   useEffect(() => {
     if (section === "canciones") onPreviewChange(songPreviewState);
@@ -505,6 +526,13 @@ export function SettingsPanel({
           Tema
         </button>
         <button
+          className={section === "atajos" ? "active" : ""}
+          onClick={() => setSection("atajos")}
+        >
+          <Keyboard />
+          Atajos
+        </button>
+        <button
           className={section === "version" ? "active" : ""}
           onClick={() => setSection("version")}
         >
@@ -513,6 +541,43 @@ export function SettingsPanel({
         </button>
       </aside>
       <div className="settings-content">
+        {section === "atajos" && (
+          <>
+            <div className="section-title compact-title">
+              <div>
+                <span className="eyebrow">OPERACIÓN RÁPIDA</span>
+                <h2>Teclas de acceso rápido</h2>
+                <p>Podés cambiar cualquier combinación. No se ejecutan mientras escribís en un campo.</p>
+              </div>
+            </div>
+            <div className="settings-card shortcut-settings-card">
+              <div className="shortcut-settings-list">
+                {(Object.keys(shortcutLabels) as ShortcutAction[]).map((action) => (
+                  <label className="shortcut-setting-row" key={action}>
+                    <span>{shortcutLabels[action]}</span>
+                    <input
+                      value={shortcuts[action]}
+                      placeholder={defaultShortcuts[action]}
+                      onChange={(event) => setShortcuts((current) => ({ ...current, [action]: event.target.value }))}
+                      onBlur={(event) => setShortcuts((current) => ({ ...current, [action]: event.target.value.trim() }))}
+                    />
+                  </label>
+                ))}
+              </div>
+              <div className="inspector-actions">
+                <button type="button" className="secondary" onClick={() => setShortcuts({ ...defaultShortcuts })}>
+                  Restaurar valores
+                </button>
+                <button type="button" className="primary" onClick={() => withSaveNotification(async () => {
+                  localStorage.setItem(shortcutStorageKey, JSON.stringify(shortcuts));
+                  window.dispatchEvent(new CustomEvent("fl-shortcuts-changed"));
+                }, "Los atajos fueron guardados.")}>
+                  <Save /> Guardar atajos
+                </button>
+              </div>
+            </div>
+          </>
+        )}
         {section === "version" && (
           <>
             <div className="section-title compact-title">
@@ -1052,6 +1117,45 @@ export function SettingsPanel({
                 </label>
               </div>
             </ExpanderRow>
+            <ExpanderRow
+              className="preview-display-expander"
+              title="Habilitar pantalla de vista previa"
+              description={
+                availablePreviewDisplays.length
+                  ? "Abrí una ventana flotante o enviá la preparación a otro monitor, siempre con el formato real del proyector."
+                  : "Abre una ventana flotante ajustable aunque no tengas otro monitor conectado."
+              }
+              checked={settings.previewEnabled}
+              onCheckedChange={(previewEnabled) =>
+                setSettings((value) => ({
+                  ...value,
+                  previewEnabled,
+                  previewDisplayId: previewEnabled ? value.previewDisplayId : null,
+                }))
+              }
+            >
+              <div className="win11-expander-grid single-column">
+                <label>
+                  Ubicación de la vista previa
+                  <select
+                    value={settings.previewDisplayId ?? ""}
+                    onChange={(event) =>
+                      setSettings((value) => ({
+                        ...value,
+                        previewDisplayId: event.target.value ? Number(event.target.value) : null,
+                      }))
+                    }
+                  >
+                    <option value="">Ventana flotante en esta computadora</option>
+                    {availablePreviewDisplays.map((display) => (
+                      <option value={display.id} key={display.id}>
+                        {display.label} · {display.width}×{display.height}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </ExpanderRow>
             </div>
             <button className="save-settings primary" onClick={saveDisplay}>
               <Save size={17} />
@@ -1273,18 +1377,11 @@ export function SettingsPanel({
                       />
                     </label>
                   </div>
-                  <div
-                    className={`bible-size-guidance ${bibleSizeAboveRecommendation ? "warning" : "safe"}`}
-                    role="status"
-                  >
-                    <strong>
-                      Recomendado para {bibleFormatLabel}: hasta {recommendedBibleSize}px
-                    </strong>
-                    <span>
-                      {bibleSizeAboveRecommendation
-                        ? `El tamaño elegido supera la zona estable por ${bible.textFontSize - recommendedBibleSize}px y puede producir cambios notorios en versículos largos.`
-                        : "El tamaño elegido mantiene una transición pareja entre versículos cortos y largos."}
-                    </span>
+                  <div className={`bible-size-guidance compact ${bibleSizeAboveRecommendation ? "warning" : "safe"}`} role="status">
+                    <strong>Recomendado para {bibleFormatLabel}: hasta {recommendedBibleSize}px</strong>
+                    {bibleSizeAboveRecommendation && (
+                      <span>El tamaño elegido supera la recomendación para esta pantalla.</span>
+                    )}
                   </div>
                   <label className="toggle-row bible-fit-toggle">
                     <input

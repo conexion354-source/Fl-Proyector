@@ -88,6 +88,11 @@ if (!window.flProyector) {
       };
       stateListeners.forEach((listener) => listener(state));
     },
+    setPreviewState: async (next: any) => {
+      if (next) state = next;
+      stateListeners.forEach((listener) => listener(state));
+    },
+    clearPreviewState: async () => {},
     clearProjectionContent: async () => {
       state = {
         ...state,

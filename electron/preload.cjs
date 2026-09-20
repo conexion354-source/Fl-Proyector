@@ -2,13 +2,35 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("flProyector", {
   getState: () => ipcRenderer.invoke("projection:get-state"),
+  getLiveState: () => ipcRenderer.invoke("projection:get-live-state"),
   updateState: (patch) => ipcRenderer.invoke("projection:update-state", patch),
+  getProjectionFrozen: () => ipcRenderer.invoke("projection:freeze:get"),
+  setProjectionFrozen: (frozen) => ipcRenderer.invoke("projection:freeze:set", frozen),
+  getFloatingPreviewOpen: () => ipcRenderer.invoke("preview:window:get"),
+  setFloatingPreviewOpen: (open) => ipcRenderer.invoke("preview:window:set", open),
+  setPreviewState: (state) => ipcRenderer.invoke("preview:set-state", state),
+  clearPreviewState: () => ipcRenderer.invoke("preview:clear"),
   clearProjectionContent: () => ipcRenderer.invoke("projection:clear-content"),
   finishVideoPlayback: () => ipcRenderer.invoke("projection:video-ended"),
   onState: (callback) => {
     const listener = (_event, state) => callback(state);
     ipcRenderer.on("projection:state", listener);
     return () => ipcRenderer.removeListener("projection:state", listener);
+  },
+  onLiveState: (callback) => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("projection:live-state", listener);
+    return () => ipcRenderer.removeListener("projection:live-state", listener);
+  },
+  onProjectionFreezeStatus: (callback) => {
+    const listener = (_event, frozen) => callback(frozen);
+    ipcRenderer.on("projection:freeze-status", listener);
+    return () => ipcRenderer.removeListener("projection:freeze-status", listener);
+  },
+  onFloatingPreviewStatus: (callback) => {
+    const listener = (_event, open) => callback(open);
+    ipcRenderer.on("preview:window-status", listener);
+    return () => ipcRenderer.removeListener("preview:window-status", listener);
   },
   openProjection: () => ipcRenderer.invoke("projection:open"),
   closeProjection: () => ipcRenderer.invoke("projection:close"),

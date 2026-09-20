@@ -518,9 +518,15 @@ export function startRemoteServer(
     // Bible replaces foreground multimedia, but preserves the church
     // background (including an animated background and its playback state).
     if (patch.text?.kind === "biblia") {
+      const beforeClear = getState();
       multimedia.clear();
       applyPatch({
         ...patch,
+        // The mobile client intentionally sends only the Bible foreground.
+        // Re-attach the exact background captured before clearing multimedia
+        // so a remote song/video can never blank the church background.
+        background: { ...beforeClear.background },
+        video: { ...beforeClear.video, loop: beforeClear.background.kind === "video" },
         presentation: { visible: false },
         lowerThird: { visible: false },
       });

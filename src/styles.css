@@ -844,6 +844,8 @@ html[data-theme="light"] .sidebar .sidebar-toggle:hover {
 }
 .panel-heading {
   display: flex;
+  align-items: center;
+  gap: 8px;
   justify-content: space-between;
   color: #9ba2b2;
   font-size: 10px;
@@ -851,6 +853,45 @@ html[data-theme="light"] .sidebar .sidebar-toggle:hover {
   letter-spacing: 0.1em;
   margin-bottom: 10px;
 }
+.preview-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.preview-mode-switch {
+  display: flex;
+  padding: 2px;
+  border: 1px solid #303642;
+  border-radius: 6px;
+  background: #11141b;
+}
+.preview-mode-switch button,
+.preview-float-button {
+  min-width: 0;
+  height: 25px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #9ba2b2;
+  font: inherit;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.preview-mode-switch button.active,
+.preview-float-button.active {
+  background: #665cff;
+  color: #fff;
+}
+.preview-float-button {
+  display: grid;
+  width: 27px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #303642;
+}
+.preview-float-button svg { width: 14px; }
 .panel-heading span {
   color: #555c6b;
 }
@@ -875,6 +916,7 @@ html[data-theme="light"] .sidebar .sidebar-toggle:hover {
   padding: 3px 5px;
   border-radius: 2px;
 }
+.preview-label.prepare { background: #2563eb; }
 .master-controls {
   margin-top: 20px;
 }
@@ -886,6 +928,9 @@ html[data-theme="light"] .sidebar .sidebar-toggle:hover {
 }
 .master-grid.master-grid-four {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.master-grid.master-grid-five {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .master-grid button {
   height: 64px;

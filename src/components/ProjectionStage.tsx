@@ -347,6 +347,7 @@ export function ProjectionStage({
     fontFamily,
     textAlign: state.text.align,
     color: state.text.color,
+    "--projection-text-color": state.text.color,
     backgroundColor: state.text.backgroundColor,
     "--projection-panel-color": state.text.backgroundColor,
     borderRadius: `${state.text.borderRadius}px`,
@@ -593,7 +594,16 @@ function PresentationLayer({
       navigationTimer.current = null;
       try {
         viewer.current?.setMode("present");
-        viewer.current?.goTo(Math.max(0, presentation.slideIndex));
+        // The viewer applies presentation mode asynchronously. Navigating in
+        // the same tick can leave the editor canvas visible and skip slide
+        // transitions, especially when a remote device taps quickly.
+        window.setTimeout(() => {
+          try {
+            viewer.current?.goTo(Math.max(0, presentation.slideIndex));
+          } catch (reason) {
+            console.error("No se pudo cambiar la diapositiva", reason);
+          }
+        }, 180);
       } catch (reason) {
         console.error("No se pudo cambiar la diapositiva", reason);
       }

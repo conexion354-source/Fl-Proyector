@@ -121,6 +121,8 @@ export type DisplaySettings = {
   mainDisplayId: number | null;
   thirdDisplayEnabled: boolean;
   thirdDisplayId: number | null;
+  previewEnabled: boolean;
+  previewDisplayId: number | null;
 };
 
 export type ChurchSettings = {
@@ -207,6 +209,8 @@ export const initialDisplaySettings: DisplaySettings = {
   mainDisplayId: null,
   thirdDisplayEnabled: false,
   thirdDisplayId: null,
+  previewEnabled: false,
+  previewDisplayId: null,
 };
 export const initialChurchSettings: ChurchSettings = {
   name: "Mi Iglesia",

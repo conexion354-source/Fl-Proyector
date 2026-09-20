@@ -14,7 +14,9 @@ const normalizePromptText = (html: string) =>
 
 const legacyPrompts = {
   song: new Set(["escribi aqui la letra del canto..."]),
-  announcement: new Set(["bienvenidos", "escribi el anuncio aqui"]),
+  // “Bienvenidos” is a perfectly valid announcement, not a placeholder.
+  // Only the explicit editor hint is discarded when loading legacy records.
+  announcement: new Set(["escribi el anuncio aqui"]),
 };
 
 export function withoutLegacyEditorPrompt(

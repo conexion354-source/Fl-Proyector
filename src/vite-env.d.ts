@@ -28,10 +28,20 @@ declare global {
   interface Window {
     flProyector: {
       getState(): Promise<ProjectionState>;
+      getLiveState(): Promise<ProjectionState>;
       updateState(patch: ProjectionPatch): Promise<void>;
+      getProjectionFrozen(): Promise<boolean>;
+      setProjectionFrozen(frozen: boolean): Promise<boolean>;
+      getFloatingPreviewOpen(): Promise<boolean>;
+      setFloatingPreviewOpen(open: boolean): Promise<boolean>;
+      setPreviewState(state: ProjectionState | null): Promise<void>;
+      clearPreviewState(): Promise<void>;
       clearProjectionContent(): Promise<void>;
       finishVideoPlayback(): Promise<void>;
       onState(callback: (state: ProjectionState) => void): () => void;
+      onLiveState(callback: (state: ProjectionState) => void): () => void;
+      onProjectionFreezeStatus(callback: (frozen: boolean) => void): () => void;
+      onFloatingPreviewStatus(callback: (open: boolean) => void): () => void;
       openProjection(): Promise<void>;
       closeProjection(): Promise<void>;
       projectionStatus(): Promise<{

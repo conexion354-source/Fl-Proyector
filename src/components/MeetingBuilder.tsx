@@ -15,6 +15,7 @@ import {
   Image,
   ListPlus,
   Megaphone,
+  MonitorPlay,
   Music2,
   Palette,
   Play,
@@ -218,6 +219,7 @@ function bibleSections(
 export function MeetingBuilder({
   state,
   update,
+  previewAspectRatio,
   meetingId,
   setMeetingId,
   focusedItemId,
@@ -225,6 +227,7 @@ export function MeetingBuilder({
 }: {
   state: ProjectionState;
   update: (patch: ProjectionPatch) => void;
+  previewAspectRatio: string;
   meetingId: number | null;
   setMeetingId: (id: number | null) => void;
   focusedItemId: number | null;
@@ -295,6 +298,7 @@ export function MeetingBuilder({
   );
   const [pendingMeetingDelete, setPendingMeetingDelete] =
     useState<Meeting | null>(null);
+  const [previewDraft, setPreviewDraft] = useState<ProjectionState | null>(null);
   const [renamingMeeting, setRenamingMeeting] = useState<Meeting | null>(null);
   // Make the newest rich-editor payload available to Guardar immediately,
   // even when blur and click occur in the same Windows event cycle.
@@ -1176,6 +1180,37 @@ export function MeetingBuilder({
     });
   };
 
+  const previewItem = (item: MeetingItem) => {
+    const payload = item.payload as Record<string, any>;
+    const source = (payload.meetingMedia as MediaItem | undefined) ?? mediaById(payload.backgroundId ?? payload.mediaId);
+    const next: ProjectionState = {
+      ...state,
+      blackout: false,
+      // The preview represents the item being prepared. The projector keeps
+      // its own live state (including a logo that may currently be on air).
+      logo: false,
+      presentation: { ...state.presentation, visible: false },
+      lowerThird: { ...state.lowerThird, visible: false },
+      background: source ? { ...state.background, id: source.id, url: source.url, name: source.name, kind: source.kind } : state.background,
+    };
+    if (item.type === "song") {
+      const song = songs.find((value) => value.id === Number(payload.songId));
+      const stanza = song ? splitSongStanzas(song.content)[0] || song.content : "<p>Vista previa de canción</p>";
+      next.text = { ...state.text, html: stanza, kind: "canto", visible: true, title: state.songStyle.showTitle ? song?.title || item.title : "", fontSize: state.songStyle.fontSize, fontFamily: state.songStyle.fontFamily, color: state.songStyle.textColor, backgroundColor: state.songStyle.backgroundColor, position: state.songStyle.position, align: state.songStyle.align, borderRadius: state.songStyle.borderRadius, template: state.songStyle.template, titlePosition: state.songStyle.titlePosition, titleColor: state.songStyle.titleColor, titleBackground: state.songStyle.titleBackground, titleFontSize: state.songStyle.titleFontSize, titleStyle: state.songStyle.titleStyle };
+    } else if (item.type === "announcement") {
+      const pages = announcementPages(payload);
+      next.text = { ...state.text, html: pages[Number(payload.announcementPage || 0)] || pages[0], kind: "anuncio", visible: true, position: payload.position || "center", fontSize: Number(payload.fontSize || 64), color: payload.color || "#ffffff", backgroundColor: payload.backgroundColor || "rgba(0,0,0,.55)", align: payload.align || "center", borderRadius: Number(payload.borderRadius || 0), template: payload.template || "plain", animation: payload.animation || "fade", shadowEnabled: payload.shadowEnabled !== false, shadowColor: payload.shadowColor || "#000000", shadowBlur: Number(payload.shadowBlur ?? 14) };
+    } else if (item.type === "presentation") {
+      next.presentation = { path: String(payload.path || ""), url: String(payload.url || ""), name: String(payload.name || item.title), previewSlides: payload.previewSlides as string[] | undefined, slideIndex: 0, slideCount: Number(payload.slideCount || 0), visible: true };
+      next.text = { ...state.text, visible: false };
+    } else if (source?.kind === "image") {
+      next.presentation = { path: null, url: source.url, name: source.name, previewSlides: [source.url], slideIndex: 0, slideCount: 1, visible: true };
+      next.text = { ...state.text, visible: false };
+    }
+    setPreviewDraft(next);
+    void window.flProyector.setPreviewState(next);
+  };
+
   const reorder = async (targetId: number) => {
     if (!dragId || !meetingId || dragId === targetId) return;
     const next = [...items],
@@ -1764,12 +1799,14 @@ export function MeetingBuilder({
               songs={songs}
               media={media}
               projectionState={state}
+              previewAspectRatio={previewAspectRatio}
               songDraft={songDraft}
               setSongDraft={setSongDraft}
               setItem={setSelected}
               setPayload={setPayload}
               onSave={saveEditor}
               onDelete={() => setPendingDelete(selected)}
+              onPreview={() => previewItem(selected)}
               onAnnouncementPage={(html, payload) => {
                 if (onAirItemId !== selected.id) return;
                 update({
@@ -1843,6 +1880,19 @@ export function MeetingBuilder({
             >
               Cancelar
             </button>
+          </div>
+        </div>
+      )}
+
+      {previewDraft && (
+        <div className="modal-backdrop preview-only-backdrop" onMouseDown={() => { setPreviewDraft(null); void window.flProyector.clearPreviewState(); }}>
+          <div className="preview-only-dialog" role="dialog" aria-modal="true" aria-label="Vista previa sin proyectar" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <span className="eyebrow">VISTA PREVIA</span>
+              <button type="button" className="dialog-close" aria-label="Cerrar" onClick={() => { setPreviewDraft(null); void window.flProyector.clearPreviewState(); }}><X /></button>
+            </header>
+            <p>Así se vería en la pantalla. Todavía no se envió al proyector.</p>
+            <div className="preview-only-frame" style={{ aspectRatio: previewAspectRatio }}><ProjectionStage state={previewDraft} preview /></div>
           </div>
         </div>
       )}
@@ -2417,12 +2467,14 @@ function ItemEditor({
   songs,
   media,
   projectionState,
+  previewAspectRatio,
   songDraft,
   setSongDraft,
   setItem,
   setPayload,
   onSave,
   onDelete,
+  onPreview,
   onAnnouncementPage,
   isDraft,
 }: {
@@ -2430,6 +2482,7 @@ function ItemEditor({
   songs: Song[];
   media: MediaItem[];
   projectionState: ProjectionState;
+  previewAspectRatio: string;
   songDraft: {
     title: string;
     content: string;
@@ -2450,6 +2503,7 @@ function ItemEditor({
   setPayload: (patch: Record<string, unknown>) => void;
   onSave: () => void;
   onDelete: () => void;
+  onPreview: () => void;
   onAnnouncementPage: (html: string, payload: Record<string, unknown>) => void;
   isDraft: boolean;
 }) {
@@ -2458,9 +2512,20 @@ function ItemEditor({
   return (
     <div className={`item-editor ${visual ? "visual-item-editor" : ""}`}>
       <div className="item-editor-controls">
-        <span className="eyebrow">
-          EDITAR {itemLabels[item.type].toUpperCase()}
-        </span>
+        <div className="item-editor-heading">
+          <span className="eyebrow">
+            EDITAR {itemLabels[item.type].toUpperCase()}
+          </span>
+          <button
+            type="button"
+            className="secondary preview-editor-button"
+            onClick={onPreview}
+            aria-label="Abrir vista previa"
+            title="Abrir vista previa sin enviar al proyector"
+          >
+            <MonitorPlay />
+          </button>
+        </div>
         {item.type !== "song" && (
           <label>
             Nombre del ítem
@@ -2520,6 +2585,7 @@ function ItemEditor({
             payload={p}
             setPayload={setPayload}
             showSize={item.type !== "announcement"}
+            showTextColor={item.type === "announcement"}
           />
         )}
         {item.type === "presentation" && (
@@ -2543,6 +2609,7 @@ function ItemEditor({
           item={item}
           media={media}
           state={projectionState}
+          previewAspectRatio={previewAspectRatio}
         />
       )}
     </div>
@@ -2561,6 +2628,7 @@ const panelColors = [
   "#14532d",
   "#164e63",
 ];
+const announcementTextColors = ["#ffffff", "#f8fafc", "#111827", "#0f172a", "#facc15", "#86efac", "#67e8f9"];
 
 function AnnouncementPagesEditor({
   payload,
@@ -2823,10 +2891,12 @@ function DesignControls({
   payload: p,
   setPayload,
   showSize = true,
+  showTextColor = false,
 }: {
   payload: any;
   setPayload: (patch: Record<string, unknown>) => void;
   showSize?: boolean;
+  showTextColor?: boolean;
 }) {
   const position = p.position || "center";
   const template = p.template || "plain";
@@ -2958,6 +3028,14 @@ function DesignControls({
         value={String(p.backgroundColor || "#000000").slice(0, 7)}
         onChange={(backgroundColor) => setPayload({ backgroundColor })}
       />
+      {showTextColor && (
+        <PresetPalette
+          label="Color del texto"
+          colors={announcementTextColors}
+          value={String(p.color || "#ffffff").slice(0, 7)}
+          onChange={(color) => setPayload({ color })}
+        />
+      )}
     </>
   );
 }
@@ -3042,12 +3120,16 @@ function AnnouncementPreview({
   item,
   media,
   state,
+  previewAspectRatio,
 }: {
   item: MeetingItem;
   media: MediaItem[];
   state: ProjectionState;
+  previewAspectRatio: string;
 }) {
   const p = item.payload as any;
+  const previewPages = announcementPages(p);
+  const previewPage = Math.max(0, Math.min(Number(p.announcementPage || 0), previewPages.length - 1));
   const selectedBackground = media.find(
     (value) => value.id === Number(p.backgroundId),
   );
@@ -3066,7 +3148,7 @@ function AnnouncementPreview({
     lowerThird: { ...state.lowerThird, visible: false },
     text: {
       ...state.text,
-      html: String(p.html || ""),
+      html: previewPages[previewPage] || String(p.html || ""),
       visible: true,
       kind: item.type === "bible" ? "biblia" : "anuncio",
       position: p.position || "center",
@@ -3090,9 +3172,9 @@ function AnnouncementPreview({
           <span className="live-dot" />
           VISTA PREVIA
         </div>
-        <small>16:9 · cambios en vivo</small>
+        <small>{previewAspectRatio.replace(/\s*\/\s*/, ":")} · cambios en vivo</small>
       </div>
-      <div className="designer-preview">
+      <div className="designer-preview" style={{ aspectRatio: previewAspectRatio }}>
         <ProjectionStage state={previewState} preview />
       </div>
       <p>Esta pantalla representa cómo se verá el anuncio en el proyector.</p>

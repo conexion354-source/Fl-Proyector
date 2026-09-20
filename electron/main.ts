@@ -15,7 +15,6 @@ import { mkdir, readdir, copyFile, readFile, rename, rm } from "node:fs/promises
 import { createWriteStream } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { request as httpsRequest } from "node:https";
 import { networkInterfaces } from "node:os";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
@@ -110,6 +109,11 @@ function parseXmlBible(xml: string): BibleData {
 let controlWindow: BrowserWindow | null = null;
 let projectionWindow: BrowserWindow | null = null;
 let thirdProjectionWindow: BrowserWindow | null = null;
+let previewProjectionWindow: BrowserWindow | null = null;
+let floatingPreviewWindow: BrowserWindow | null = null;
+let previewState: ProjectionState | null = null;
+let projectionFrozen = false;
+let frozenProjectionState: ProjectionState | null = null;
 let liveAudienceWindow: BrowserWindow | null = null;
 let tagsDialogWindow: BrowserWindow | null = null;
 let projectionDisplayId: number | null = null;
@@ -548,20 +552,56 @@ function mergeState(patch: ProjectionPatch) {
       finishVideoPlayback();
     });
   }
-  for (const win of [
-    controlWindow,
-    projectionWindow,
-    thirdProjectionWindow,
-    liveAudienceWindow,
-  ])
+  const liveState = currentLiveState();
+  if (controlWindow && !controlWindow.isDestroyed()) {
+    controlWindow.webContents.send("projection:state", state);
+    controlWindow.webContents.send("projection:live-state", liveState);
+  }
+  for (const win of [projectionWindow, thirdProjectionWindow, liveAudienceWindow])
     if (win && !win.isDestroyed())
-      win.webContents.send("projection:state", state);
-  remoteServer?.broadcast(state);
+      win.webContents.send("projection:state", liveState);
+  if (previewProjectionWindow && !previewProjectionWindow.isDestroyed())
+    previewProjectionWindow.webContents.send("projection:state", previewState ?? state);
+  if (floatingPreviewWindow && !floatingPreviewWindow.isDestroyed())
+    floatingPreviewWindow.webContents.send("projection:state", previewState ?? state);
+  remoteServer?.broadcast(liveState);
   scheduleLiveAudienceFrame();
 }
 
+function currentLiveState() {
+  return projectionFrozen && frozenProjectionState
+    ? frozenProjectionState
+    : state;
+}
+
+function publishFreezeStatus() {
+  if (!controlWindow || controlWindow.isDestroyed()) return;
+  controlWindow.webContents.send("projection:freeze-status", projectionFrozen);
+  controlWindow.webContents.send("projection:live-state", currentLiveState());
+}
+
+function setProjectionFrozen(frozen: boolean) {
+  if (frozen === projectionFrozen) return projectionFrozen;
+  if (frozen) {
+    frozenProjectionState = structuredClone(state);
+    projectionFrozen = true;
+  } else {
+    projectionFrozen = false;
+    frozenProjectionState = null;
+    const liveState = currentLiveState();
+    for (const win of [projectionWindow, thirdProjectionWindow, liveAudienceWindow])
+      if (win && !win.isDestroyed())
+        win.webContents.send("projection:state", liveState);
+    remoteServer?.broadcast(liveState);
+    scheduleLiveAudienceFrame();
+  }
+  publishFreezeStatus();
+  return projectionFrozen;
+}
+
 function scheduleLiveAudienceFrame() {
-  if (!remoteServer?.needsLiveFrame(state)) {
+  const liveState = currentLiveState();
+  if (!remoteServer?.needsLiveFrame(liveState)) {
     if (liveAudienceCaptureTimer) clearTimeout(liveAudienceCaptureTimer);
     if (liveAudienceCaptureRetryTimer)
       clearTimeout(liveAudienceCaptureRetryTimer);
@@ -578,15 +618,16 @@ function scheduleLiveAudienceFrame() {
   liveAudienceCaptureTimer = setTimeout(async () => {
     liveAudienceCaptureTimer = null;
     await captureLiveAudienceFrame();
-    if (!state.presentation.visible) return;
-    const presentationKey = `${state.presentation.url}|${state.presentation.slideIndex}`;
+    const capturedState = currentLiveState();
+    if (!capturedState.presentation.visible) return;
+    const presentationKey = `${capturedState.presentation.url}|${capturedState.presentation.slideIndex}`;
     let retries = 2;
     const retry = () => {
       liveAudienceCaptureRetryTimer = setTimeout(async () => {
         liveAudienceCaptureRetryTimer = null;
         if (
-          !remoteServer?.needsLiveFrame(state) ||
-          `${state.presentation.url}|${state.presentation.slideIndex}` !==
+          !remoteServer?.needsLiveFrame(currentLiveState()) ||
+          `${currentLiveState().presentation.url}|${currentLiveState().presentation.slideIndex}` !==
             presentationKey
         )
           return;
@@ -600,7 +641,7 @@ function scheduleLiveAudienceFrame() {
 }
 
 async function captureLiveAudienceFrame() {
-  if (!remoteServer?.needsLiveFrame(state)) return;
+  if (!remoteServer?.needsLiveFrame(currentLiveState())) return;
   const source = projectionWindow && !projectionWindow.isDestroyed()
     ? projectionWindow
     : thirdProjectionWindow && !thirdProjectionWindow.isDestroyed()
@@ -679,7 +720,16 @@ function projectionTargets(settings: DisplaySettings) {
           display.id !== occupiedMainId,
       )
     : undefined;
-  return { mainTarget, thirdTarget };
+  const previewTarget = settings.previewEnabled
+    ? displays.find(
+        (display) =>
+          display.id === settings.previewDisplayId &&
+          display.id !== primary.id &&
+          display.id !== occupiedMainId &&
+          display.id !== thirdTarget?.id,
+      )
+    : undefined;
+  return { mainTarget, thirdTarget, previewTarget };
 }
 
 async function createControlWindow() {
@@ -717,12 +767,19 @@ async function createControlWindow() {
     for (const auxiliary of [
       projectionWindow,
       thirdProjectionWindow,
+      previewProjectionWindow,
+      floatingPreviewWindow,
       liveAudienceWindow,
       tagsDialogWindow,
     ])
       if (auxiliary && !auxiliary.isDestroyed()) auxiliary.destroy();
     projectionWindow = null;
     thirdProjectionWindow = null;
+    previewProjectionWindow = null;
+    floatingPreviewWindow = null;
+    previewState = null;
+    projectionFrozen = false;
+    frozenProjectionState = null;
     liveAudienceWindow = null;
     tagsDialogWindow = null;
     projectionDisplayId = null;
@@ -746,6 +803,8 @@ async function openProjection() {
     projectionDisplayId = null;
     if (thirdProjectionWindow && !thirdProjectionWindow.isDestroyed())
       thirdProjectionWindow.close();
+    if (previewProjectionWindow && !previewProjectionWindow.isDestroyed())
+      previewProjectionWindow.close();
     controlWindow?.webContents.send("projection:status-changed", false);
   });
   await synchronizeProjectionWindows(settings);
@@ -777,7 +836,7 @@ async function ensureLiveAudienceWindow() {
   await win.loadURL(rendererUrl("projection"));
   if (win.isDestroyed()) return;
   win.webContents.send("projection:display-settings", settings);
-  win.webContents.send("projection:state", state);
+  win.webContents.send("projection:state", currentLiveState());
 }
 
 function closeLiveAudienceWindow() {
@@ -786,9 +845,75 @@ function closeLiveAudienceWindow() {
   liveAudienceWindow = null;
 }
 
+function previewAspectRatio(settings: DisplaySettings) {
+  if (settings.aspectRatio === "16:10") return 16 / 10;
+  if (settings.aspectRatio === "4:3") return 4 / 3;
+  if (settings.aspectRatio === "custom" || settings.aspectRatio === "16:9")
+    return 16 / 9;
+  const viewport = projectionViewport(settings);
+  return viewport.width / Math.max(1, viewport.height);
+}
+
+async function openFloatingPreview() {
+  if (floatingPreviewWindow && !floatingPreviewWindow.isDestroyed()) {
+    floatingPreviewWindow.show();
+    floatingPreviewWindow.focus();
+    return true;
+  }
+  const settings = database.getDisplaySettings();
+  const ratio = previewAspectRatio(settings);
+  const primary = screen.getPrimaryDisplay();
+  const width = Math.min(760, Math.max(420, primary.workAreaSize.width - 80));
+  const height = Math.round(width / ratio);
+  const win = new BrowserWindow({
+    width,
+    height,
+    minWidth: 360,
+    minHeight: Math.round(360 / ratio),
+    useContentSize: true,
+    title: "Vista previa · FL Proyector",
+    backgroundColor: settings.backgroundColor,
+    resizable: true,
+    movable: true,
+    minimizable: true,
+    maximizable: true,
+    alwaysOnTop: true,
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: join(app.getAppPath(), "electron/preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+    },
+  });
+  floatingPreviewWindow = win;
+  win.setAspectRatio(ratio);
+  win.setMenu(null);
+  win.setMenuBarVisibility(false);
+  win.on("closed", () => {
+    if (floatingPreviewWindow === win) floatingPreviewWindow = null;
+    controlWindow?.webContents.send("preview:window-status", false);
+  });
+  win.webContents.on("did-finish-load", () => {
+    if (win.isDestroyed()) return;
+    win.webContents.send("projection:display-settings", settings);
+    win.webContents.send("projection:state", previewState ?? state);
+  });
+  await win.loadURL(rendererUrl("projection"));
+  controlWindow?.webContents.send("preview:window-status", true);
+  return true;
+}
+
+function closeFloatingPreview() {
+  if (floatingPreviewWindow && !floatingPreviewWindow.isDestroyed())
+    floatingPreviewWindow.close();
+  floatingPreviewWindow = null;
+}
+
 async function createProjectionWindow(
   target: Electron.Display | undefined,
   settings: DisplaySettings,
+  preview = false,
 ) {
   const resolution =
     settings.resolution === "display"
@@ -839,7 +964,10 @@ async function createProjectionWindow(
     recovering = false;
     if (win.isDestroyed()) return;
     win.webContents.send("projection:display-settings", settings);
-    win.webContents.send("projection:state", state);
+    win.webContents.send(
+      "projection:state",
+      preview ? (previewState ?? state) : currentLiveState(),
+    );
   };
   const recoverProjectionRenderer = () => {
     if (recovering || win.isDestroyed()) return;
@@ -909,6 +1037,8 @@ async function synchronizeProjectionWindows(settings: DisplaySettings) {
     projectionWindow.hide();
     if (thirdProjectionWindow && !thirdProjectionWindow.isDestroyed())
       thirdProjectionWindow.hide();
+    if (previewProjectionWindow && !previewProjectionWindow.isDestroyed())
+      previewProjectionWindow.hide();
     return;
   }
   projectionDisplayId = mainTarget?.id ?? null;
@@ -918,18 +1048,33 @@ async function synchronizeProjectionWindows(settings: DisplaySettings) {
   if (!thirdTarget) {
     if (thirdProjectionWindow && !thirdProjectionWindow.isDestroyed())
       thirdProjectionWindow.close();
-    return;
-  }
-  if (!thirdProjectionWindow || thirdProjectionWindow.isDestroyed()) {
+  } else if (!thirdProjectionWindow || thirdProjectionWindow.isDestroyed()) {
     const thirdWindow = await createProjectionWindow(thirdTarget, settings);
     thirdProjectionWindow = thirdWindow;
     thirdWindow.on("closed", () => {
       if (thirdProjectionWindow === thirdWindow) thirdProjectionWindow = null;
     });
+  } else {
+    applyDisplaySettingsToWindow(thirdProjectionWindow, thirdTarget, settings);
+    if (!thirdProjectionWindow.isVisible()) thirdProjectionWindow.showInactive();
+  }
+
+  const previewTarget = projectionTargets(settings).previewTarget;
+  if (!previewTarget) {
+    if (previewProjectionWindow && !previewProjectionWindow.isDestroyed())
+      previewProjectionWindow.close();
     return;
   }
-  applyDisplaySettingsToWindow(thirdProjectionWindow, thirdTarget, settings);
-  if (!thirdProjectionWindow.isVisible()) thirdProjectionWindow.showInactive();
+  if (!previewProjectionWindow || previewProjectionWindow.isDestroyed()) {
+    const previewWindow = await createProjectionWindow(previewTarget, settings, true);
+    previewProjectionWindow = previewWindow;
+    previewWindow.on("closed", () => {
+      if (previewProjectionWindow === previewWindow) previewProjectionWindow = null;
+    });
+  } else {
+    applyDisplaySettingsToWindow(previewProjectionWindow, previewTarget, settings);
+    if (!previewProjectionWindow.isVisible()) previewProjectionWindow.showInactive();
+  }
 }
 
 function refreshProjectionGeometry() {
@@ -1357,56 +1502,41 @@ async function importMediaFile(source: string) {
 }
 
 async function openverseRequest(endpoint: URL) {
-  const requestWithNode = (includeIdentity: boolean) => new Promise<{ status: number; body: string }>(
-    (resolve, reject) => {
-      const request = httpsRequest(
-        endpoint,
-        {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            ...(includeIdentity
-              ? {
-                  "User-Agent": `FL-Proyector/${app.getVersion()} (https://github.com/conexion354-source/Fl-Proyector)`,
-                }
-              : {}),
-          },
-        },
-        (incoming) => {
-          const chunks: Buffer[] = [];
-          let size = 0;
-          incoming.on("data", (chunk: Buffer) => {
-            size += chunk.length;
-            if (size > 12 * 1024 * 1024) {
-              request.destroy(new Error("La respuesta de Openverse es demasiado grande."));
-              return;
-            }
-            chunks.push(chunk);
-          });
-          incoming.on("end", () =>
-            resolve({
-              status: incoming.statusCode ?? 0,
-              body: Buffer.concat(chunks).toString("utf8"),
-            }),
-          );
-        },
-      );
-      request.setTimeout(15_000, () =>
-        request.destroy(new Error("Openverse tardó demasiado en responder.")),
-      );
-      request.on("error", reject);
-      request.end();
-    },
-  );
-  let response = await requestWithNode(true);
-  // Openverse supports anonymous requests. Some Windows network filters have
-  // nevertheless returned a spurious 401 for the identified request. Retry
-  // once as a completely anonymous client instead of asking the user for a
-  // key that Openverse does not require.
-  if (response.status === 401) response = await requestWithNode(false);
+  const requestHeaders = {
+    Accept: "application/json",
+    "Cache-Control": "no-cache",
+    "User-Agent": "FL-Proyector/1.0 (Openverse background search)",
+  };
+  const readResponse = async (response: Response) => {
+    const body = await response.text();
+    if (Buffer.byteLength(body, "utf8") > 12 * 1024 * 1024)
+      throw new Error("La respuesta de Openverse es demasiado grande.");
+    return { status: response.status, body };
+  };
+  const requestWithElectron = async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const response = await net.fetch(endpoint.toString(), {
+        method: "GET",
+        headers: requestHeaders,
+        signal: controller.signal,
+      });
+      return await readResponse(response);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError")
+        throw new Error("Openverse tardó demasiado en responder.");
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+  // Electron's network stack follows the system proxy and certificate store,
+  // which is more reliable than a raw Node request on Windows installations.
+  const response = await requestWithElectron();
   if (response.status === 429)
     throw new Error("Openverse recibió demasiadas búsquedas. Esperá un momento e intentá nuevamente.");
-  if (response.status === 401)
+  if (response.status === 401 || response.status === 403)
     throw new Error("Openverse rechazó temporalmente la conexión. Volvé a intentar en unos segundos.");
   if (response.status < 200 || response.status >= 300)
     throw new Error(`Openverse no está disponible en este momento (código ${response.status}).`);
@@ -1431,7 +1561,8 @@ async function searchOpenverse(
   const endpoint = new URL("https://api.openverse.org/v1/images/");
   endpoint.searchParams.set("q", normalizedQuery);
   endpoint.searchParams.set("page", String(safePage));
-  endpoint.searchParams.set("page_size", "24");
+  // Openverse limits anonymous searches to 20 results per page.
+  endpoint.searchParams.set("page_size", "20");
   endpoint.searchParams.set("mature", "false");
   endpoint.searchParams.set("size", "large");
   endpoint.searchParams.set("license", "cc0,pdm,by,by-sa");
@@ -1741,6 +1872,33 @@ if (hasSingleInstanceLock)
     });
 
     ipcMain.handle("projection:get-state", () => state);
+    ipcMain.handle("projection:get-live-state", () => currentLiveState());
+    ipcMain.handle("projection:freeze:get", () => projectionFrozen);
+    ipcMain.handle("projection:freeze:set", (_event, frozen: boolean) =>
+      setProjectionFrozen(Boolean(frozen)),
+    );
+    ipcMain.handle("preview:set-state", (_event, next: ProjectionState | null) => {
+      previewState = next ? structuredClone(next) : null;
+      if (previewProjectionWindow && !previewProjectionWindow.isDestroyed())
+        previewProjectionWindow.webContents.send("projection:state", previewState ?? state);
+      if (floatingPreviewWindow && !floatingPreviewWindow.isDestroyed())
+        floatingPreviewWindow.webContents.send("projection:state", previewState ?? state);
+    });
+    ipcMain.handle("preview:clear", () => {
+      previewState = null;
+      if (previewProjectionWindow && !previewProjectionWindow.isDestroyed())
+        previewProjectionWindow.webContents.send("projection:state", state);
+      if (floatingPreviewWindow && !floatingPreviewWindow.isDestroyed())
+        floatingPreviewWindow.webContents.send("projection:state", state);
+    });
+    ipcMain.handle("preview:window:get", () =>
+      Boolean(floatingPreviewWindow && !floatingPreviewWindow.isDestroyed()),
+    );
+    ipcMain.handle("preview:window:set", async (_event, open: boolean) => {
+      if (open) await openFloatingPreview();
+      else closeFloatingPreview();
+      return Boolean(floatingPreviewWindow && !floatingPreviewWindow.isDestroyed());
+    });
     ipcMain.handle("projection:clear-content", clearProjectionContent);
     ipcMain.handle("app:open-external", async (_event, value: unknown) => {
       if (typeof value !== "string") return false;
@@ -1767,6 +1925,9 @@ if (hasSingleInstanceLock)
     ipcMain.handle("projection:close", () => {
       projectionWindow?.close();
       thirdProjectionWindow?.close();
+      previewProjectionWindow?.close();
+      previewState = null;
+      setProjectionFrozen(false);
     });
     ipcMain.handle("projection:status", () => {
       const addresses = remoteServer?.isAvailable()
@@ -2085,6 +2246,15 @@ if (hasSingleInstanceLock)
         database.saveDisplaySettings(settings);
         mergeState({ outputViewport: projectionViewport(settings) });
         await synchronizeProjectionWindows(settings);
+        if (settings.previewEnabled && settings.previewDisplayId === null)
+          await openFloatingPreview();
+        else if (settings.previewDisplayId !== null)
+          closeFloatingPreview();
+        if (floatingPreviewWindow && !floatingPreviewWindow.isDestroyed()) {
+          const ratio = previewAspectRatio(settings);
+          floatingPreviewWindow.setAspectRatio(ratio);
+          floatingPreviewWindow.webContents.send("projection:display-settings", settings);
+        }
         // The operator preview uses the same display setting as the actual
         // projector. Notify it too, not only the projection windows.
         controlWindow?.webContents.send("projection:display-settings", settings);
@@ -2220,6 +2390,9 @@ if (hasSingleInstanceLock)
       shell.openPath(path),
     );
     await createControlWindow();
+    const savedDisplaySettings = database.getDisplaySettings();
+    if (savedDisplaySettings.previewEnabled && savedDisplaySettings.previewDisplayId === null)
+      await openFloatingPreview();
     // Existing MPG/AVI/MOV attachments are upgraded in the background so a
     // large meeting cannot delay the opening of the control window.
     void migrateMeetingVideosToMp4()

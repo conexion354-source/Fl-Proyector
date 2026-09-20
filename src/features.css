@@ -3442,10 +3442,10 @@
 .openverse-error {
   margin: 9px 0 12px;
   padding: 9px 11px;
-  border: 1px solid #7f3038;
+  border: 1px solid color-mix(in srgb, var(--fl-danger, #c42b1c) 42%, var(--fl-border, transparent));
   border-radius: 7px;
-  background: #3d1b20;
-  color: #ffadb4;
+  background: var(--fl-danger-soft, #fde7e9);
+  color: var(--fl-danger, #c42b1c);
   font-size: 10px;
 }
 .openverse-empty {

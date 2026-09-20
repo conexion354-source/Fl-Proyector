@@ -44,8 +44,10 @@ import {
   storedColumnWidth,
 } from "./components/ColumnResizer";
 import { useProjectionState } from "./hooks/useProjectionState";
+import { isEditableTarget, loadShortcuts, normalizeShortcut, type ShortcutAction } from "./keyboardShortcuts";
 import {
   initialDisplaySettings,
+  initialProjectionState,
   type DisplayInfo,
   type DisplaySettings,
   type LiveAudienceStatus,
@@ -99,6 +101,10 @@ export function App() {
   const [settingsPreview, setSettingsPreview] = useState<ReturnType<typeof useProjectionState>["state"] | null>(null);
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(initialDisplaySettings);
   const [displayPreviewSettings, setDisplayPreviewSettings] = useState<DisplaySettings | null>(null);
+  const [liveState, setLiveState] = useState(initialProjectionState);
+  const [projectionFrozen, setProjectionFrozen] = useState(false);
+  const [floatingPreviewOpen, setFloatingPreviewOpen] = useState(false);
+  const [previewPanelMode, setPreviewPanelMode] = useState<"live" | "prepare">("live");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [updateNoticeDismissed, setUpdateNoticeDismissed] = useState(false);
   const [openVersionSectionSignal, setOpenVersionSectionSignal] = useState(0);
@@ -142,6 +148,21 @@ export function App() {
   }, []);
   useEffect(() => {
     let active = true;
+    void window.flProyector.getLiveState().then((next) => active && setLiveState(next));
+    void window.flProyector.getProjectionFrozen().then((next) => active && setProjectionFrozen(next));
+    void window.flProyector.getFloatingPreviewOpen().then((next) => active && setFloatingPreviewOpen(next));
+    const stopLive = window.flProyector.onLiveState(setLiveState);
+    const stopFrozen = window.flProyector.onProjectionFreezeStatus(setProjectionFrozen);
+    const stopFloating = window.flProyector.onFloatingPreviewStatus(setFloatingPreviewOpen);
+    return () => {
+      active = false;
+      stopLive();
+      stopFrozen();
+      stopFloating();
+    };
+  }, []);
+  useEffect(() => {
+    let active = true;
     const receive = (next: UpdateStatus) => {
       if (!active) return;
       setUpdateStatus(next);
@@ -167,6 +188,50 @@ export function App() {
   useEffect(() => {
     if (updateStatus?.availableVersion) setUpdateNoticeDismissed(false);
   }, [updateStatus?.availableVersion]);
+  useEffect(() => {
+    const runShortcut = async (action: ShortcutAction) => {
+      if (["reuniones", "canciones", "fondos", "biblia", "remoto", "ajustes"].includes(action)) {
+        setTab(action as Tab);
+        return;
+      }
+      if (action === "proyector") {
+        if (!status.open) await window.flProyector.openProjection();
+        refreshStatus();
+        return;
+      }
+      if (action === "cerrarProyector") {
+        if (status.open) await window.flProyector.closeProjection();
+        refreshStatus();
+        return;
+      }
+      if (action === "logo") {
+        await update({ logo: !state.logo, blackout: false });
+        return;
+      }
+      if (action === "qr") {
+        await toggleLiveAudienceQr();
+        return;
+      }
+      if (action === "pantallaNegra") {
+        await update({ blackout: !state.blackout });
+        return;
+      }
+      await window.flProyector.clearProjectionContent();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || isEditableTarget(event.target)) return;
+      const pressed = normalizeShortcut(event).toLowerCase();
+      const action = (Object.entries(loadShortcuts()) as [ShortcutAction, string][])
+        .find(([, shortcut]) => shortcut.trim().toLowerCase() === pressed)?.[0];
+      if (!action) return;
+      event.preventDefault();
+      void runShortcut(action);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [state.blackout, state.logo, status.open, update]);
   useEffect(() => {
     localStorage.setItem("fl-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
   }, [sidebarCollapsed]);
@@ -448,6 +513,7 @@ export function App() {
             <MeetingBuilder
               state={state}
               update={update}
+              previewAspectRatio={previewAspectRatio}
               meetingId={meetingId}
               setMeetingId={setMeetingId}
               focusedItemId={focusedMeetingItemId}
@@ -496,8 +562,22 @@ export function App() {
           <div className="panel-heading">
             <div>
               <span className="live-dot" />
-              {isSettings ? "Vista previa de ajustes" : "Vista en vivo"}
+              {isSettings ? "Vista previa de ajustes" : previewPanelMode === "live" ? "Vista en vivo" : "Preparación"}
             </div>
+            {!isSettings && <div className="preview-panel-actions">
+              <div className="preview-mode-switch" aria-label="Elegir vista previa">
+                <button className={previewPanelMode === "live" ? "active" : ""} onClick={() => setPreviewPanelMode("live")}>En vivo</button>
+                <button className={previewPanelMode === "prepare" ? "active" : ""} onClick={() => setPreviewPanelMode("prepare")}>Preparar</button>
+              </div>
+              <button
+                className={floatingPreviewOpen ? "preview-float-button active" : "preview-float-button"}
+                aria-label={floatingPreviewOpen ? "Cerrar vista previa flotante" : "Abrir vista previa flotante"}
+                title={floatingPreviewOpen ? "Cerrar vista previa flotante" : "Abrir vista previa flotante y ajustable"}
+                onClick={async () => setFloatingPreviewOpen(await window.flProyector.setFloatingPreviewOpen(!floatingPreviewOpen))}
+              >
+                <MonitorUp />
+              </button>
+            </div>}
             <span>
               {activeDisplaySettings.aspectRatio === "auto"
                 ? `${previewDisplay?.width || 0}×${previewDisplay?.height || 0}`
@@ -508,7 +588,7 @@ export function App() {
           </div>
           <div className="preview-frame" style={{ aspectRatio: previewAspectRatio, backgroundColor: activeDisplaySettings.backgroundColor }}>
             <ProjectionStage
-              state={settingsPreview ?? state}
+              state={isSettings ? (settingsPreview ?? state) : previewPanelMode === "live" ? liveState : state}
               preview
               onVideoMetadata={isSettings ? undefined : handleVideoMetadata}
               onVideoTime={isSettings ? undefined : handleVideoTime}
@@ -517,7 +597,9 @@ export function App() {
                   update({ presentation: { slideCount: count } });
               }}
             />
-            {!isSettings && <div className="preview-label">En vivo</div>}
+            {!isSettings && <div className={`preview-label ${previewPanelMode === "prepare" ? "prepare" : ""}`}>
+              {previewPanelMode === "live" ? (projectionFrozen ? "En vivo · congelado" : "En vivo") : "Preparación"}
+            </div>}
           </div>
           {isSettings ? <p className="settings-preview-note">Esta vista sirve solo para diseñar. La proyección en vivo no cambia hasta que guardes y envíes contenido.</p> : <><LiveContentControls
             state={state}
@@ -528,7 +610,19 @@ export function App() {
           />
           <div className="master-controls">
             <span className="eyebrow">Controles maestros</span>
-            <div className="master-grid master-grid-four">
+            <div className="master-grid master-grid-five">
+              <button
+                className={projectionFrozen ? "active amber" : ""}
+                title="Mantiene intacta la salida mientras preparás otro contenido"
+                onClick={async () => {
+                  const frozen = await window.flProyector.setProjectionFrozen(!projectionFrozen);
+                  setProjectionFrozen(frozen);
+                  setPreviewPanelMode(frozen ? "prepare" : "live");
+                }}
+              >
+                {projectionFrozen ? <Play /> : <Pause />}
+                {projectionFrozen ? "Publicar" : "Congelar"}
+              </button>
               <button
                 className={state.blackout ? "active red" : ""}
                 onClick={() => update({ blackout: !state.blackout })}
