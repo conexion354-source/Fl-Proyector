@@ -212,6 +212,12 @@ export function App() {
         await toggleLiveAudienceQr();
         return;
       }
+      if (action === "congelar") {
+        const frozen = await window.flProyector.setProjectionFrozen(!projectionFrozen);
+        setProjectionFrozen(frozen);
+        setPreviewPanelMode(frozen ? "prepare" : "live");
+        return;
+      }
       if (action === "pantallaNegra") {
         await update({ blackout: !state.blackout });
         return;
@@ -231,7 +237,7 @@ export function App() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [state.blackout, state.logo, status.open, update]);
+  }, [projectionFrozen, state.blackout, state.logo, status.open, update]);
   useEffect(() => {
     localStorage.setItem("fl-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
   }, [sidebarCollapsed]);

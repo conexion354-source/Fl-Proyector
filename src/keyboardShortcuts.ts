@@ -9,6 +9,7 @@ export type ShortcutAction =
   | "cerrarProyector"
   | "logo"
   | "qr"
+  | "congelar"
   | "pantallaNegra"
   | "limpiar";
 
@@ -23,6 +24,7 @@ export const shortcutLabels: Record<ShortcutAction, string> = {
   cerrarProyector: "Cerrar segunda pantalla",
   logo: "Mostrar / ocultar logo",
   qr: "Mostrar / ocultar QR",
+  congelar: "Congelar / publicar pantalla",
   pantallaNegra: "Pantalla negra",
   limpiar: "Limpiar texto y contenido",
 };
@@ -38,6 +40,7 @@ export const defaultShortcuts: Record<ShortcutAction, string> = {
   cerrarProyector: "Alt+Shift+P",
   logo: "Alt+O",
   qr: "Alt+Q",
+  congelar: "Alt+F",
   pantallaNegra: "Alt+B",
   limpiar: "Alt+L",
 };
