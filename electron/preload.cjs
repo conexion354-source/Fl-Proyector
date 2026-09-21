@@ -50,6 +50,8 @@ contextBridge.exposeInMainWorld("flProyector", {
   chooseMeetingMedia: () => ipcRenderer.invoke("media:choose-for-meeting"),
   searchOpenverse: (query, orientation, page = 1) =>
     ipcRenderer.invoke("openverse:search", query, orientation, page),
+  loadRemoteImagePreview: (url) =>
+    ipcRenderer.invoke("openverse:preview", url),
   importOpenverseMedia: (item) => ipcRenderer.invoke("openverse:import", item),
   importDroppedFiles: (files) =>
     ipcRenderer.invoke(

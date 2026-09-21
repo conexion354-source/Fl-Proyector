@@ -153,7 +153,17 @@ html[data-theme="light"] .app-shell :is(.song-rich-editor,.announcement-editor) 
 }
 .rundown-list article > div { min-width:0; overflow:hidden; }
 .rundown-list article > div > :is(strong,span) { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.rundown-list article > button { min-width:70px; flex:0 0 auto; white-space:nowrap; }
+.rundown-list article > button {
+  min-width:72px;
+  width:max-content;
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  white-space:nowrap!important;
+  word-break:keep-all;
+  line-height:1;
+}
 .item-inspector { background:var(--fl-sidebar); }
 
 /* Settings */

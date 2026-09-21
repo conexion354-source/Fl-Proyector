@@ -214,6 +214,10 @@ export function SettingsPanel({
   const [songStyle, setSongStyle] = useState<SongDisplaySettings>(
     state.songStyle,
   );
+  const [songFontSizeInput, setSongFontSizeInput] = useState(String(state.songStyle.fontSize));
+  const [songTitleFontSizeInput, setSongTitleFontSizeInput] = useState(String(state.songStyle.titleFontSize));
+  const [bibleReferenceFontSizeInput, setBibleReferenceFontSizeInput] = useState(String(initialBibleDisplaySettings.referenceFontSize));
+  const [bibleTextFontSizeInput, setBibleTextFontSizeInput] = useState(String(initialBibleDisplaySettings.textFontSize));
   const [versions, setVersions] = useState<BibleVersion[]>([]);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [releaseHistory, setReleaseHistory] = useState<ReleaseHistoryEntry[]>([]);
@@ -228,12 +232,39 @@ export function SettingsPanel({
       setSettings(saved.aspectRatio === "custom" ? { ...saved, aspectRatio: "auto" } : saved),
     );
     window.flProyector.getChurchSettings().then(setChurch);
-    window.flProyector.getBibleDisplaySettings().then(setBible);
-    window.flProyector.getSongDisplaySettings().then(setSongStyle);
+    window.flProyector.getBibleDisplaySettings().then((value) => {
+      setBible(value);
+      setBibleReferenceFontSizeInput(String(value.referenceFontSize));
+      setBibleTextFontSizeInput(String(value.textFontSize));
+    });
+    window.flProyector.getSongDisplaySettings().then((value) => {
+      setSongStyle(value);
+      setSongFontSizeInput(String(value.fontSize));
+      setSongTitleFontSizeInput(String(value.titleFontSize));
+    });
     reloadVersions();
     window.flProyector.getUpdateStatus().then(setUpdateStatus);
     return window.flProyector.onUpdateStatus(setUpdateStatus);
   }, []);
+  useEffect(() => setSongFontSizeInput(String(songStyle.fontSize)), [songStyle.fontSize]);
+  useEffect(() => setSongTitleFontSizeInput(String(songStyle.titleFontSize)), [songStyle.titleFontSize]);
+  useEffect(() => setBibleReferenceFontSizeInput(String(bible.referenceFontSize)), [bible.referenceFontSize]);
+  useEffect(() => setBibleTextFontSizeInput(String(bible.textFontSize)), [bible.textFontSize]);
+  const commitSize = (
+    raw: string,
+    min: number,
+    max: number,
+    fallback: number,
+    apply: (value: number) => void,
+    setDraft: (value: string) => void,
+  ) => {
+    const parsed = Number(raw);
+    const value = Number.isFinite(parsed)
+      ? Math.max(min, Math.min(max, Math.round(parsed)))
+      : fallback;
+    setDraft(String(value));
+    apply(value);
+  };
   useEffect(() => {
     if (openVersionSectionSignal > 0) setSection("version");
   }, [openVersionSectionSignal]);
@@ -701,13 +732,24 @@ export function SettingsPanel({
                         type="number"
                         min="24"
                         max="200"
-                        value={songStyle.fontSize}
-                        onChange={(e) =>
-                          setSongStyle((value) => ({
-                            ...value,
-                            fontSize: Math.max(24, Math.min(200, Number(e.target.value) || 24)),
-                          }))
+                        value={songFontSizeInput}
+                        onChange={(e) => setSongFontSizeInput(e.target.value)}
+                        onBlur={() =>
+                          commitSize(
+                            songFontSizeInput,
+                            24,
+                            200,
+                            songStyle.fontSize,
+                            (fontSize) => setSongStyle((value) => ({ ...value, fontSize })),
+                            setSongFontSizeInput,
+                          )
                         }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.currentTarget.blur();
+                          }
+                        }}
                       />
                     </label>
                   </div>
@@ -781,16 +823,24 @@ export function SettingsPanel({
                           type="number"
                           min="14"
                           max="96"
-                          value={songStyle.titleFontSize}
-                          onChange={(e) =>
-                            setSongStyle((value) => ({
-                              ...value,
-                              titleFontSize: Math.max(
-                                14,
-                                Math.min(96, Number(e.target.value)),
-                              ),
-                            }))
+                          value={songTitleFontSizeInput}
+                          onChange={(e) => setSongTitleFontSizeInput(e.target.value)}
+                          onBlur={() =>
+                            commitSize(
+                              songTitleFontSizeInput,
+                              14,
+                              96,
+                              songStyle.titleFontSize,
+                              (titleFontSize) => setSongStyle((value) => ({ ...value, titleFontSize })),
+                              setSongTitleFontSizeInput,
+                            )
                           }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              e.currentTarget.blur();
+                            }
+                          }}
                         />
                       </label>
                       <label>
@@ -1273,13 +1323,24 @@ export function SettingsPanel({
                         type="number"
                         min="10"
                         max="120"
-                        value={bible.referenceFontSize}
-                        onChange={(e) =>
-                          setBible((v) => ({
-                            ...v,
-                            referenceFontSize: Number(e.target.value),
-                          }))
+                        value={bibleReferenceFontSizeInput}
+                        onChange={(e) => setBibleReferenceFontSizeInput(e.target.value)}
+                        onBlur={() =>
+                          commitSize(
+                            bibleReferenceFontSizeInput,
+                            10,
+                            120,
+                            bible.referenceFontSize,
+                            (referenceFontSize) => setBible((v) => ({ ...v, referenceFontSize })),
+                            setBibleReferenceFontSizeInput,
+                          )
                         }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.currentTarget.blur();
+                          }
+                        }}
                       />
                     </label>
                   </div>
@@ -1367,13 +1428,24 @@ export function SettingsPanel({
                         type="number"
                         min="24"
                         max="200"
-                        value={bible.textFontSize}
-                        onChange={(e) =>
-                          setBible((v) => ({
-                            ...v,
-                            textFontSize: Math.max(24, Math.min(200, Number(e.target.value) || 24)),
-                          }))
+                        value={bibleTextFontSizeInput}
+                        onChange={(e) => setBibleTextFontSizeInput(e.target.value)}
+                        onBlur={() =>
+                          commitSize(
+                            bibleTextFontSizeInput,
+                            24,
+                            200,
+                            bible.textFontSize,
+                            (textFontSize) => setBible((v) => ({ ...v, textFontSize })),
+                            setBibleTextFontSizeInput,
+                          )
                         }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.currentTarget.blur();
+                          }
+                        }}
                       />
                     </label>
                   </div>

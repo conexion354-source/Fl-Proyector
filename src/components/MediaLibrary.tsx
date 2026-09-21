@@ -56,6 +56,7 @@ export function MediaLibrary({ state, update }: Props) {
   const [openverseError, setOpenverseError] = useState("");
   const [importingOpenverseId, setImportingOpenverseId] = useState<string | null>(null);
   const [importedOpenverseIds, setImportedOpenverseIds] = useState<Set<string>>(new Set());
+  const [openversePreviewSources, setOpenversePreviewSources] = useState<Record<string, string>>({});
   const [pendingDelete, setPendingDelete] = useState<MediaItem | null>(null);
   const [editingTags, setEditingTags] = useState<MediaItem | null>(null);
   const [mediaNameDraft, setMediaNameDraft] = useState("");
@@ -66,6 +67,33 @@ export function MediaLibrary({ state, update }: Props) {
     reload();
     return window.flProyector.onMediaChanged(reload);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const entries = await Promise.all(
+        openverseResults.map(async (item) => {
+          try {
+            const source = await window.flProyector.loadRemoteImagePreview(item.previewUrl);
+            // Openverse's anonymous thumbnail proxy can occasionally answer
+            // 424 even though the original image is available. In that case
+            // use the original URL as a browser-safe fallback so the result
+            // is still previewable before downloading.
+            return [item.externalId, source || item.downloadUrl] as const;
+          } catch {
+            return [item.externalId, item.downloadUrl] as const;
+          }
+        }),
+      );
+      if (!active) return;
+      setOpenversePreviewSources((current) => ({
+        ...current,
+        ...Object.fromEntries(entries.filter(Boolean) as Array<readonly [string, string]>),
+      }));
+    };
+    if (openverseResults.length) void load();
+    return () => { active = false; };
+  }, [openverseResults]);
 
   const filtered = useMemo(
     () =>
@@ -442,7 +470,11 @@ export function MediaLibrary({ state, update }: Props) {
                     return (
                       <article key={item.externalId} className="openverse-card">
                         <div className="openverse-preview">
-                          <img src={item.previewUrl} alt="" />
+                          {openversePreviewSources[item.externalId] ? (
+                            <img src={openversePreviewSources[item.externalId]} alt="" />
+                          ) : (
+                            <div className="openverse-preview-loading"><LoaderCircle className="spin" /></div>
+                          )}
                           <span><ImageIcon /></span>
                         </div>
                         <div className="openverse-card-copy">

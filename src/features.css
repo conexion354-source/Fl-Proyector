@@ -3384,6 +3384,14 @@
   height: 100%;
   object-fit: cover;
 }
+.openverse-preview-loading {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--fl-accent, #0ea5e9);
+}
+.openverse-preview-loading svg { width: 24px; height: 24px; }
 .openverse-preview > span {
   position: absolute;
   top: 7px;

@@ -722,6 +722,13 @@ html[data-theme="light"] .sidebar .sidebar-toggle:hover {
   justify-content: space-between;
   gap: 4px;
 }
+.media-meta > div:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.media-meta .card-actions {
+  flex: 0 0 auto;
+}
 .media-meta strong,
 .media-meta span {
   max-width: 128px;

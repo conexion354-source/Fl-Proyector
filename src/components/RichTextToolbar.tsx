@@ -53,9 +53,9 @@ export function RichTextToolbar({
   const [open, setOpen] = useState<"text" | "highlight" | "shadow" | null>(
     null,
   );
-  const [sizeInput, setSizeInput] = useState(fontSize ?? 64);
+  const [sizeInput, setSizeInput] = useState(String(fontSize ?? 64));
   useEffect(() => {
-    if (fontSize !== undefined) setSizeInput(fontSize);
+    if (fontSize !== undefined) setSizeInput(String(fontSize));
   }, [fontSize]);
   const choose = (type: "text" | "highlight", color: string) => {
     if (type === "text") editor?.chain().focus().setColor(color).run();
@@ -74,6 +74,14 @@ export function RichTextToolbar({
       return;
     }
     onFontSize?.(next);
+  };
+  const commitFontSize = () => {
+    const parsed = Number(sizeInput);
+    const next = Number.isFinite(parsed)
+      ? Math.max(18, Math.min(140, Math.round(parsed)))
+      : fontSize ?? 64;
+    setSizeInput(String(next));
+    changeFontSize(next);
   };
   return (
     <div
@@ -108,13 +116,14 @@ export function RichTextToolbar({
             min="18"
             max="140"
             value={sizeInput}
-            onChange={(event) => {
-              const value = Math.max(
-                18,
-                Math.min(140, Number(event.target.value) || 18),
-              );
-              setSizeInput(value);
-              changeFontSize(value);
+            onChange={(event) => setSizeInput(event.target.value)}
+            onBlur={commitFontSize}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                commitFontSize();
+                event.currentTarget.blur();
+              }
             }}
           />
         </label>

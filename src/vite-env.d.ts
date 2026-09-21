@@ -66,6 +66,7 @@ declare global {
         orientation: "all" | "landscape" | "portrait" | "square",
         page?: number,
       ): Promise<OpenverseSearchResponse>;
+      loadRemoteImagePreview(url: string): Promise<string | null>;
       importOpenverseMedia(item: OpenverseMediaResult): Promise<MediaItem[]>;
       importDroppedFiles(files: File[]): Promise<MediaItem[]>;
       setFavorite(id: number, slot: number | null): Promise<void>;

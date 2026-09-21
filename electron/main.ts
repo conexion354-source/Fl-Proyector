@@ -1625,6 +1625,45 @@ async function searchOpenverse(
   return value;
 }
 
+const openversePreviewCache = new Map<string, { expiresAt: number; value: string }>();
+
+async function loadOpenversePreview(url: string): Promise<string | null> {
+  let remote: URL;
+  try {
+    remote = new URL(String(url));
+  } catch {
+    return null;
+  }
+  const hostname = remote.hostname.toLowerCase();
+  const allowedHost =
+    remote.protocol === "https:" &&
+    (hostname === "openverse.org" || hostname.endsWith(".openverse.org") ||
+      hostname === "upload.wikimedia.org" || hostname.endsWith(".wikimedia.org") ||
+      hostname.endsWith(".staticflickr.com"));
+  if (!allowedHost) return null;
+  const cacheKey = remote.toString();
+  const cached = openversePreviewCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const response = await net.fetch(cacheKey, {
+    method: "GET",
+    headers: {
+      Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+      Referer: "https://openverse.org/",
+      "User-Agent": "FL-Proyector/1.0",
+    },
+  });
+  if (!response.ok || !response.body) return null;
+  const contentType = (response.headers.get("content-type") || "").split(";", 1)[0].toLowerCase();
+  if (!contentType.startsWith("image/")) return null;
+  const length = Number(response.headers.get("content-length") || 0);
+  if (length > 8 * 1024 * 1024) return null;
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length > 8 * 1024 * 1024) return null;
+  const value = `data:${contentType};base64,${bytes.toString("base64")}`;
+  openversePreviewCache.set(cacheKey, { expiresAt: Date.now() + 30 * 60_000, value });
+  return value;
+}
+
 async function importOpenverseMedia(candidate: OpenverseMediaResult) {
   const cached = openverseResultCache.get(String(candidate.externalId || ""));
   if (!cached || cached.expiresAt <= Date.now())
@@ -2024,6 +2063,9 @@ if (hasSingleInstanceLock)
         page = 1,
       ) => searchOpenverse(query, orientation, page),
     );
+    ipcMain.handle("openverse:preview", (_event, url: string) =>
+      loadOpenversePreview(url),
+    );
     ipcMain.handle(
       "openverse:import",
       (_event, item: OpenverseMediaResult) => importOpenverseMedia(item),
@@ -2122,7 +2164,15 @@ if (hasSingleInstanceLock)
     ipcMain.handle("media:delete", async (_event, id: number) => {
       const path = database.getMediaPath(id);
       if (!path) return false;
-      await shell.trashItem(path);
+      try {
+        await shell.trashItem(path);
+      } catch {
+        // Windows can reject shell.trashItem for files just downloaded by the
+        // app. This exact file is inside the managed media directory, so it
+        // is safe to remove it as a fallback.
+        if (path.startsWith(mediaDir)) await rm(path, { force: true });
+        else throw new Error("No se pudo enviar el fondo a la papelera.");
+      }
       await syncMedia();
       controlWindow?.webContents.send("media:changed");
       return true;
