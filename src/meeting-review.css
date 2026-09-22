@@ -182,7 +182,18 @@
 .stanza-toolbar svg {
   width: 14px;
 }
+.stanza-density-controls {
+  display: flex;
+  gap: 3px;
+  padding-left: 3px;
+  border-left: 1px solid #303642;
+}
+.stanza-density-controls button {
+  width: 24px;
+  height: 24px;
+}
 .stanza-list {
+  --stanza-card-scale: 1;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -193,11 +204,17 @@
 }
 .stanza-list > button {
   --song-section-color: #3b82f6;
+  /* A vertical flex list shrinks children by default when there are many
+     sections. That made the card border shorter than its lyrics, so lines
+     visually spilled into the next stanza. Cards must keep their content
+     height and let this list be the only scrollable area. */
+  flex: 0 0 auto;
   border: 1px solid color-mix(in srgb, var(--song-section-color) 38%, var(--fl-border, #282e38));
   border-left: 4px solid var(--song-section-color);
   background: color-mix(in srgb, var(--song-section-color) 9%, var(--fl-surface, #11141a));
   border-radius: 8px;
-  padding: 11px;
+  padding: calc(11px * var(--stanza-card-scale));
+  min-height: calc(52px * var(--stanza-card-scale));
   text-align: left;
   color: var(--fl-muted, #aeb5c1);
   cursor: pointer;
@@ -206,9 +223,23 @@
   border-color: var(--song-section-color);
 }
 .stanza-list > button.active {
-  border-color: var(--song-section-color);
-  background: color-mix(in srgb, var(--song-section-color) 19%, var(--fl-surface, #11141a));
-  box-shadow: inset 3px 0 var(--song-section-color);
+  border-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 16%, var(--fl-surface, #11141a));
+  box-shadow: inset 3px 0 #ef4444;
+  color: #fca5a5;
+}
+.stanza-list > button[data-section-type="chorus"] {
+  /* The chorus is usually repeated. A full, stable fill makes it instantly
+     recognizable in the on-air column instead of relying on a thin accent. */
+  background: #166534;
+  border-color: #4ade80;
+  color: #ecfdf5;
+}
+.stanza-list > button[data-section-type="chorus"]:hover,
+.stanza-list > button[data-section-type="chorus"].active {
+  background: #15803d;
+  border-color: #86efac;
+  box-shadow: inset 3px 0 #bbf7d0;
 }
 .stanza-list > button[data-section-type="chorus"] { --song-section-color: #22c55e; }
 .stanza-list > button[data-section-type="prechorus"] { --song-section-color: #a855f7; }
@@ -217,6 +248,12 @@
 .stanza-list > button[data-section-type="interlude"] { --song-section-color: #14b8a6; }
 .stanza-list > button[data-section-type="ending"] { --song-section-color: #ef4444; }
 .stanza-list > button[data-section-type="other"] { --song-section-color: #64748b; }
+.stanza-list > button.active[data-section-type] {
+  background: color-mix(in srgb, #ef4444 16%, var(--fl-surface, #11141a));
+  border-color: #ef4444;
+  box-shadow: inset 3px 0 #ef4444;
+  color: #fca5a5;
+}
 .stanza-list > button > b {
   display: block;
   color: #827aff;
@@ -224,10 +261,33 @@
   letter-spacing: 0.1em;
   margin-bottom: 6px;
 }
+.stanza-list > button.active > b,
+.stanza-list > button.active p,
+.stanza-list > button.active div {
+  color: #f87171;
+}
 .stanza-list > button p {
   font-size: 11px;
   line-height: 1.45;
   margin: 0.25em 0;
+}
+.stanza-list.is-compact {
+  gap: 3px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.stanza-list.is-compact > button {
+  padding: max(3px, calc(8px * var(--stanza-card-scale)));
+  min-height: 0;
+}
+.stanza-list.is-compact > button > b {
+  margin-bottom: 2px;
+  font-size: clamp(7px, calc(8px * var(--stanza-card-scale)), 8px);
+}
+.stanza-list.is-compact > button div p {
+  margin: 0.08em 0;
+  font-size: clamp(8px, calc(11px * var(--stanza-card-scale)), 11px);
+  line-height: 1.25;
 }
 .stanza-list + .summary-edit {
   margin-top: 9px;
@@ -452,9 +512,9 @@ html[data-theme="light"] .announcement-editor .tiptap {
   color: #1f2937 !important;
   caret-color: #1f2937 !important;
 }
-.announcement-editor .tiptap :not([style*="color"]) {
-  color: inherit;
-}
+/* Do not set a color on every unstyled descendant here. For example, a
+   <strong> inside a colored TextStyle span must inherit that span's color;
+   forcing it to inherit from .tiptap made bold text revert to white. */
 .announcement-editor .tiptap * {
   user-select: text !important;
   -webkit-user-select: text !important;
@@ -989,8 +1049,8 @@ html[data-theme="light"] .announcement-editor .tiptap {
   max-width: 46px !important;
   height: 28px !important;
   padding: 0 2px !important;
-  border: 1px solid #313743 !important;
-  border-radius: 3px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
   background: transparent !important;
   text-align: center;
   color: #fff;

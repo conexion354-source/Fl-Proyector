@@ -130,6 +130,7 @@ declare global {
         url: string;
         name: string;
         previewSlides?: string[];
+        nativeOnly?: boolean;
       } | null>;
       readPresentation(path: string): Promise<Uint8Array>;
       openPresentation(path: string): Promise<string>;

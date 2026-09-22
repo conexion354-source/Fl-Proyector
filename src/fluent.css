@@ -1472,7 +1472,7 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
 .app-shell :is(
   .meeting-dialog,.song-create-dialog,.item-edit-dialog,.library-picker,
   .bible-picker,.reference-design-dialog,.overlay-settings-dialog
-) :is(h2,h3,strong) { color:var(--fl-text)!important; }
+) :is(h2,h3) { color:var(--fl-text)!important; }
 .app-shell :is(
   .meeting-dialog,.song-create-dialog,.item-edit-dialog,.library-picker,
   .bible-picker,.reference-design-dialog,.overlay-settings-dialog
@@ -1717,7 +1717,11 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   border:1px solid var(--fl-border);
   border-radius:12px;
   color:var(--fl-text);
-  background:var(--fl-panel);
+  /* --fl-panel is not part of the Fluent theme tokens. An unresolved custom
+     property makes the whole declaration invalid, leaving this dialog see-
+     through. Use the solid surface token deliberately. */
+  background:var(--fl-surface)!important;
+  opacity:1;
   box-shadow:0 28px 90px rgba(0,0,0,.48);
 }
 .live-audience-dialog > header {
@@ -1730,7 +1734,7 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   gap:16px;
   padding:16px 18px;
   border-bottom:1px solid var(--fl-border);
-  background:var(--fl-panel);
+  background:var(--fl-surface)!important;
 }
 .live-audience-dialog-title { display:flex; align-items:center; gap:12px; }
 .live-audience-dialog-title h2 { margin:2px 0 0; font-size:20px; }
@@ -1836,7 +1840,7 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   .meeting-dialog,.song-create-dialog,.item-edit-dialog,.library-picker,
   .bible-picker,.reference-design-dialog,.background-assignment-dialog,
   .overlay-settings-dialog,.confirm-delete-dialog
-) :is(h1,h2,h3,h4,strong) { color:var(--fl-text)!important; }
+) :is(h1,h2,h3,h4) { color:var(--fl-text)!important; }
 .app-shell :is(
   .meeting-dialog,.song-create-dialog,.item-edit-dialog,.library-picker,
   .bible-picker,.reference-design-dialog,.background-assignment-dialog,
@@ -1872,6 +1876,8 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   border-bottom: 1px solid var(--fl-border);
 }
 .shortcut-setting-row input { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.shortcut-setting-row input:disabled { opacity: .72; cursor: not-allowed; }
+.shortcut-error { margin: 14px 0 0; padding: 10px 12px; border: 1px solid #c84b57; border-radius: 10px; color: #ffd5da; background: #4a2028; font-size: 13px; }
 .bible-size-guidance.compact { padding: 8px 12px; margin: 10px 0; }
 .bible-size-guidance.compact strong { font-size: 13px; }
 .bible-size-guidance.compact span { display: inline; margin-left: 8px; font-size: 12px; }
@@ -1960,8 +1966,8 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
 }
 .app-shell .announcement-toolbar .toolbar-size input {
   color:var(--fl-text)!important;
-  border-color:var(--fl-border)!important;
-  background:var(--fl-surface-alt)!important;
+  border:0!important;
+  background:transparent!important;
 }
 .app-shell .toolbar-divider { background:var(--fl-border)!important; }
 .app-shell :is(.design-fields,.background-choice,.bible-picker-controls) :is(select,input) {
@@ -2498,6 +2504,23 @@ html:not([data-theme="light"]) .app-shell :is(.announcement-editor,.rich-editor,
   --fl-control-height: 32px;
   --fl-row-height: 40px;
   --fl-radius: 4px;
+}
+.app-shell .song-list > button:not(.new-song) {
+  min-height: 44px;
+  padding: 6px 10px;
+  line-height: 1.2;
+}
+.app-shell .song-list > button:not(.new-song) strong {
+  line-height: 1.2;
+}
+.app-shell .song-list > button:not(.new-song) span {
+  margin-top: 2px;
+  line-height: 1.15;
+}
+.app-shell .song-list .new-song {
+  min-height: 38px;
+  margin-bottom: 6px;
+  padding: 7px 10px;
 }
 .app-shell :is(input:not([type="checkbox"]):not([type="range"]), select) {
   min-height: var(--fl-control-height);

@@ -1,14 +1,24 @@
 plugins { id 'com.android.application' }
 
+dependencies {
+    // Uses Google Play services' isolated scanner UI, so the remote does not
+    // need direct camera permission or a camera preview of its own.
+    implementation 'com.google.android.gms:play-services-code-scanner:16.1.0'
+}
+
 android {
     namespace 'com.flproyector.remoto'
     compileSdk 35
+
+    buildFeatures {
+        buildConfig true
+    }
 
     defaultConfig {
         applicationId 'com.flproyector.remoto'
         minSdk 23
         targetSdk 35
-        versionCode 7
-        versionName '10.11.16'
+        versionCode 13
+        versionName '10.11.30'
     }
 }

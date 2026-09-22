@@ -11,12 +11,14 @@ import {
   ChevronDown,
   ChevronUp,
   Edit3,
+  ExternalLink,
   GripVertical,
   Image,
   ListPlus,
   Megaphone,
   MonitorPlay,
   Music2,
+  Minus,
   Palette,
   Play,
   Plus,
@@ -260,6 +262,9 @@ export function MeetingBuilder({
   const [picker, setPicker] = useState<"song" | "media" | "bible" | null>(null);
   const [pickerSearch, setPickerSearch] = useState("");
   const [activeStanza, setActiveStanza] = useState(0);
+  // This only changes the density of the operator cards. It deliberately does
+  // not affect the text sent to the projector.
+  const [stanzaCardScale, setStanzaCardScale] = useState(1);
   const [onAirItemId, setOnAirItemId] = useState<number | null>(null);
   const [stanzaContextMenu, setStanzaContextMenu] = useState<{
     index: number;
@@ -903,6 +908,7 @@ export function MeetingBuilder({
         kind: "canto",
         sourceSongId: song.id,
         sourceSectionIndex: safeIndex,
+        sourceSongStanzas: stanzas,
         visible: true,
         position: theme.position,
         fontSize: theme.fontSize,
@@ -980,6 +986,13 @@ export function MeetingBuilder({
 
   const firePresentation = (item: MeetingItem, requestedIndex = 0) => {
     const payload = item.payload as any;
+    if (payload.nativeOnly) {
+      // Legacy binary files keep their animations, timings and embedded media
+      // only when their native presentation app renders them.
+      void window.flProyector.openPresentation(String(payload.path || ""));
+      setOnAirItemId(item.id);
+      return;
+    }
     const slideCount =
       state.presentation.path === String(payload.path)
         ? state.presentation.slideCount
@@ -1211,7 +1224,7 @@ export function MeetingBuilder({
     if (item.type === "song") {
       const song = songs.find((value) => value.id === Number(payload.songId));
       const stanza = song ? splitSongStanzas(song.content)[0] || song.content : "<p>Vista previa de canción</p>";
-      next.text = { ...state.text, html: stanza, kind: "canto", visible: true, title: state.songStyle.showTitle ? song?.title || item.title : "", fontSize: state.songStyle.fontSize, fontFamily: state.songStyle.fontFamily, color: state.songStyle.textColor, backgroundColor: state.songStyle.backgroundColor, position: state.songStyle.position, align: state.songStyle.align, borderRadius: state.songStyle.borderRadius, template: state.songStyle.template, titlePosition: state.songStyle.titlePosition, titleColor: state.songStyle.titleColor, titleBackground: state.songStyle.titleBackground, titleFontSize: state.songStyle.titleFontSize, titleStyle: state.songStyle.titleStyle };
+      next.text = { ...state.text, html: stanza, kind: "canto", visible: true, sourceSongStanzas: song ? splitSongStanzas(song.content) : null, title: state.songStyle.showTitle ? song?.title || item.title : "", fontSize: state.songStyle.fontSize, fontFamily: state.songStyle.fontFamily, color: state.songStyle.textColor, backgroundColor: state.songStyle.backgroundColor, position: state.songStyle.position, align: state.songStyle.align, borderRadius: state.songStyle.borderRadius, template: state.songStyle.template, titlePosition: state.songStyle.titlePosition, titleColor: state.songStyle.titleColor, titleBackground: state.songStyle.titleBackground, titleFontSize: state.songStyle.titleFontSize, titleStyle: state.songStyle.titleStyle };
     } else if (item.type === "announcement") {
       const pages = announcementPages(payload);
       next.text = { ...state.text, html: pages[Number(payload.announcementPage || 0)] || pages[0], kind: "anuncio", visible: true, position: payload.position || "center", fontSize: Number(payload.fontSize || 64), color: payload.color || "#ffffff", backgroundColor: payload.backgroundColor || "rgba(0,0,0,.55)", align: payload.align || "center", borderRadius: Number(payload.borderRadius || 0), template: payload.template || "plain", animation: payload.animation || "fade", shadowEnabled: payload.shadowEnabled !== false, shadowColor: payload.shadowColor || "#000000", shadowBlur: Number(payload.shadowBlur ?? 14) };
@@ -1532,6 +1545,8 @@ export function MeetingBuilder({
             projection={state}
             activeStanza={activeStanza}
             isOnAir={isItemOnAir(selected)}
+            stanzaCardScale={stanzaCardScale}
+            onStanzaCardScaleChange={setStanzaCardScale}
             onStanza={(index) =>
               selected.type === "bible"
                 ? fireBibleSection(selected, index)
@@ -2025,6 +2040,8 @@ function ItemSummary({
   projection,
   activeStanza,
   isOnAir,
+  stanzaCardScale,
+  onStanzaCardScaleChange,
   onStanza,
   onStanzaContextMenu,
   onEdit,
@@ -2035,6 +2052,8 @@ function ItemSummary({
   projection: ProjectionState;
   activeStanza: number;
   isOnAir: boolean;
+  stanzaCardScale: number;
+  onStanzaCardScaleChange: (value: number) => void;
   onStanza: (index: number) => void;
   onStanzaContextMenu: (index: number, x: number, y: number) => void;
   onEdit: () => void;
@@ -2076,6 +2095,34 @@ function ItemSummary({
               {activeStanza + 1} de {stanzas.length || 1}
             </span>
             <small>↑ ↓ para cambiar</small>
+            <div className="stanza-density-controls" aria-label="Tamaño de las estrofas en la lista">
+              <button
+                type="button"
+                title="Achicar estrofas en la lista"
+                aria-label="Achicar estrofas en la lista"
+                disabled={stanzaCardScale <= 0.38}
+                onClick={() =>
+                  onStanzaCardScaleChange(
+                    Math.max(0.38, Number((stanzaCardScale - 0.14).toFixed(2))),
+                  )
+                }
+              >
+                <Minus />
+              </button>
+              <button
+                type="button"
+                title="Agrandar estrofas en la lista"
+                aria-label="Agrandar estrofas en la lista"
+                disabled={stanzaCardScale >= 1.42}
+                onClick={() =>
+                  onStanzaCardScaleChange(
+                    Math.min(1.42, Number((stanzaCardScale + 0.14).toFixed(2))),
+                  )
+                }
+              >
+                <Plus />
+              </button>
+            </div>
             <button
               disabled={activeStanza === 0}
               onClick={() => onStanza(activeStanza - 1)}
@@ -2089,7 +2136,10 @@ function ItemSummary({
               <ChevronDown />
             </button>
           </div>
-          <div className="stanza-list">
+          <div
+            className={`stanza-list ${stanzaCardScale <= 0.66 ? "is-compact" : ""} ${stanzaCardScale <= 0.52 ? "is-ultra-compact" : ""}`}
+            style={{ "--stanza-card-scale": stanzaCardScale } as CSSProperties}
+          >
             {(stanzas.length ? stanzas : [song.content]).map(
               (stanza, index) => (
                 <button
@@ -2209,7 +2259,20 @@ function PresentationSummary({
           </span>
         </div>
       </div>
-      <small>Los controles están debajo de Vista en vivo.</small>
+      <button
+        type="button"
+        className="native-presentation-open"
+        onClick={() => void window.flProyector.openPresentation(String(payload.path || ""))}
+      >
+        <ExternalLink /> Abrir con PowerPoint del sistema
+      </button>
+      {payload.nativeOnly ? (
+        <>
+          <small>El modo nativo conserva efectos, transiciones y audio originales.</small>
+        </>
+      ) : (
+        <small>El visor integrado muestra diapositivas; el modo nativo conserva efectos y transiciones.</small>
+      )}
     </div>
   );
 }
@@ -2594,7 +2657,14 @@ function ItemEditor({
           />
         )}
         {item.type === "presentation" && (
-          <div className="file-path">{String(p.path || "")}</div>
+          <>
+            <div className="file-path">{String(p.path || "")}</div>
+            {p.nativeOnly && (
+              <p className="native-presentation-note">
+                Se abrirá con PowerPoint del sistema para conservar sus efectos.
+              </p>
+            )}
+          </>
         )}
         <div className="inspector-actions">
           {!isDraft && (
@@ -2893,7 +2963,9 @@ function RichSongEditor({
           al proyectar.
         </span>
         <button
+          type="button"
           onClick={() => editor?.chain().focus().insertContent("<p></p>").run()}
+          title="Crear una nueva estrofa"
         >
           <Plus />
           Separar estrofa

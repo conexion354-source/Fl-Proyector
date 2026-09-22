@@ -178,6 +178,10 @@ export type SongDisplaySettings = {
   fontSize: number;
   minimumFontSize: number;
   autoFit: boolean;
+  /** Keeps one visual scale for every section of the song currently on air. */
+  stableFontSize: boolean;
+  horizontalMargin: number;
+  verticalMargin: number;
   textColor: string;
   backgroundColor: string;
   position: "top" | "center" | "bottom" | "lower";
@@ -255,6 +259,9 @@ export const initialSongDisplaySettings: SongDisplaySettings = {
   fontSize: 64,
   minimumFontSize: 32,
   autoFit: true,
+  stableFontSize: true,
+  horizontalMargin: 8,
+  verticalMargin: 10,
   textColor: "#ffffff",
   backgroundColor: "rgba(0,0,0,0)",
   position: "center",
@@ -327,6 +334,8 @@ export type ProjectionState = {
     /** Song and section currently feeding the projection, when applicable. */
     sourceSongId?: number | null;
     sourceSectionIndex?: number | null;
+    /** Complete song sections used to establish a stable on-air type scale. */
+    sourceSongStanzas?: string[] | null;
     /** Last Bible verse feeding the projection, retained for settings previews. */
     sourceBibleText?: string | null;
     sourceBibleReference?: string | null;
@@ -380,6 +389,7 @@ export const initialProjectionState: ProjectionState = {
     kind: "biblia",
     sourceSongId: null,
     sourceSectionIndex: null,
+    sourceSongStanzas: null,
     sourceBibleText: null,
     sourceBibleReference: null,
     sourceBibleVersion: null,

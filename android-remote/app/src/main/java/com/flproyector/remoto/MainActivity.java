@@ -2,8 +2,13 @@ package com.flproyector.remoto;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Intent;
 import android.graphics.Color;
+import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -20,6 +25,13 @@ import android.widget.ProgressBar;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanner;
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions;
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning;
+import com.google.mlkit.vision.barcode.common.Barcode;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -38,6 +50,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import org.json.JSONObject;
+
 public class MainActivity extends Activity {
     private static final String PREFS = "fl-remoto";
     private static final String SERVER_URL = "server-url";
@@ -47,12 +61,47 @@ public class MainActivity extends Activity {
     private final ExecutorService connectionWorker = Executors.newSingleThreadExecutor();
     private volatile ExecutorService scanPool;
     private volatile int connectionAttempt = 0;
+    private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback networkCallback;
+    private boolean updateNoticeShown = false;
+
+    private void scanProjectorQr() {
+        GmsBarcodeScannerOptions options = new GmsBarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+            .enableAutoZoom()
+            .build();
+        GmsBarcodeScanner scanner = GmsBarcodeScanning.getClient(this, options);
+        scanner.startScan()
+            .addOnSuccessListener(barcode -> {
+                String url = normalize(barcode.getRawValue());
+                if (url != null) connectAutomatically(url);
+                else showInvalidQr();
+            })
+            .addOnFailureListener(error -> showScannerUnavailable());
+    }
+
+    private void showInvalidQr() {
+        new AlertDialog.Builder(this)
+            .setTitle("Código QR no válido")
+            .setMessage("Escaneá el código que aparece en Control remoto de FL Proyector.")
+            .setPositiveButton("Aceptar", null)
+            .show();
+    }
+
+    private void showScannerUnavailable() {
+        new AlertDialog.Builder(this)
+            .setTitle("No se pudo abrir la cámara")
+            .setMessage("Probá nuevamente o ingresá la dirección del proyector de forma manual.")
+            .setPositiveButton("Aceptar", null)
+            .show();
+    }
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         String link = serverFromIntent(getIntent());
         if (link == null)
             link = getSharedPreferences(PREFS, MODE_PRIVATE).getString(SERVER_URL, null);
+        watchNetworkChanges();
         connectAutomatically(link);
     }
 
@@ -119,6 +168,23 @@ public class MainActivity extends Activity {
         });
     }
 
+    // The APK stays entirely local. When Android reports a new Wi-Fi/mobile
+    // network, first probe the remembered PC and then scan that new subnet.
+    private void watchNetworkChanges() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return;
+        connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        if (connectivityManager == null) return;
+        networkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override public void onAvailable(Network network) {
+                if (isFinishing() || isDestroyed()) return;
+                connectAutomatically(activeUrl);
+            }
+        };
+        try {
+            connectivityManager.registerDefaultNetworkCallback(networkCallback);
+        } catch (Exception ignored) { }
+    }
+
     private boolean probe(String baseUrl) {
         if (baseUrl == null) return false;
         HttpURLConnection connection = null;
@@ -171,6 +237,55 @@ public class MainActivity extends Activity {
         return null;
     }
 
+    private boolean isNewerVersion(String available, String installed) {
+        String[] remote = available.replaceAll("[^0-9.]", "").split("\\.");
+        String[] local = installed.replaceAll("[^0-9.]", "").split("\\.");
+        for (int i = 0; i < Math.max(remote.length, local.length); i++) {
+            int remotePart = i < remote.length && !remote[i].isEmpty() ? Integer.parseInt(remote[i]) : 0;
+            int localPart = i < local.length && !local[i].isEmpty() ? Integer.parseInt(local[i]) : 0;
+            if (remotePart != localPart) return remotePart > localPart;
+        }
+        return false;
+    }
+
+    private void checkRemoteUpdate(String baseUrl) {
+        connectionWorker.execute(() -> {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(baseUrl + "/api/remote/app-version").openConnection();
+                connection.setConnectTimeout(900);
+                connection.setReadTimeout(900);
+                connection.setUseCaches(false);
+                if (connection.getResponseCode() != 200) return;
+                BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                StringBuilder body = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) body.append(line);
+                reader.close();
+                JSONObject response = new JSONObject(body.toString());
+                String available = response.optString("androidVersion");
+                String apkPath = response.optString("apkPath", "/downloads/FL-Remoto.apk");
+                if (available.isEmpty() || !isNewerVersion(available, BuildConfig.VERSION_NAME) || updateNoticeShown) return;
+                updateNoticeShown = true;
+                runOnUiThread(() -> new AlertDialog.Builder(this)
+                    .setTitle("Actualización disponible")
+                    .setMessage("Hay una nueva versión de FL Proyector Remoto (" + available + "). Se descarga directamente desde la PC, sin Internet.")
+                    .setNegativeButton("Más tarde", null)
+                    .setPositiveButton("Descargar", (dialog, which) -> {
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(baseUrl + apkPath)));
+                        } catch (Exception ignored) { }
+                    })
+                    .show());
+            } catch (Exception ignored) {
+                // No Internet is required. If the PC is not reachable, simply
+                // wait until the next local connection rather than showing an error.
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        });
+    }
+
     private Set<String> localIpv4Prefixes() {
         Set<String> prefixes = new HashSet<>();
         try {
@@ -203,6 +318,11 @@ public class MainActivity extends Activity {
         webView = null;
     }
 
+    private void revealRemote(WebView view) {
+        if (view == webView && connectionOverlay != null)
+            connectionOverlay.setVisibility(View.GONE);
+    }
+
     @SuppressLint("SetJavaScriptEnabled") private void openProjector(String url) {
         activeUrl = url;
         destroyWebView();
@@ -226,7 +346,14 @@ public class MainActivity extends Activity {
         webView.getSettings().setDisplayZoomControls(false);
         webView.clearCache(false);
         webView.getSettings().setUserAgentString(webView.getSettings().getUserAgentString() + " FlRemotoNative/10.11");
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override public void onProgressChanged(WebView view, int progress) {
+                // Some Android WebView versions delay onPageFinished while
+                // the remote page establishes its local socket connection.
+                // The page is usable as soon as its first content is visible.
+                if (progress >= 80) revealRemote(view);
+            }
+        });
         webView.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri requested = request.getUrl();
@@ -242,7 +369,11 @@ public class MainActivity extends Activity {
             @Override public void onPageFinished(WebView view, String pageUrl) {
                 if (view != webView) return;
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(SERVER_URL, activeUrl).apply();
-                if (connectionOverlay != null) connectionOverlay.setVisibility(View.GONE);
+                revealRemote(view);
+                checkRemoteUpdate(activeUrl);
+            }
+            @Override public void onPageCommitVisible(WebView view, String pageUrl) {
+                revealRemote(view);
             }
         });
         FrameLayout shell = new FrameLayout(this);
@@ -326,7 +457,7 @@ public class MainActivity extends Activity {
         title.setTextSize(28);
         title.setTypeface(null, 1);
         TextView help = new TextView(this);
-        help.setText("La búsqueda automática no encontró la PC. Podés escanear el QR o escribir la dirección local. No necesita Internet; solo la misma red Wi‑Fi.");
+        help.setText("La búsqueda automática no encontró la PC. Escaneá el QR del sistema o escribí la dirección local. No necesita Internet; solo la misma red Wi-Fi.");
         help.setTextColor(Color.rgb(190, 198, 218));
         help.setTextSize(16);
         help.setPadding(0, 22, 0, 28);
@@ -341,8 +472,12 @@ public class MainActivity extends Activity {
             String url = normalize(address.getText().toString());
             if (url != null) openProjector(url); else address.setError("Ingresá una dirección válida");
         });
+        Button scan = new Button(this);
+        scan.setText("ESCANEAR CÓDIGO QR");
+        scan.setOnClickListener(v -> scanProjectorQr());
         root.addView(title);
         root.addView(help);
+        root.addView(scan, new LinearLayout.LayoutParams(-1, -2));
         root.addView(address, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-1, -2);
         buttonParams.topMargin = 22;
@@ -369,6 +504,9 @@ public class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         connectionAttempt++;
+        if (connectivityManager != null && networkCallback != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try { connectivityManager.unregisterNetworkCallback(networkCallback); } catch (Exception ignored) { }
+        }
         connectionWorker.shutdownNow();
         if (scanPool != null) scanPool.shutdownNow();
         destroyWebView();

@@ -15,6 +15,9 @@ import type { ProjectionState } from "../../shared/types";
 type Props = {
   state: ProjectionState;
   preview?: boolean;
+  /** Song-design preview shows the requested size directly while live previews
+   * keep the exact safety fitting used by the physical projector. */
+  designPreview?: boolean;
   onPresentationSlideCount?: (count: number) => void;
   onVideoMetadata?: (duration: number) => void;
   onVideoTime?: (time: number) => void;
@@ -55,6 +58,7 @@ const BIBLE_REFERENCE_GAP_SCALE = 0.55;
 export function ProjectionStage({
   state,
   preview = false,
+  designPreview = false,
   onPresentationSlideCount,
   onVideoMetadata,
   onVideoTime,
@@ -70,10 +74,10 @@ export function ProjectionStage({
   const [currentUrl, setCurrentUrl] = useState<string | null>(
     state.background.url,
   );
+  // A video is content, not a decorative crop: preserve every frame whatever
+  // its source aspect ratio.
   const requestedMediaFit =
-    state.background.kind === "video" && !state.video.loop
-      ? "contain"
-      : "cover";
+    state.background.kind === "video" ? "contain" : "cover";
   const [previousMediaFit, setPreviousMediaFit] = useState<
     "cover" | "contain"
   >("cover");
@@ -111,15 +115,23 @@ export function ProjectionStage({
 
   useEffect(() => {
     const element = textRef.current;
+    // Lyrics and Bible passages need measured safe-area fitting. Announcements
+    // instead use their own chosen panel geometry (center, top, lower third,
+    // etc.), so fitting them here would overwrite that geometry.
     const isProjectableText =
-      state.text.kind === "biblia" || state.text.kind === "canto";
+      state.text.visible &&
+      (state.text.kind === "biblia" || state.text.kind === "canto");
     if (!element || !isProjectableText) {
       setFitTextSize(state.text.fontSize);
       return;
     }
     const measure = () => {
       const host = element.parentElement;
-      const scale = preview && host
+      // A floating output window can be resized while no physical projector
+      // is attached. Scale its content against the configured output canvas
+      // too, so it remains a faithful, uncropped representation of the real
+      // projection at every window size.
+      const scale = host
         ? Math.max(
             0.01,
             Math.min(
@@ -132,12 +144,27 @@ export function ProjectionStage({
       setContentScale((current) =>
         Math.abs(current - scale) > 0.002 ? scale : current,
       );
-      const shouldFillBible =
-        state.text.kind === "biblia" && state.bibleStyle.fillScreen;
-      const configuredHorizontal = state.bibleStyle.horizontalMargin;
-      const configuredVertical = state.bibleStyle.verticalMargin;
+      // Bible text has one configured size. It may shrink only to prevent a
+      // cut; it never expands short verses to "fill" unused screen space.
+      const shouldFillBible = false;
+      const isSong = state.text.kind === "canto";
+      const isBible = state.text.kind === "biblia";
+      const configuredHorizontal = isSong
+        ? state.songStyle.horizontalMargin ?? 8
+        : isBible
+          ? state.bibleStyle.horizontalMargin
+          : 8;
+      const configuredVertical = isSong
+        ? state.songStyle.verticalMargin ?? 10
+        : isBible
+          ? state.bibleStyle.verticalMargin
+          : 8;
+      const stableSongStanzas =
+        isSong && state.songStyle.stableFontSize
+          ? state.text.sourceSongStanzas?.filter(Boolean) ?? []
+          : [];
       const evaluate = (horizontalMargin: number, verticalMargin: number) => {
-        if (state.text.kind === "biblia") {
+        if (isProjectableText) {
           element.style.left = `${horizontalMargin}%`;
           element.style.right = `${horizontalMargin}%`;
           element.style.top = `${verticalMargin}%`;
@@ -154,13 +181,18 @@ export function ProjectionStage({
           responsiveCeiling,
           requestedSize * MAX_BALANCED_FILL_SCALE,
         );
-        let low = Math.min(requestedSize, Math.max(2, 7 * scale)),
+        const configuredMinimum = isSong
+          ? state.songStyle.minimumFontSize * scale
+          : isBible
+            ? 7 * scale
+            : 8 * scale;
+        let low = Math.min(requestedSize, Math.max(2, configuredMinimum)),
           high = shouldFillBible ? balancedFillCeiling : requestedSize,
           best = low;
         const applyCandidate = (fontSize: number) => {
           element.style.fontSize = `${fontSize}px`;
           element.style.setProperty("--fit-text-size", `${fontSize}px`);
-          if (state.text.kind === "biblia") {
+          if (isBible) {
             element.style.setProperty(
               "--bible-reference-size",
               `${Math.max(8 * scale, state.bibleStyle.referenceFontSize * scale)}px`,
@@ -175,7 +207,7 @@ export function ProjectionStage({
             );
           }
         };
-        const contentFits = (fontSize: number) => {
+        const contentFits = (fontSize: number, html = state.text.html) => {
           // A centered flex item can be clipped on both sides while its live
           // scrollHeight still reports the constrained box. Measure an
           // invisible, unconstrained copy instead so preview and real output
@@ -213,6 +245,7 @@ export function ProjectionStage({
             animation: "none",
             fontSize: `${fontSize}px`,
           });
+          measurement.innerHTML = html;
           const bibleSlide =
             measurement.querySelector<HTMLElement>(".bible-slide");
           const bibleVerseSlot =
@@ -240,10 +273,14 @@ export function ProjectionStage({
           measurement.remove();
           return fits;
         };
+        const candidateFits = (fontSize: number) =>
+          stableSongStanzas.length
+            ? stableSongStanzas.every((stanza) => contentFits(fontSize, stanza))
+            : contentFits(fontSize);
         for (let step = 0; step < 12; step++) {
           const middle = (low + high) / 2;
           applyCandidate(middle);
-          if (contentFits(middle)) {
+          if (candidateFits(middle)) {
             best = middle;
             low = middle;
           } else high = middle;
@@ -263,23 +300,10 @@ export function ProjectionStage({
       };
 
       let result = evaluate(configuredHorizontal, configuredVertical);
-      // “Rellenar pantalla” first respects the chosen safe area. If that would
-      // force the preferred font size down, it recovers otherwise unused space
-      // down to a small 2% safety edge before reducing the type.
-      if (
-        shouldFillBible &&
-        result.fontSize < requestedSize - 0.5 &&
-        (configuredHorizontal > 2 || configuredVertical > 2)
-      ) {
-        const expanded = evaluate(
-          Math.min(configuredHorizontal, 2),
-          Math.min(configuredVertical, 2),
-        );
-        if (expanded.fontSize >= result.fontSize) result = expanded;
-        else result = evaluate(configuredHorizontal, configuredVertical);
-      }
+      // Keep the selected safe area stable. Changing its edges for a short
+      // verse also moved the reference banner, which is visually distracting.
       setFitTextSize(result.fontSize);
-      if (state.text.kind === "biblia")
+      if (isBible)
         setBibleFit((current) =>
           Math.abs(current.referenceScale - result.referenceScale) > 0.002 ||
           current.horizontalMargin !== result.horizontalMargin ||
@@ -322,6 +346,10 @@ export function ProjectionStage({
     state.bibleStyle.referenceStyle,
     state.songStyle.uppercase,
     state.songStyle.autoFit,
+    state.songStyle.stableFontSize,
+    state.songStyle.horizontalMargin,
+    state.songStyle.verticalMargin,
+    state.text.sourceSongStanzas,
     outputViewport.width,
     outputViewport.height,
     preview,
@@ -329,13 +357,18 @@ export function ProjectionStage({
 
   const bibleSafeArea = state.text.kind === "biblia";
   const songSafeArea = state.text.kind === "canto";
+  const liveAudienceQr = state.text.html.includes("data-live-audience-qr");
+  // Announcements have their own position and panel geometry (including the
+  // lower-third designs).  Treating them as a full safe-area layer stretches
+  // a top or bottom panel from edge to edge, which is especially visible as a
+  // tall vertical accent line in the designer preview.
   const projectionSafeArea = bibleSafeArea || songSafeArea;
   const bibleFill = bibleSafeArea && state.bibleStyle.fillScreen;
-  // Bible passages and song stanzas must never be allowed to escape their
-  // physical projection area. Keep the configured size as the ceiling and
-  // apply the safety fit in both preview and output, including installations
-  // whose older saved preferences have autoFit disabled.
-  const fitText = projectionSafeArea;
+  // Safety fitting is never optional for projected lyrics: clipping text is
+  // worse than a measured reduction, especially in live meetings.
+  // The design preview must mirror the configured size immediately. The
+  // actual output still uses the safety fit to prevent clipping on a projector.
+  const fitText = projectionSafeArea && !designPreview;
   const uppercase =
     (state.text.kind === "biblia" && state.bibleStyle.uppercase) ||
     (state.text.kind === "canto" && state.songStyle.uppercase);
@@ -359,19 +392,29 @@ export function ProjectionStage({
       ? {
           left: bibleSafeArea
             ? `${bibleFit.horizontalMargin}%`
-            : "8%",
+            : songSafeArea
+              ? `${state.songStyle.horizontalMargin ?? 8}%`
+              : "8%",
           right: bibleSafeArea
             ? `${bibleFit.horizontalMargin}%`
-            : "8%",
+            : songSafeArea
+              ? `${state.songStyle.horizontalMargin ?? 8}%`
+              : "8%",
           top: bibleSafeArea
             ? `${bibleFit.verticalMargin}%`
-            : state.text.title && state.text.titlePosition === "top"
-              ? "17%"
+            : songSafeArea
+              ? `${Math.max(
+                  state.songStyle.verticalMargin ?? 10,
+                  state.text.title && state.text.titlePosition === "top" ? 17 : 0,
+                )}%`
               : "8%",
           bottom: bibleSafeArea
             ? `${bibleFit.verticalMargin}%`
-            : state.text.title && state.text.titlePosition === "bottom"
-              ? "17%"
+            : songSafeArea
+              ? `${Math.max(
+                  state.songStyle.verticalMargin ?? 10,
+                  state.text.title && state.text.titlePosition === "bottom" ? 17 : 0,
+                )}%`
               : "8%",
           height: "auto",
           maxWidth: "none",

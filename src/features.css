@@ -484,12 +484,13 @@
 .song-rich-editor .tiptap > p[data-song-section-label] {
   --song-section-color: #3b82f6;
   position: relative;
-  margin: 0 0 10px;
-  padding: 30px 12px 12px 15px;
+  margin: 0 0 calc(10px * var(--song-editor-stanza-scale, 1));
+  padding: calc(30px * var(--song-editor-stanza-scale, 1)) calc(12px * var(--song-editor-stanza-scale, 1)) calc(12px * var(--song-editor-stanza-scale, 1)) calc(15px * var(--song-editor-stanza-scale, 1));
   border: 1px solid color-mix(in srgb, var(--song-section-color) 42%, transparent);
-  border-left: 4px solid var(--song-section-color);
+  border-left: calc(4px * var(--song-editor-stanza-scale, 1)) solid var(--song-section-color);
   border-radius: 8px;
   background: color-mix(in srgb, var(--song-section-color) 9%, transparent);
+  font-size: calc(1em * var(--song-editor-stanza-scale, 1));
   transition: border-color 120ms ease, background 120ms ease;
 }
 .song-rich-editor .tiptap > p[data-song-section-label]:hover {
@@ -499,10 +500,10 @@
 .song-rich-editor .tiptap > p[data-song-section-label]::before {
   content: attr(data-song-section-label) "  ·  clic derecho para cambiar";
   position: absolute;
-  top: 7px;
-  left: 12px;
+  top: calc(7px * var(--song-editor-stanza-scale, 1));
+  left: calc(12px * var(--song-editor-stanza-scale, 1));
   color: var(--song-section-color);
-  font: 750 10px/1.2 "Segoe UI Variable", "Segoe UI", sans-serif;
+  font: 750 calc(10px * var(--song-editor-stanza-scale, 1))/1.2 "Segoe UI Variable", "Segoe UI", sans-serif;
   letter-spacing: .02em;
   text-shadow: none;
 }
@@ -990,21 +991,33 @@
   border-top: 1px solid #2a303b;
   border-bottom: 1px solid #2a303b;
 }
-.minimum-song-size {
+.song-safe-area-grid {
   display: grid;
-  grid-template-columns: 1fr 90px;
-  align-items: center;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-top: 11px;
 }
-.minimum-song-size input {
-  width: 100%;
+.song-safe-area-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #8f97a6;
+  font-size: 9px;
+}
+.song-safe-area-grid input {
   height: 34px;
-  padding: 0 9px;
   border: 1px solid #303642;
+  background: #161a22;
+  color: #d5d9e1;
   border-radius: 7px;
-  background: #12151c;
-  color: #fff;
+  padding: 0 9px;
+}
+.song-safe-area-help {
+  display: block;
+  margin-top: 8px;
+  color: #778091;
+  font-size: 9px;
+  line-height: 1.45;
 }
 .song-title-options {
   margin-top: 13px;
@@ -1283,8 +1296,12 @@
 }
 .projection-viewport {
   position: relative;
-  max-height: 100%;
-  max-width: 100%;
+  /* Keep a single, exact canvas ratio.  A resizable fallback window may have
+     any shape, but its projection must be letterboxed rather than stretched
+     or clipped. */
+  width: min(100vw, calc(100vh * var(--projection-width) / var(--projection-height)));
+  aspect-ratio: var(--projection-width) / var(--projection-height);
+  height: auto;
   overflow: hidden;
 }
 @media (max-width: 1250px) {
@@ -2747,6 +2764,7 @@
   padding: 0;
 }
 .projection-text.bible-safe-area .bible-slide {
+  position: relative;
   display: flex;
   width: 100%;
   height: 100%;
@@ -2758,7 +2776,9 @@
   display: flex;
   min-width: 0;
   min-height: 0;
-  flex: 1 1 auto;
+  box-sizing: border-box;
+  height: 100%;
+  flex: 0 0 100%;
   align-items: center;
   overflow: hidden;
 }
@@ -2778,7 +2798,7 @@
 }
 .projection-text.bible-safe-area .bible-reference-slot {
   display: flex;
-  position: relative;
+  position: absolute;
   z-index: 2;
   width: 100%;
   height: var(--bible-reference-height);
@@ -2789,10 +2809,20 @@
   line-height: 1;
 }
 .projection-text.bible-safe-area .bible-reference-slot.reference-before {
-  margin-bottom: var(--bible-reference-gap);
+  top: 0;
+  left: 0;
+  right: 0;
+}
+.projection-text.bible-safe-area .bible-slide.bible-reference-before .bible-verse-slot {
+  padding-top: calc(var(--bible-reference-height) + var(--bible-reference-gap));
 }
 .projection-text.bible-safe-area .bible-reference-slot.reference-after {
-  margin-top: var(--bible-reference-gap);
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+.projection-text.bible-safe-area .bible-slide.bible-reference-after .bible-verse-slot {
+  padding-bottom: calc(var(--bible-reference-height) + var(--bible-reference-gap));
 }
 .projection-text.bible-safe-area .bible-reference-label {
   display: inline-flex;
@@ -2857,7 +2887,8 @@
 .bible-settings-layout + .save-settings {
   display: none;
 }
-.bible-fill-card {
+.bible-fill-card,
+.bible-safe-area-card {
   margin-top: 12px;
   padding: 12px;
 }
@@ -2873,6 +2904,13 @@
 }
 .bible-fill-card h3 {
   margin-bottom: 9px;
+}
+.bible-safe-area-card h3 { margin: 0 0 5px; }
+.bible-safe-area-card > p {
+  margin: 0 0 11px;
+  color: #778091;
+  font-size: 9px;
+  line-height: 1.45;
 }
 .long-verse-settings { margin-top: 16px; padding-top: 14px; border-top: 1px solid #2a303b; }
 .long-verse-settings h3 { margin: 0 0 11px; }
@@ -3656,8 +3694,55 @@
   font-size: 8px;
   margin-top: 8px;
 }
+.native-presentation-note {
+  margin: 8px 0 0;
+  color: #f7b267;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.native-presentation-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 38px;
+  margin-top: 10px;
+  border: 1px solid #e28b3d;
+  border-radius: 8px;
+  color: #fff1df;
+  background: #563417;
+  font: 700 11px inherit;
+  cursor: pointer;
+}
+.native-presentation-open svg { width: 15px; height: 15px; }
 .song-edit-dialog {
   width: min(920px, calc(100vw - 40px));
+  height: min(820px, calc(100vh - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  padding: 20px;
+}
+.song-edit-dialog .item-editor,
+.song-edit-dialog .item-editor-controls {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.song-edit-dialog .item-editor-controls {
+  overflow: hidden;
+  padding-top: 0;
+}
+.song-edit-dialog .inspector-actions {
+  flex: 0 0 auto;
+  margin-top: 12px;
+}
+.meeting-song-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .meeting-song-editor > label {
   display: flex;
@@ -3687,12 +3772,18 @@
 }
 .song-format-toolbar {
   min-height: 48px;
+  flex: 0 0 auto;
 }
 .meeting-song-content,
 .meeting-song-content .tiptap {
-  min-height: 330px;
+  min-height: 0;
+}
+.meeting-song-content {
+  flex: 1 1 auto;
+  overflow: auto;
 }
 .meeting-song-content .tiptap {
+  min-height: 100%;
   font-size: 17px;
   line-height: 1.55;
   padding: 18px;
@@ -3701,6 +3792,7 @@
   margin: 0.28em 0;
 }
 .song-editor-help {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -3710,8 +3802,11 @@
 }
 .song-editor-help span {
   margin-right: auto;
+  min-width: 0;
 }
 .song-editor-help button {
+  flex: 0 0 auto;
+  white-space: nowrap;
   height: 31px;
   border: 1px solid #3d4350;
   background: #191d25;
@@ -4032,6 +4127,51 @@
 .song-editor.is-reading .song-rich-editor .tiptap {
   cursor: default;
 }
+.song-editor-title-row {
+  align-items: start;
+}
+.song-editor-title-field,
+.song-editor-category-field,
+.song-stanza-size-controls {
+  display: grid;
+  gap: 5px;
+}
+.song-editor-title-field {
+  min-width: 0;
+  flex: 1;
+}
+.song-editor-header-actions {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+}
+.song-editor-category-field select {
+  width: min(260px, 28vw);
+}
+.song-stanza-size-controls > div {
+  display: flex;
+  height: 34px;
+}
+.song-stanza-size-controls button {
+  display: grid;
+  width: 34px;
+  place-items: center;
+  border: 1px solid #343c4b;
+  background: #181d27;
+  color: #d6d9e1;
+  cursor: pointer;
+}
+.song-stanza-size-controls button:first-child { border-radius: 8px 0 0 8px; }
+.song-stanza-size-controls button:last-child { border-left: 0; border-radius: 0 8px 8px 0; }
+.song-stanza-size-controls button:hover:not(:disabled) { background: #252b37; color: #fff; }
+.song-stanza-size-controls button:disabled { opacity: .42; cursor: default; }
+.song-stanza-size-controls svg { width: 15px; height: 15px; }
+@media (max-width: 760px) {
+  .song-editor-title-row { align-items: stretch; flex-direction: column; }
+  .song-editor-header-actions { justify-content: space-between; }
+  .song-editor-category-field { flex: 1; }
+  .song-editor-category-field select { width: 100%; }
+}
 .editor-actions .edit-song {
   border-color: #5149be;
   background: #28234d;
@@ -4068,7 +4208,7 @@
 .alert-control-row .alert-action svg { width: 15px; }
 
 .projection-text:has(> .live-audience-projection) {
-  inset: 5% !important;
+  inset: 2% !important;
   width: auto !important;
   height: auto !important;
   max-width: none !important;
@@ -4079,38 +4219,30 @@
 }
 .live-audience-projection {
   display:grid;
-  grid-template-rows:auto auto minmax(0,1fr);
+  grid-template-rows:auto minmax(0,1fr);
   justify-items:center;
   align-items:center;
-  gap:min(2.2%,.34em);
+  gap:min(1.2%,.2em);
   width:100%;
   height:100%;
   min-width:0;
   min-height:0;
   margin:0;
-  padding:min(4%,.6em);
-  border:1px solid rgba(255,255,255,.22);
-  border-radius:.35em;
-  background:rgba(9,12,20,.88);
-  box-shadow:0 24px 80px rgba(0,0,0,.48);
+  padding:min(1.5%,.22em);
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
   overflow:hidden;
-}
-.live-audience-projection > span {
-  color:#ef3340;
-  font-family:"Oswald","Arial Narrow",sans-serif;
-  font-size:.46em;
-  font-weight:700;
-  letter-spacing:.1em;
-  text-transform:uppercase;
 }
 .live-audience-projection > strong {
   max-width:100%;
   font-family:"Oswald","Arial Narrow",sans-serif;
-  font-size:.68em;
+  font-size:.5em;
   font-weight:700;
   line-height:1.1;
   letter-spacing:.025em;
   text-transform:uppercase;
   text-wrap:balance;
 }
-.live-audience-projection > img { display:block; width:auto; height:100%; min-height:0; max-width:100%; max-height:100%; aspect-ratio:1; object-fit:contain; padding:.13em; border-radius:.22em; background:#fff; }
+.live-audience-projection > img { display:block; width:auto; height:100%; min-height:0; max-width:100%; max-height:100%; aspect-ratio:1; object-fit:contain; padding:.055em; border:.055em solid #fff; border-radius:.12em; background:#fff; box-shadow:0 .08em .28em rgba(0,0,0,.32); }

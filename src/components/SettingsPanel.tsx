@@ -19,6 +19,7 @@ import {
   initialBibleDisplaySettings,
   initialChurchSettings,
   initialDisplaySettings,
+  initialSongDisplaySettings,
   type BibleDisplaySettings,
   type BibleVersion,
   type ChurchSettings,
@@ -34,9 +35,9 @@ import { buildBibleSlides } from "../bibleDisplay";
 import { projectionFonts } from "../fonts";
 import { ExpanderRow } from "./ui/ExpanderRow";
 import { withSaveNotification } from "./SaveNotification";
-import { recommendedBibleFontSize } from "../../shared/bibleLayout";
 import {
   defaultShortcuts,
+  shortcutFromKeyEvent,
   loadShortcuts,
   shortcutLabels,
   shortcutStorageKey,
@@ -260,6 +261,8 @@ export function SettingsPanel({
   const [releaseHistoryOpen, setReleaseHistoryOpen] = useState(false);
   const [releaseHistoryLoading, setReleaseHistoryLoading] = useState(false);
   const [shortcuts, setShortcuts] = useState<Record<ShortcutAction, string>>(() => loadShortcuts());
+  const [editingShortcuts, setEditingShortcuts] = useState(false);
+  const [shortcutError, setShortcutError] = useState("");
   const [referenceDesignOpen, setReferenceDesignOpen] = useState(false);
   const reloadVersions = () =>
     window.flProyector.listBibleVersions().then(setVersions);
@@ -274,9 +277,10 @@ export function SettingsPanel({
       setBibleTextFontSizeInput(String(value.textFontSize));
     });
     window.flProyector.getSongDisplaySettings().then((value) => {
-      setSongStyle(value);
-      setSongFontSizeInput(String(value.fontSize));
-      setSongTitleFontSizeInput(String(value.titleFontSize));
+      const normalized = { ...initialSongDisplaySettings, ...value, autoFit: true };
+      setSongStyle(normalized);
+      setSongFontSizeInput(String(normalized.fontSize));
+      setSongTitleFontSizeInput(String(normalized.titleFontSize));
     });
     reloadVersions();
     window.flProyector.getUpdateStatus().then(setUpdateStatus);
@@ -402,6 +406,10 @@ export function SettingsPanel({
   const saveBible = async () => {
     const nextBible = {
       ...bible,
+      // Projection safety is built in. Never enlarge a short verse just to
+      // fill space: that makes consecutive passages look inconsistent.
+      autoFit: true,
+      fillScreen: false,
       referenceFontSize: normalizedSize(
         bibleReferenceFontSizeInput,
         10,
@@ -460,6 +468,11 @@ export function SettingsPanel({
   const saveSongStyle = async () => {
     const nextSongStyle = {
       ...songStyle,
+      // Never persist a setting that can leave projected lyrics clipped.
+      autoFit: true,
+      stableFontSize: songStyle.stableFontSize ?? true,
+      horizontalMargin: songStyle.horizontalMargin ?? 8,
+      verticalMargin: songStyle.verticalMargin ?? 10,
       fontSize: normalizedSize(songFontSizeInput, 24, 200, songStyle.fontSize),
       titleFontSize: normalizedSize(
         songTitleFontSizeInput,
@@ -542,6 +555,7 @@ export function SettingsPanel({
       ...state.text,
       html: "<p>Señor mi Dios, al contemplar los cielos<br>El firmamento y las estrellas mil</p>",
       kind: "canto",
+      sourceSongStanzas: null,
       visible: true,
       fontSize: songStyle.fontSize,
       fontFamily: songStyle.fontFamily,
@@ -562,11 +576,6 @@ export function SettingsPanel({
     blackout: false,
     logo: false,
   };
-  const recommendedBibleSize = recommendedBibleFontSize(bible, state.outputViewport);
-  const bibleViewportRatio = state.outputViewport.width / Math.max(1, state.outputViewport.height);
-  const bibleFormatLabel = Math.abs(bibleViewportRatio - 4 / 3) < 0.08 ? "4:3" : Math.abs(bibleViewportRatio - 16 / 10) < 0.08 ? "16:10" : "16:9";
-  const bibleSizeAboveRecommendation = bible.textFontSize > recommendedBibleSize;
-
   useEffect(() => {
     if (section === "canciones") onPreviewChange(songPreviewState);
     else if (section === "biblias") onPreviewChange(previewState);
@@ -690,7 +699,7 @@ export function SettingsPanel({
               <div>
                 <span className="eyebrow">OPERACIÓN RÁPIDA</span>
                 <h2>Teclas de acceso rápido</h2>
-                <p>Podés cambiar cualquier combinación. No se ejecutan mientras escribís en un campo.</p>
+                <p>Usá una tecla o Alt + una tecla. No se ejecutan mientras modificás un campo.</p>
               </div>
             </div>
             <div className="settings-card shortcut-settings-card">
@@ -701,19 +710,50 @@ export function SettingsPanel({
                     <input
                       value={shortcuts[action]}
                       placeholder={defaultShortcuts[action]}
-                      onChange={(event) => setShortcuts((current) => ({ ...current, [action]: event.target.value }))}
-                      onBlur={(event) => setShortcuts((current) => ({ ...current, [action]: event.target.value.trim() }))}
+                      disabled={!editingShortcuts}
+                      readOnly
+                      aria-label={`${shortcutLabels[action]}: ${shortcuts[action]}`}
+                      onPaste={(event) => event.preventDefault()}
+                      onKeyDown={(event) => {
+                        event.preventDefault();
+                        const shortcut = shortcutFromKeyEvent(event.nativeEvent);
+                        if (!shortcut) {
+                          setShortcutError("Usá solamente una tecla, o Alt + una tecla. No se permiten Ctrl, Shift ni combinaciones adicionales.");
+                          return;
+                        }
+                        const duplicate = (Object.keys(shortcuts) as ShortcutAction[]).find(
+                          (otherAction) => otherAction !== action && shortcuts[otherAction].toLowerCase() === shortcut.toLowerCase(),
+                        );
+                        if (duplicate) {
+                          setShortcutError(`${shortcut} ya está asignado a “${shortcutLabels[duplicate]}”. Elegí otra tecla.`);
+                          return;
+                        }
+                        setShortcutError("");
+                        setShortcuts((current) => ({ ...current, [action]: shortcut }));
+                      }}
                     />
                   </label>
                 ))}
               </div>
+              {shortcutError && <p className="shortcut-error" role="alert">{shortcutError}</p>}
               <div className="inspector-actions">
-                <button type="button" className="secondary" onClick={() => setShortcuts({ ...defaultShortcuts })}>
+                <button type="button" className="secondary" onClick={() => {
+                  setEditingShortcuts(true);
+                  setShortcutError("");
+                }}>
+                  Modificar
+                </button>
+                <button type="button" className="secondary" onClick={() => {
+                  setShortcuts({ ...defaultShortcuts });
+                  setEditingShortcuts(true);
+                  setShortcutError("");
+                }}>
                   Restaurar valores
                 </button>
-                <button type="button" className="primary" onClick={() => withSaveNotification(async () => {
+                <button type="button" className="primary" disabled={!editingShortcuts} onClick={() => withSaveNotification(async () => {
                   localStorage.setItem(shortcutStorageKey, JSON.stringify(shortcuts));
                   window.dispatchEvent(new CustomEvent("fl-shortcuts-changed"));
+                  setEditingShortcuts(false);
                 }, "Los atajos fueron guardados.")}>
                   <Save /> Guardar atajos
                 </button>
@@ -838,7 +878,7 @@ export function SettingsPanel({
                       </select>
                     </label>
                     <label>
-                      Tamaño máximo
+                      Tamaño de la letra
                       <input
                         className="song-font-size-input"
                         type="number"
@@ -878,19 +918,54 @@ export function SettingsPanel({
                     <input
                       className="win11-toggle"
                       type="checkbox"
-                      checked={songStyle.autoFit}
+                      checked={songStyle.stableFontSize !== false}
                       onChange={(e) =>
                         setSongStyle((value) => ({
                           ...value,
-                          autoFit: e.target.checked,
+                          stableFontSize: e.target.checked,
                         }))
                       }
                     />
                     <div>
-                      <strong>Ajuste automático de seguridad</strong>
-                      <span>Conserva el tamaño elegido y solo lo reduce si el texto se saldría de la pantalla.</span>
+                      <strong>Usar el mismo tamaño en toda la canción</strong>
+                      <span>Activado: todas las estrofas conservan una escala estable. Desactivado: cada estrofa se ajusta por separado.</span>
                     </div>
                   </label>
+                  <div className="song-safe-area-grid">
+                    <label>
+                      Margen lateral %
+                      <input
+                        type="number"
+                        min="2"
+                        max="25"
+                        value={songStyle.horizontalMargin ?? 8}
+                        onChange={(e) =>
+                          setSongStyle((value) => ({
+                            ...value,
+                            horizontalMargin: Math.max(2, Math.min(25, Number(e.target.value) || 2)),
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Margen vertical %
+                      <input
+                        type="number"
+                        min="2"
+                        max="25"
+                        value={songStyle.verticalMargin ?? 10}
+                        onChange={(e) =>
+                          setSongStyle((value) => ({
+                            ...value,
+                            verticalMargin: Math.max(2, Math.min(25, Number(e.target.value) || 2)),
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <small className="song-safe-area-help">
+                    Estos márgenes definen el área segura de la pantalla donde puede aparecer la letra.
+                  </small>
                   <label className="toggle-row">
                     <input className="win11-toggle" type="checkbox" checked={songStyle.uppercase} onChange={(e) => setSongStyle((value) => ({ ...value, uppercase: e.target.checked }))} />
                     <div><strong>Todo en mayúsculas</strong><span>Solo afecta lo que se proyecta.</span></div>
@@ -1409,8 +1484,8 @@ export function SettingsPanel({
                           }))
                         }
                       >
-                        <option value="before">Al principio</option>
-                        <option value="after">Al final</option>
+                        <option value="before">Encabezado fijo</option>
+                        <option value="after">Pie de pantalla fijo</option>
                       </select>
                     </label>
                     <label>
@@ -1603,29 +1678,6 @@ export function SettingsPanel({
                       />
                     </label>
                   </div>
-                  <div className={`bible-size-guidance compact ${bibleSizeAboveRecommendation ? "warning" : "safe"}`} role="status">
-                    <strong>Recomendado para {bibleFormatLabel}: hasta {recommendedBibleSize}px</strong>
-                    {bibleSizeAboveRecommendation && (
-                      <span>El tamaño elegido supera la recomendación para esta pantalla.</span>
-                    )}
-                  </div>
-                  <label className="toggle-row bible-fit-toggle">
-                    <input
-                      className="win11-toggle"
-                      type="checkbox"
-                      checked={bible.autoFit}
-                      onChange={(e) =>
-                        setBible((value) => ({
-                          ...value,
-                          autoFit: e.target.checked,
-                        }))
-                      }
-                    />
-                    <div>
-                      <strong>Protección automática de pantalla</strong>
-                      <span>Usa el tamaño elegido mientras entre; si desborda, lo reduce solo lo necesario.</span>
-                    </div>
-                  </label>
                   <ColorDots
                     label="Color del versículo"
                     value={bible.textColor}
@@ -1711,15 +1763,9 @@ export function SettingsPanel({
                     )}
                   </div>
                 </div>
-                <ExpanderRow
-                  className="bible-fill-card"
-                  title="Rellenar pantalla"
-                  description="Aprovecha el área disponible y reduce suavemente el texto y la referencia si hace falta para evitar cortes."
-                  checked={bible.fillScreen}
-                  onCheckedChange={(fillScreen) =>
-                    setBible((v) => ({ ...v, fillScreen }))
-                  }
-                >
+                <div className="settings-card bible-safe-area-card">
+                  <h3>Área segura del texto</h3>
+                  <p>Define los márgenes de la pantalla donde se mostrará el versículo. La cita queda fija fuera de esta zona.</p>
                   <div className="bible-margin-grid">
                     <label>
                       Lateral %
@@ -1758,7 +1804,7 @@ export function SettingsPanel({
                       />
                     </label>
                   </div>
-                </ExpanderRow>
+                </div>
                   <div className="settings-card long-verse-settings">
                     <h3>Versículos largos</h3>
                     <div className="long-verse-controls single">

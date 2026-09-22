@@ -30,14 +30,14 @@ export const shortcutLabels: Record<ShortcutAction, string> = {
 };
 
 export const defaultShortcuts: Record<ShortcutAction, string> = {
-  reuniones: "Ctrl+1",
-  canciones: "Ctrl+2",
-  fondos: "Ctrl+3",
-  biblia: "Ctrl+4",
-  remoto: "Ctrl+5",
-  ajustes: "Ctrl+6",
+  reuniones: "1",
+  canciones: "2",
+  fondos: "3",
+  biblia: "4",
+  remoto: "5",
+  ajustes: "6",
   proyector: "Alt+P",
-  cerrarProyector: "Alt+Shift+P",
+  cerrarProyector: "Alt+X",
   logo: "Alt+O",
   qr: "Alt+Q",
   congelar: "Alt+F",
@@ -47,10 +47,35 @@ export const defaultShortcuts: Record<ShortcutAction, string> = {
 
 export const shortcutStorageKey = "fl-keyboard-shortcuts-v1";
 
+export function isAllowedShortcut(value: string): boolean {
+  return /^(?:Alt\+)?[A-Z0-9]$/i.test(value.trim());
+}
+
+export function shortcutFromKeyEvent(
+  event: Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">,
+): string | null {
+  if (event.ctrlKey || event.metaKey || event.shiftKey) return null;
+  const key = event.key.toUpperCase();
+  if (!/^[A-Z0-9]$/.test(key)) return null;
+  return event.altKey ? `Alt+${key}` : key;
+}
+
 export function loadShortcuts(): Record<ShortcutAction, string> {
   try {
     const saved = JSON.parse(localStorage.getItem(shortcutStorageKey) || "null");
-    return { ...defaultShortcuts, ...(saved && typeof saved === "object" ? saved : {}) };
+    const merged = { ...defaultShortcuts, ...(saved && typeof saved === "object" ? saved : {}) };
+    const used = new Set<string>();
+    return (Object.keys(defaultShortcuts) as ShortcutAction[]).reduce((result, action) => {
+      const shortcut = String(merged[action] || "").trim().toUpperCase();
+      if (isAllowedShortcut(shortcut) && !used.has(shortcut)) {
+        used.add(shortcut);
+        result[action] = shortcut;
+      } else {
+        result[action] = defaultShortcuts[action];
+        used.add(defaultShortcuts[action]);
+      }
+      return result;
+    }, {} as Record<ShortcutAction, string>);
   } catch {
     return { ...defaultShortcuts };
   }

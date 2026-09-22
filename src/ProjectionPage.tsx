@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { initialDisplaySettings } from '../shared/types'
 import { ProjectionStage } from './components/ProjectionStage'
 import { useProjectionState } from './hooks/useProjectionState'
@@ -10,6 +10,7 @@ export function ProjectionPage() {
     window.flProyector.getDisplaySettings().then(setDisplaySettings)
     return window.flProyector.onDisplaySettings(setDisplaySettings)
   }, [])
+  const viewport = state.outputViewport
   return (
     <main
       className="projection-page"
@@ -18,9 +19,9 @@ export function ProjectionPage() {
       <div
         className="projection-viewport"
         style={{
-          width: `${state.outputViewport.width}px`,
-          height: `${state.outputViewport.height}px`,
-        }}
+          "--projection-width": viewport.width,
+          "--projection-height": viewport.height,
+        } as CSSProperties}
       >
         <ProjectionStage
           state={state}

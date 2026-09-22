@@ -1124,10 +1124,9 @@ const validMedia = (name: string) =>
 const mediaUrl = (path: string) =>
   `fl-media://local/${encodeURIComponent(path)}`;
 
-const browserPlayableVideoExtensions = new Set([".mp4", ".webm"]);
-const needsVideoConversion = (extension: string) =>
-  videoExtensions.includes(extension) &&
-  !browserPlayableVideoExtensions.has(extension);
+// An .mp4 may still use HEVC or an unsupported audio stream. Normalize every
+// imported video to the browser-safe H.264 + AAC format.
+const needsVideoConversion = (extension: string) => videoExtensions.includes(extension);
 
 async function transcodeVideoToMp4(source: string, destination: string) {
   if (!ffmpegPath) {
@@ -1142,6 +1141,10 @@ async function transcodeVideoToMp4(source: string, destination: string) {
         "-y",
         "-i",
         source,
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a?",
         "-c:v",
         "libx264",
         "-preset",
@@ -1152,6 +1155,12 @@ async function transcodeVideoToMp4(source: string, destination: string) {
         "yuv420p",
         "-c:a",
         "aac",
+        "-b:a",
+        "192k",
+        "-ac",
+        "2",
+        "-ar",
+        "48000",
         "-movflags",
         "+faststart",
         destination,
@@ -1207,11 +1216,15 @@ async function migrateMeetingVideosToMp4() {
       const embedded = item.payload.meetingMedia as MediaItem | undefined;
       if (!embedded?.path) continue;
       const extension = extname(embedded.path).toLowerCase();
-      if (!needsVideoConversion(extension)) continue;
+      if (
+        !needsVideoConversion(extension) ||
+        embedded.path.toLowerCase().endsWith("-compatible.mp4")
+      )
+        continue;
 
       const destination = join(
         meetingMediaDir,
-        `${basename(embedded.path, extension)}.mp4`,
+        `${basename(embedded.path, extension)}-compatible.mp4`,
       );
       try {
         await transcodeVideoToMp4(embedded.path, destination);
@@ -1422,6 +1435,10 @@ function projectRemoteMultimedia(itemId: number) {
   beginRemoteMultimedia(itemId);
   const payload = item.payload as Record<string, unknown>;
   if (item.type === "presentation") {
+    if (payload.nativeOnly) {
+      void shell.openPath(String(payload.path || ""));
+      return;
+    }
     const slideCount = Number(payload.slideCount || (payload.previewSlides as unknown[] | undefined)?.length || 0);
     mergeState({
       ...remoteBasePatch(), blackout: false, logo: false, text: { visible: false }, lowerThird: { visible: false },
@@ -1492,7 +1509,7 @@ async function syncMedia() {
 async function importMediaFile(source: string) {
   const extension = extname(source).toLowerCase();
   if (needsVideoConversion(extension)) {
-    const destination = join(mediaDir, `${basename(source, extension)}.mp4`);
+    const destination = join(mediaDir, `${basename(source, extension)}-compatible.mp4`);
     await transcodeVideoToMp4(source, destination);
     return destination;
   }
@@ -1827,6 +1844,7 @@ if (hasSingleInstanceLock)
             html: stanzas[index] || song.content,
             title: state.songStyle.showTitle ? song.title : "",
             sourceSectionIndex: index,
+            sourceSongStanzas: stanzas,
           },
         });
       },
@@ -2398,8 +2416,8 @@ if (hasSingleInstanceLock)
         properties: ["openFile"],
         filters: [
           {
-            name: "PowerPoint moderno",
-            extensions: ["pptx", "ppsx", "pptm", "potx"],
+            name: "PowerPoint (todos los formatos)",
+            extensions: ["ppt", "pps", "pot", "pptx", "ppsx", "pptm", "ppsm", "potx", "potm"],
           },
         ],
       });
@@ -2417,12 +2435,13 @@ if (hasSingleInstanceLock)
         path: destination,
         url: mediaUrl(destination),
         name: basename(destination),
+        nativeOnly: [".ppt", ".pps", ".pot"].includes(extname(destination).toLowerCase()),
       };
     });
     ipcMain.handle("presentation:read", async (_event, path: string) => {
       const source = String(path || "").trim();
       const extension = extname(source).toLowerCase();
-      if (!source || ![".pptx", ".ppsx", ".pptm", ".potx"].includes(extension))
+      if (!source || ![".pptx", ".ppsx", ".pptm", ".ppsm", ".potx", ".potm"].includes(extension))
         throw new Error("El archivo no es una presentación compatible.");
       const content = await readFile(source);
       // All supported Office Open XML formats are ZIP containers. Rejecting

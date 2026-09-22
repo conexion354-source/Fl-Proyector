@@ -10,6 +10,7 @@ import {
   Check,
   FolderPlus,
   Music2,
+  Minus,
   Palette,
   Pencil,
   Plus,
@@ -199,6 +200,9 @@ export function SongLibrary({
   const [editing, setEditing] = useState(false);
   const [addingToMeeting, setAddingToMeeting] = useState(false);
   const [editorRevision, setEditorRevision] = useState(0);
+  // This is deliberately a reading preference, not song data: it only
+  // changes how large the stanza cards look in this desktop editor.
+  const [stanzaDisplayScale, setStanzaDisplayScale] = useState(1);
   const [sectionContextMenu, setSectionContextMenu] = useState<{
     index: number;
     x: number;
@@ -702,8 +706,8 @@ export function SongLibrary({
           />
         ) : (
         <>
-        <div className="section-title">
-          <div>
+        <div className="section-title song-editor-title-row">
+          <label className="song-editor-title-field">
             <span className="eyebrow">
               {editing ? "EDITAR CANCIÓN" : "CANCIÓN"}
             </span>
@@ -715,30 +719,58 @@ export function SongLibrary({
                 setSelected((value) => ({ ...value, title: e.target.value }))
               }
             />
+          </label>
+          <div className="song-editor-header-actions">
+            <label className="song-editor-category-field">
+              <span className="eyebrow">CATEGORÍA</span>
+              <select
+                aria-label="Categoría de la canción"
+                title="Elegí una categoría o creá una nueva"
+                disabled={!selected.id && !editing}
+                value={selected.categoryId ?? ""}
+                onChange={(e) => {
+                  if (e.target.value === "__new__") {
+                    openNewCategory(true);
+                    return;
+                  }
+                  void assignCategory(
+                    e.target.value ? Number(e.target.value) : null,
+                  );
+                }}
+              >
+                <option value="">Sin categoría</option>
+                {categories.map((category) => (
+                  <option value={category.id} key={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+                <option value="__new__">＋ Crear nueva categoría…</option>
+              </select>
+            </label>
+            <div className="song-stanza-size-controls" aria-label="Tamaño de las estrofas en el sistema">
+              <span className="eyebrow">ESTROFAS</span>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setStanzaDisplayScale((value) => Math.max(0.72, Number((value - 0.08).toFixed(2))))}
+                  disabled={stanzaDisplayScale <= 0.72}
+                  title="Achicar estrofas en el sistema"
+                  aria-label="Achicar estrofas en el sistema"
+                >
+                  <Minus />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStanzaDisplayScale((value) => Math.min(1.28, Number((value + 0.08).toFixed(2))))}
+                  disabled={stanzaDisplayScale >= 1.28}
+                  title="Agrandar estrofas en el sistema"
+                  aria-label="Agrandar estrofas en el sistema"
+                >
+                  <Plus />
+                </button>
+              </div>
+            </div>
           </div>
-          <select
-            aria-label="Categoría de la canción"
-            title="Elegí una categoría o creá una nueva"
-            disabled={!selected.id && !editing}
-            value={selected.categoryId ?? ""}
-            onChange={(e) => {
-              if (e.target.value === "__new__") {
-                openNewCategory(true);
-                return;
-              }
-              void assignCategory(
-                e.target.value ? Number(e.target.value) : null,
-              );
-            }}
-          >
-            <option value="">Sin categoría</option>
-            {categories.map((category) => (
-              <option value={category.id} key={category.id}>
-                {category.name}
-              </option>
-            ))}
-            <option value="__new__">＋ Crear nueva categoría…</option>
-          </select>
         </div>
         {editing && (
           <RichTextToolbar
@@ -807,11 +839,12 @@ export function SongLibrary({
               .run();
           }}
           style={{
+            "--song-editor-stanza-scale": stanzaDisplayScale,
             textShadow:
               selected.shadowEnabled !== false
                 ? `0 3px ${Number(selected.shadowBlur ?? 14)}px ${selected.shadowColor || "#000000"}`
                 : "none",
-          }}
+          } as CSSProperties}
         />
         <div className="editor-actions">
           <button
