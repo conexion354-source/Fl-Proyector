@@ -60,6 +60,9 @@ contextBridge.exposeInMainWorld("flProyector", {
     ),
   setFavorite: (id, slot) => ipcRenderer.invoke("media:favorite", id, slot),
   setTags: (id, tags) => ipcRenderer.invoke("media:tags", id, tags),
+  // Kept in sync with the public TypeScript API and the main-process handler.
+  // This is used by the media editor when a tag-only edit is requested.
+  editMediaTags: (id, tags) => ipcRenderer.invoke("media:edit-tags", id, tags),
   updateMediaDetails: (id, name, tags) =>
     ipcRenderer.invoke("media:update-details", id, name, tags),
   submitMediaTags: (tags) => ipcRenderer.send("media:tags-dialog-result", tags),

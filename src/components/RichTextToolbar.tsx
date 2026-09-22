@@ -35,6 +35,9 @@ export function RichTextToolbar({
   editor,
   fontSize,
   onFontSize,
+  fontFamily = "Inter",
+  onFontFamily,
+  onTextColor,
   shadow,
   onShadowChange,
   className = "",
@@ -42,6 +45,9 @@ export function RichTextToolbar({
   editor: Editor | null;
   fontSize?: number;
   onFontSize?: (value: number) => void;
+  fontFamily?: string;
+  onFontFamily?: (value: string) => void;
+  onTextColor?: (value: string) => void;
   shadow?: { enabled: boolean; color: string; blur: number };
   onShadowChange?: (shadow: {
     enabled: boolean;
@@ -58,9 +64,44 @@ export function RichTextToolbar({
     if (fontSize !== undefined) setSizeInput(String(fontSize));
   }, [fontSize]);
   const choose = (type: "text" | "highlight", color: string) => {
-    if (type === "text") editor?.chain().focus().setColor(color).run();
-    else editor?.chain().focus().toggleHighlight({ color }).run();
+    if (editor) {
+      const { empty, from } = editor.state.selection;
+      if (type === "text") {
+        if (empty) {
+          editor
+            .chain()
+            .focus()
+            .selectAll()
+            .setColor(color)
+            .setTextSelection(from)
+            .run();
+          onTextColor?.(color);
+        } else editor.chain().focus().setColor(color).run();
+      } else if (empty) {
+        editor
+          .chain()
+          .focus()
+          .selectAll()
+          .toggleHighlight({ color })
+          .setTextSelection(from)
+          .run();
+      } else editor.chain().focus().toggleHighlight({ color }).run();
+    }
     setOpen(null);
+  };
+  const changeFontFamily = (value: string) => {
+    if (!editor) return;
+    const { empty, from } = editor.state.selection;
+    if (empty) {
+      editor
+        .chain()
+        .focus()
+        .selectAll()
+        .setFontFamily(value)
+        .setTextSelection(from)
+        .run();
+      onFontFamily?.(value);
+    } else editor.chain().focus().setFontFamily(value).run();
   };
   const changeFontSize = (value: number) => {
     const next = Math.max(18, Math.min(140, value));
@@ -95,11 +136,10 @@ export function RichTextToolbar({
       }}
     >
       <select
-        defaultValue="Inter"
+        value={fontFamily}
         title="Fuente"
-        onChange={(event) =>
-          editor?.chain().focus().setFontFamily(event.target.value).run()
-        }
+        aria-label="Fuente del texto"
+        onChange={(event) => changeFontFamily(event.target.value)}
       >
         {projectionFonts.map((font) => (
           <option value={font.value} key={font.label}>

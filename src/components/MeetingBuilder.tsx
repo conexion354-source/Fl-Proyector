@@ -800,6 +800,18 @@ export function MeetingBuilder({
         !state.video.loop
       );
     }
+    // A collaborator can put a song on air without changing this window's
+    // local onAirItemId.  The projection state still carries the canonical
+    // song id, so use it to keep the meeting list's AL AIRE state consistent.
+    if (item.type === "song") {
+      const songId = Number(payload.songId);
+      return (
+        Number.isInteger(songId) &&
+        state.text.visible &&
+        state.text.kind === "canto" &&
+        state.text.sourceSongId === songId
+      );
+    }
     return false;
   };
 
@@ -943,6 +955,9 @@ export function MeetingBuilder({
         : restoredBackground,
       text: {
         html: sections[safeIndex].html,
+        sourceBibleText: sections[safeIndex].sourceText,
+        sourceBibleReference: sections[safeIndex].reference,
+        sourceBibleVersion: sections[safeIndex].version,
         kind: "biblia",
         visible: true,
         position: payload.position || "center",
@@ -2516,15 +2531,6 @@ function ItemEditor({
           <span className="eyebrow">
             EDITAR {itemLabels[item.type].toUpperCase()}
           </span>
-          <button
-            type="button"
-            className="secondary preview-editor-button"
-            onClick={onPreview}
-            aria-label="Abrir vista previa"
-            title="Abrir vista previa sin enviar al proyector"
-          >
-            <MonitorPlay />
-          </button>
         </div>
         {item.type !== "song" && (
           <label>
@@ -2585,7 +2591,6 @@ function ItemEditor({
             payload={p}
             setPayload={setPayload}
             showSize={item.type !== "announcement"}
-            showTextColor={item.type === "announcement"}
           />
         )}
         {item.type === "presentation" && (
@@ -2610,6 +2615,7 @@ function ItemEditor({
           media={media}
           state={projectionState}
           previewAspectRatio={previewAspectRatio}
+          onOpenPreview={onPreview}
         />
       )}
     </div>
@@ -2628,8 +2634,6 @@ const panelColors = [
   "#14532d",
   "#164e63",
 ];
-const announcementTextColors = ["#ffffff", "#f8fafc", "#111827", "#0f172a", "#facc15", "#86efac", "#67e8f9"];
-
 function AnnouncementPagesEditor({
   payload,
   setPayload,
@@ -2646,7 +2650,7 @@ function AnnouncementPagesEditor({
   );
   const changePage = (index: number) => {
     const next = { ...payload, announcementPage: index };
-    setPayload({ announcementPage: index, announcementPages: pages, html: pages[0] });
+    setPayload({ announcementPage: index, announcementPages: pages, html: pages[index] });
     onPreview(pages[index], next);
   };
   const changePageContent = (html: string) => {
@@ -2685,6 +2689,9 @@ function AnnouncementPagesEditor({
         html={pages[current]}
         fontSize={Number(payload.fontSize || 64)}
         onFontSize={(fontSize) => setPayload({ fontSize })}
+        fontFamily={String(payload.fontFamily || "Inter")}
+        onFontFamily={(fontFamily) => setPayload({ fontFamily })}
+        onTextColor={(color) => setPayload({ color })}
         shadow={{
           enabled: payload.shadowEnabled !== false,
           color: String(payload.shadowColor || "#000000"),
@@ -2712,6 +2719,9 @@ function RichAnnouncementEditor({
   html,
   fontSize,
   onFontSize,
+  fontFamily,
+  onFontFamily,
+  onTextColor,
   shadow,
   onShadowChange,
   onChange,
@@ -2719,6 +2729,9 @@ function RichAnnouncementEditor({
   html: string;
   fontSize: number;
   onFontSize: (value: number) => void;
+  fontFamily: string;
+  onFontFamily: (value: string) => void;
+  onTextColor: (value: string) => void;
   shadow: { enabled: boolean; color: string; blur: number };
   onShadowChange: (shadow: {
     enabled: boolean;
@@ -2752,6 +2765,9 @@ function RichAnnouncementEditor({
         editor={editor}
         fontSize={fontSize}
         onFontSize={onFontSize}
+        fontFamily={fontFamily}
+        onFontFamily={onFontFamily}
+        onTextColor={onTextColor}
         shadow={shadow}
         onShadowChange={onShadowChange}
       />
@@ -2891,12 +2907,10 @@ function DesignControls({
   payload: p,
   setPayload,
   showSize = true,
-  showTextColor = false,
 }: {
   payload: any;
   setPayload: (patch: Record<string, unknown>) => void;
   showSize?: boolean;
-  showTextColor?: boolean;
 }) {
   const position = p.position || "center";
   const template = p.template || "plain";
@@ -3028,14 +3042,6 @@ function DesignControls({
         value={String(p.backgroundColor || "#000000").slice(0, 7)}
         onChange={(backgroundColor) => setPayload({ backgroundColor })}
       />
-      {showTextColor && (
-        <PresetPalette
-          label="Color del texto"
-          colors={announcementTextColors}
-          value={String(p.color || "#ffffff").slice(0, 7)}
-          onChange={(color) => setPayload({ color })}
-        />
-      )}
     </>
   );
 }
@@ -3121,11 +3127,13 @@ function AnnouncementPreview({
   media,
   state,
   previewAspectRatio,
+  onOpenPreview,
 }: {
   item: MeetingItem;
   media: MediaItem[];
   state: ProjectionState;
   previewAspectRatio: string;
+  onOpenPreview: () => void;
 }) {
   const p = item.payload as any;
   const previewPages = announcementPages(p);
@@ -3172,7 +3180,18 @@ function AnnouncementPreview({
           <span className="live-dot" />
           VISTA PREVIA
         </div>
-        <small>{previewAspectRatio.replace(/\s*\/\s*/, ":")} · cambios en vivo</small>
+        <div className="preview-heading-actions">
+          <small>{previewAspectRatio.replace(/\s*\/\s*/, ":")} · cambios en vivo</small>
+          <button
+            type="button"
+            className="secondary preview-editor-button"
+            onClick={onOpenPreview}
+            aria-label="Ampliar vista previa"
+            title="Ampliar vista previa sin enviar al proyector"
+          >
+            <MonitorPlay />
+          </button>
+        </div>
       </div>
       <div className="designer-preview" style={{ aspectRatio: previewAspectRatio }}>
         <ProjectionStage state={previewState} preview />

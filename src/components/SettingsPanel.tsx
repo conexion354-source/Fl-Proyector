@@ -87,8 +87,44 @@ const referenceDesigns: Array<{
   { value: "lower-third", label: "Lower third", detail: "Franja profesional" },
   { value: "broadcast", label: "TV en vivo", detail: "Doble acento" },
 ];
-const longBiblePreviewPassage =
-  "Porque de tal manera amó Dios al mundo, que ha dado á su Hijo unigénito, para que todo aquel que en él cree, no se pierda, mas tenga vida eterna. Porque no envió Dios á su Hijo al mundo, para que condene al mundo, mas para que el mundo sea salvo por él. El que en él cree, no es condenado; mas el que no cree, ya es condenado, porque no creyó en el nombre del unigénito Hijo de Dios.";
+const fallbackBiblePreview = {
+  text: "Porque de tal manera amó Dios al mundo, que ha dado a su Hijo unigénito, para que todo aquel que en él cree no se pierda, sino que tenga vida eterna.",
+  reference: "Juan 3:16",
+  version: "RVR1960",
+};
+
+function biblePreviewSource(state: ProjectionState) {
+  const savedText = state.text.sourceBibleText?.trim();
+  if (savedText)
+    return {
+      text: savedText,
+      reference: state.text.sourceBibleReference?.trim() || fallbackBiblePreview.reference,
+      version: state.text.sourceBibleVersion?.trim() || "",
+    };
+  if (state.text.kind !== "biblia" || !state.text.html.trim())
+    return fallbackBiblePreview;
+  const holder = document.createElement("div");
+  holder.innerHTML = state.text.html;
+  const text = holder.querySelector(".bible-verse-text")?.textContent?.replace(/\s+/g, " ").trim();
+  if (!text) return fallbackBiblePreview;
+  const referenceParts = holder
+    .querySelector(".bible-reference-label")
+    ?.textContent?.split("·")
+    .map((part) => part.trim())
+    .filter(Boolean) ?? [];
+  return {
+    text,
+    reference: referenceParts[0] || fallbackBiblePreview.reference,
+    version: referenceParts[1] || "",
+  };
+}
+
+function normalizedSize(raw: string, min: number, max: number, fallback: number) {
+  const parsed = Number(raw);
+  return Number.isFinite(parsed)
+    ? Math.max(min, Math.min(max, Math.round(parsed)))
+    : fallback;
+}
 
 function ColorDots({
   label,
@@ -258,12 +294,22 @@ export function SettingsPanel({
     apply: (value: number) => void,
     setDraft: (value: string) => void,
   ) => {
-    const parsed = Number(raw);
-    const value = Number.isFinite(parsed)
-      ? Math.max(min, Math.min(max, Math.round(parsed)))
-      : fallback;
+    const value = normalizedSize(raw, min, max, fallback);
     setDraft(String(value));
     apply(value);
+  };
+  const changeSizeDraft = (
+    raw: string,
+    min: number,
+    max: number,
+    setDraft: (value: string) => void,
+    apply: (value: number) => void,
+  ) => {
+    setDraft(raw);
+    if (!raw.trim()) return;
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed >= min && parsed <= max)
+      apply(Math.round(parsed));
   };
   useEffect(() => {
     if (openVersionSectionSignal > 0) setSection("version");
@@ -354,34 +400,99 @@ export function SettingsPanel({
       }));
   };
   const saveBible = async () => {
+    const nextBible = {
+      ...bible,
+      referenceFontSize: normalizedSize(
+        bibleReferenceFontSizeInput,
+        10,
+        120,
+        bible.referenceFontSize,
+      ),
+      textFontSize: normalizedSize(
+        bibleTextFontSizeInput,
+        24,
+        200,
+        bible.textFontSize,
+      ),
+    };
+    const source = biblePreviewSource(state);
+    const hasLiveBibleSource = Boolean(
+      state.text.sourceBibleText?.trim() ||
+        (state.text.kind === "biblia" &&
+          state.text.html.includes("bible-verse-text")),
+    );
+    const liveSlide =
+      state.text.kind === "biblia" && hasLiveBibleSource
+        ? buildBibleSlides(
+            source.text,
+            source.reference,
+            source.version,
+            nextBible,
+            state.outputViewport,
+          )[0]
+        : null;
+    setBible(nextBible);
+    setBibleReferenceFontSizeInput(String(nextBible.referenceFontSize));
+    setBibleTextFontSizeInput(String(nextBible.textFontSize));
     await withSaveNotification(async () => {
-      await window.flProyector.saveBibleDisplaySettings(bible);
-      update({ bibleStyle: bible });
+      await window.flProyector.saveBibleDisplaySettings(nextBible);
+      update({
+        bibleStyle: nextBible,
+        ...(liveSlide
+          ? {
+              text: {
+                html: liveSlide.html,
+                fontSize: nextBible.textFontSize,
+                fontFamily: nextBible.textFontFamily,
+                color: nextBible.textColor,
+                shadowEnabled: nextBible.textShadowEnabled,
+                shadowColor: nextBible.textShadowColor,
+                shadowBlur: nextBible.textShadowBlur,
+                sourceBibleText: liveSlide.sourceText,
+                sourceBibleReference: liveSlide.reference,
+                sourceBibleVersion: liveSlide.version,
+              },
+            }
+          : {}),
+      });
     }, "La configuración bíblica fue guardada.");
   };
   const saveSongStyle = async () => {
+    const nextSongStyle = {
+      ...songStyle,
+      fontSize: normalizedSize(songFontSizeInput, 24, 200, songStyle.fontSize),
+      titleFontSize: normalizedSize(
+        songTitleFontSizeInput,
+        14,
+        96,
+        songStyle.titleFontSize,
+      ),
+    };
+    setSongStyle(nextSongStyle);
+    setSongFontSizeInput(String(nextSongStyle.fontSize));
+    setSongTitleFontSizeInput(String(nextSongStyle.titleFontSize));
     await withSaveNotification(async () => {
-      await window.flProyector.saveSongDisplaySettings(songStyle);
+      await window.flProyector.saveSongDisplaySettings(nextSongStyle);
       update({
-        songStyle,
+        songStyle: nextSongStyle,
         ...(state.text.kind === "canto"
           ? {
               text: {
                 ...state.text,
-                fontSize: songStyle.fontSize,
-                fontFamily: songStyle.fontFamily,
-                color: songStyle.textColor,
-                backgroundColor: songStyle.backgroundColor,
-                position: songStyle.position,
-                align: songStyle.align,
-                borderRadius: songStyle.borderRadius,
-                template: songStyle.template,
-                title: songStyle.showTitle ? state.text.title : "",
-                titlePosition: songStyle.titlePosition,
-                titleColor: songStyle.titleColor,
-                titleBackground: songStyle.titleBackground,
-                titleFontSize: songStyle.titleFontSize,
-                titleStyle: songStyle.titleStyle,
+                fontSize: nextSongStyle.fontSize,
+                fontFamily: nextSongStyle.fontFamily,
+                color: nextSongStyle.textColor,
+                backgroundColor: nextSongStyle.backgroundColor,
+                position: nextSongStyle.position,
+                align: nextSongStyle.align,
+                borderRadius: nextSongStyle.borderRadius,
+                template: nextSongStyle.template,
+                title: nextSongStyle.showTitle ? state.text.title : "",
+                titlePosition: nextSongStyle.titlePosition,
+                titleColor: nextSongStyle.titleColor,
+                titleBackground: nextSongStyle.titleBackground,
+                titleFontSize: nextSongStyle.titleFontSize,
+                titleStyle: nextSongStyle.titleStyle,
               },
             }
           : {}),
@@ -391,10 +502,11 @@ export function SettingsPanel({
   const importBible = async () => {
     if (await window.flProyector.importBible()) reloadVersions();
   };
+  const previewBibleSource = biblePreviewSource(state);
   const biblePreview = buildBibleSlides(
-    longBiblePreviewPassage,
-    "Juan 3:16–18",
-    "RV1909",
+    previewBibleSource.text,
+    previewBibleSource.reference,
+    previewBibleSource.version,
     bible,
     state.outputViewport,
   )[0];
@@ -733,7 +845,16 @@ export function SettingsPanel({
                         min="24"
                         max="200"
                         value={songFontSizeInput}
-                        onChange={(e) => setSongFontSizeInput(e.target.value)}
+                        onChange={(e) =>
+                          changeSizeDraft(
+                            e.target.value,
+                            24,
+                            200,
+                            setSongFontSizeInput,
+                            (fontSize) =>
+                              setSongStyle((value) => ({ ...value, fontSize })),
+                          )
+                        }
                         onBlur={() =>
                           commitSize(
                             songFontSizeInput,
@@ -824,7 +945,19 @@ export function SettingsPanel({
                           min="14"
                           max="96"
                           value={songTitleFontSizeInput}
-                          onChange={(e) => setSongTitleFontSizeInput(e.target.value)}
+                          onChange={(e) =>
+                            changeSizeDraft(
+                              e.target.value,
+                              14,
+                              96,
+                              setSongTitleFontSizeInput,
+                              (titleFontSize) =>
+                                setSongStyle((value) => ({
+                                  ...value,
+                                  titleFontSize,
+                                })),
+                            )
+                          }
                           onBlur={() =>
                             commitSize(
                               songTitleFontSizeInput,
@@ -1324,7 +1457,19 @@ export function SettingsPanel({
                         min="10"
                         max="120"
                         value={bibleReferenceFontSizeInput}
-                        onChange={(e) => setBibleReferenceFontSizeInput(e.target.value)}
+                        onChange={(e) =>
+                          changeSizeDraft(
+                            e.target.value,
+                            10,
+                            120,
+                            setBibleReferenceFontSizeInput,
+                            (referenceFontSize) =>
+                              setBible((value) => ({
+                                ...value,
+                                referenceFontSize,
+                              })),
+                          )
+                        }
                         onBlur={() =>
                           commitSize(
                             bibleReferenceFontSizeInput,
@@ -1429,7 +1574,16 @@ export function SettingsPanel({
                         min="24"
                         max="200"
                         value={bibleTextFontSizeInput}
-                        onChange={(e) => setBibleTextFontSizeInput(e.target.value)}
+                        onChange={(e) =>
+                          changeSizeDraft(
+                            e.target.value,
+                            24,
+                            200,
+                            setBibleTextFontSizeInput,
+                            (textFontSize) =>
+                              setBible((value) => ({ ...value, textFontSize })),
+                          )
+                        }
                         onBlur={() =>
                           commitSize(
                             bibleTextFontSizeInput,

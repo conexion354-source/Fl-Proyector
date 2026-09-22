@@ -327,6 +327,10 @@ export type ProjectionState = {
     /** Song and section currently feeding the projection, when applicable. */
     sourceSongId?: number | null;
     sourceSectionIndex?: number | null;
+    /** Last Bible verse feeding the projection, retained for settings previews. */
+    sourceBibleText?: string | null;
+    sourceBibleReference?: string | null;
+    sourceBibleVersion?: string | null;
     fontSize: number;
     fontFamily: string;
     align: "left" | "center" | "right";
@@ -376,6 +380,9 @@ export const initialProjectionState: ProjectionState = {
     kind: "biblia",
     sourceSongId: null,
     sourceSectionIndex: null,
+    sourceBibleText: null,
+    sourceBibleReference: null,
+    sourceBibleVersion: null,
     fontSize: 64,
     fontFamily: "Inter",
     align: "center",

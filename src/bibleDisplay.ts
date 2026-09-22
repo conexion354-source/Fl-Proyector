@@ -10,6 +10,9 @@ export type BibleSlide = {
   contentHtml: string;
   fontSize: number;
   label: string;
+  sourceText: string;
+  reference: string;
+  version: string;
 };
 
 const escapeHtml = (value: string) =>
@@ -87,6 +90,9 @@ export function buildBibleSlides(
       contentHtml: escapeHtml(piece),
       fontSize,
       label: `${reference}${partSuffix}`,
+      sourceText: text,
+      reference,
+      version,
     };
   });
 }

@@ -892,6 +892,13 @@ html[data-theme="light"] .announcement-editor .tiptap {
   color: #697282;
   letter-spacing: 0;
 }
+.preview-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
 .designer-preview {
   position: relative;
   aspect-ratio: 16/9;
@@ -951,9 +958,13 @@ html[data-theme="light"] .announcement-editor .tiptap {
   gap: 4px;
 }
 .announcement-toolbar > select {
-  min-width: 112px;
-  width: 112px;
-  height: 32px;
+  min-width: 148px;
+  width: 148px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 32px 0 10px;
+  line-height: normal;
+  text-overflow: ellipsis;
 }
 .announcement-toolbar .toolbar-size {
   width: 112px;
@@ -1029,8 +1040,13 @@ html[data-theme="light"] .announcement-editor .tiptap {
   gap: 5px;
 }
 .lower-third-gallery button {
-  height: 52px;
+  height: auto;
+  min-height: 58px;
   gap: 3px;
+  min-width: 0;
+  padding: 5px 4px;
+  line-height: 1.12;
+  white-space: normal;
 }
 .lower-third-gallery i {
   width: 48px;
@@ -1095,6 +1111,10 @@ html[data-theme="light"] .announcement-editor .tiptap {
   justify-content: center;
   gap: 8px;
   cursor: pointer;
+  min-width: 0;
+  padding-inline: 7px;
+  line-height: 1.15;
+  white-space: normal;
 }
 .announcement-position-grid button.active {
   border-color: #7168ff;
@@ -1171,11 +1191,25 @@ html[data-theme="light"] .announcement-editor .tiptap {
   background: #e81123 !important;
 }
 .announcement-visual-dialog .announcement-preview {
+  /* Reserve a real header lane for the floating close control. This keeps it
+     clear of the preview card border at every dialog width. */
   margin-top: 38px;
 }
 .announcement-visual-dialog .design-fields {
   margin-top: 8px;
   gap: 10px;
+}
+.announcement-visual-dialog .announcement-animation-field,
+.announcement-visual-dialog .design-fields label {
+  gap: 7px;
+  line-height: 1.35;
+}
+.announcement-visual-dialog .announcement-animation-field select,
+.announcement-visual-dialog .design-fields select {
+  height: 38px;
+  min-height: 38px;
+  padding: 0 34px 0 12px;
+  line-height: normal;
 }
 .announcement-visual-dialog .inspector-actions {
   position: sticky;

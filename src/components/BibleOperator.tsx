@@ -256,6 +256,9 @@ export function BibleOperator({
       lowerThird: { visible: false },
       text: {
         html: slide.html,
+        sourceBibleText: slide.sourceText,
+        sourceBibleReference: slide.reference,
+        sourceBibleVersion: slide.version,
         fontSize:
           state.bibleStyle.longVerseMode === "auto-fit"
             ? state.bibleStyle.textFontSize

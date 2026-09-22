@@ -1931,6 +1931,17 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
 .app-shell .announcement-toolbar .toolbar-palette button.format-swatch,
 .app-shell .announcement-toolbar .toolbar-palette button.format-swatch:hover,
 .app-shell .announcement-toolbar .toolbar-palette button.format-swatch:focus-visible {
+  display:block!important;
+  flex:0 0 24px!important;
+  width:24px!important;
+  min-width:24px!important;
+  max-width:24px!important;
+  height:24px!important;
+  min-height:24px!important;
+  max-height:24px!important;
+  aspect-ratio:1 / 1!important;
+  padding:0!important;
+  border-radius:50%!important;
   background-color:var(--swatch)!important;
   background-image:none!important;
   border-color:rgb(255 255 255 / 42%)!important;
@@ -2479,4 +2490,233 @@ html:not([data-theme="light"]) .app-shell :is(.announcement-editor,.rich-editor,
   .app-shell .bible-toolbar .bible-search {
     grid-column:1 / -1;
   }
+}
+
+/* Compact Fluent density pass. This layer only changes presentation: the
+   existing components, handlers and state remain untouched. */
+.app-shell {
+  --fl-control-height: 32px;
+  --fl-row-height: 40px;
+  --fl-radius: 4px;
+}
+.app-shell :is(input:not([type="checkbox"]):not([type="range"]), select) {
+  min-height: var(--fl-control-height);
+  height: var(--fl-control-height);
+  border-radius: var(--fl-radius)!important;
+}
+.app-shell :is(button, input, select, textarea) {
+  font-size: 13px;
+}
+.topbar {
+  height: 44px;
+  min-height: 44px;
+  padding-inline: 10px;
+  gap: 10px;
+}
+.sidebar {
+  width: 168px;
+  min-width: 168px;
+  flex-basis: 168px;
+  height: calc(100vh - 44px);
+  padding: 10px 7px;
+}
+.sidebar button {
+  height: 34px;
+  padding-inline: 10px;
+  gap: 10px;
+  font-size: 13px;
+}
+.settings-page {
+  grid-template-columns: 176px minmax(0, 1fr);
+}
+.settings-menu {
+  padding: 14px 8px;
+}
+.settings-menu button {
+  height: 34px;
+  padding-inline: 9px;
+  font-size: 12px;
+}
+.settings-content {
+  padding: 18px 20px 26px;
+}
+.settings-card {
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: var(--fl-radius)!important;
+}
+.settings-card h3 {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.settings-row,
+.win11-expander-grid {
+  gap: 8px;
+  margin-top: 8px;
+}
+.toggle-row {
+  min-height: 34px;
+  margin-bottom: 5px;
+}
+.meeting-page {
+  grid-template-columns: var(--meeting-list-width, 204px) 4px minmax(300px,1fr) 4px var(--item-panel-width, 280px);
+}
+.meeting-list {
+  padding: 12px 8px;
+}
+.create-meeting {
+  height: 32px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+.meeting-list>button:not(.create-meeting) {
+  min-height: 46px;
+  margin: 3px 0;
+  padding: 6px 8px;
+  border-radius: var(--fl-radius);
+}
+.meeting-list strong { font-size: 12px; }
+.meeting-list span { font-size: 10px; }
+.rundown {
+  padding: 14px;
+}
+.add-item-row {
+  gap: 6px;
+}
+.add-item-row button {
+  height: 44px;
+  border-radius: var(--fl-radius);
+  font-size: 10px;
+}
+.rundown-list {
+  gap: 6px;
+}
+.rundown-list article {
+  height: 56px;
+  padding-inline: 9px;
+  gap: 7px;
+  border-radius: 6px;
+}
+.rundown-list article strong { font-size: 12px; }
+.rundown-list article span { font-size: 10px; }
+.rundown-list article>button {
+  min-width: 68px;
+  height: 28px;
+  padding-inline: 7px;
+  font-size: 10px;
+}
+.item-inspector {
+  padding: 14px 12px;
+}
+.master-controls {
+  margin-top: 12px;
+}
+.master-grid {
+  gap: 6px;
+}
+.master-grid button {
+  height: 44px;
+  border-radius: var(--fl-radius);
+  font-size: 10px;
+}
+.background-controls {
+  margin-top: 10px;
+  padding: 11px;
+  border-radius: var(--fl-radius);
+}
+.library-panel,
+.editor-panel,
+.bible-page {
+  padding: 16px 18px 0;
+}
+.section-title {
+  margin-bottom: 12px;
+}
+.section-title h2 {
+  font-size: 24px;
+}
+
+/* Shared alignment rules for rows, toolbars and dialogs. Keeping these on the
+   common surfaces prevents long labels from pushing actions out of view. */
+.app-shell :is(.meeting-list>button, .song-list>button, .media-card, .rundown-list article,
+  .settings-card, .toolbar, .announcement-toolbar, .stanza-toolbar) {
+  min-width: 0;
+  box-sizing: border-box;
+}
+.app-shell :is(.toolbar, .announcement-toolbar, .stanza-toolbar) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.app-shell :is(.toolbar button, .announcement-toolbar button, .stanza-toolbar button,
+  .inspector-actions button, .editor-actions button, .song-create-actions button,
+  .confirm-delete-actions button, .bible-picker-footer button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-height: 32px;
+  gap: 6px;
+  white-space: nowrap;
+}
+.app-shell :is(.toolbar button, .announcement-toolbar button, .stanza-toolbar button) svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+.app-shell :is(.meeting-list>button, .song-list>button, .rundown-list article) > :is(div, strong) {
+  min-width: 0;
+}
+.app-shell :is(.meeting-list strong, .song-list strong, .rundown-list article strong,
+  .media-meta strong, .media-meta span) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-shell :is(.meeting-list>button, .song-list>button, .rundown-list article) > button {
+  flex: 0 0 auto;
+  white-space: nowrap!important;
+}
+.app-shell :is(.item-edit-dialog, .song-create-dialog, .library-picker, .bible-picker,
+  .reference-design-dialog, .background-assignment-dialog, .overlay-settings-dialog,
+  .preview-only-dialog, .confirm-delete-dialog) {
+  box-sizing: border-box;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+}
+.app-shell :is(.inspector-actions, .editor-actions, .song-create-actions,
+  .confirm-delete-actions, .bible-picker-footer) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.app-shell :is(.dialog-close, .win11-settings-close, .help-dialog-close,
+  .media-tags-close, .live-audience-dialog-close) {
+  flex: 0 0 auto;
+}
+@media (max-width: 900px) {
+  .app-shell .meeting-page {
+    grid-template-columns: 190px 4px minmax(260px,1fr) 4px 240px;
+  }
+  .app-shell .live-panel {
+    min-width: 260px;
+    width: min(34vw, 320px);
+    flex-basis: min(34vw, 320px);
+  }
+}
+@media (max-width: 620px) {
+  .app-shell .topbar { gap: 6px; }
+  .app-shell .topbar .on-air { display: none; }
+  .app-shell .sidebar { width: 58px; min-width: 58px; flex-basis: 58px; }
+  .app-shell .sidebar button { justify-content: center; padding-inline: 0; }
+  .app-shell .sidebar button span { display: none; }
+  .app-shell .sidebar button svg { width: 18px; }
+  .app-shell .settings-page { grid-template-columns: 1fr; }
+  .app-shell .settings-menu { overflow-x: auto; }
+  .app-shell .settings-content { padding: 14px; }
+  .app-shell .toolbar,
+  .app-shell .announcement-toolbar,
+  .app-shell .stanza-toolbar { flex-wrap: wrap; }
 }
