@@ -704,6 +704,7 @@ function PresentationLayer({
         >
           <PowerPointViewer
             ref={viewer}
+            className="fl-presentation-viewer"
             content={content}
             filePath={presentation.path || undefined}
             fileName={presentation.name}

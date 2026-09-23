@@ -3574,6 +3574,12 @@
   height: 100% !important;
   min-height: 0 !important;
 }
+/* FL Proyector owns navigation from the control panel and remote. The
+   renderer's floating slideshow toolbar must never cover the projected deck
+   or provide a second, unsynchronised set of controls. */
+.presentation-layer [data-pptx-present-toolbar] {
+  display: none !important;
+}
 .presentation-loading {
   width: 100%;
   height: 100%;

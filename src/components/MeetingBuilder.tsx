@@ -2269,7 +2269,7 @@ function PresentationSummary({
           <small>El modo nativo conserva efectos, transiciones y audio originales.</small>
         </>
       ) : (
-        <small>El visor integrado reproduce cada aparición y transición al avanzar.</small>
+        <small>La vista integrada es compatible con diapositivas simples. Para conservar todos los efectos y medios originales, abrila con PowerPoint.</small>
       )}
     </div>
   );
