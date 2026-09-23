@@ -46,7 +46,7 @@
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
     "lucide-react": "latest",
-    "pptx-react-viewer": "^3.7.0",
+    "pptx-react-viewer": "^3.21.0",
     "qrcode": "^1.5.4",
     "react": "latest",
     "react-dom": "latest",

@@ -11,7 +11,6 @@ import {
   ChevronDown,
   ChevronUp,
   Edit3,
-  ExternalLink,
   GripVertical,
   Image,
   ListPlus,
@@ -986,13 +985,6 @@ export function MeetingBuilder({
 
   const firePresentation = (item: MeetingItem, requestedIndex = 0) => {
     const payload = item.payload as any;
-    if (payload.nativeOnly) {
-      // Legacy binary files keep their animations, timings and embedded media
-      // only when their native presentation app renders them.
-      void window.flProyector.openPresentation(String(payload.path || ""));
-      setOnAirItemId(item.id);
-      return;
-    }
     const slideCount =
       state.presentation.path === String(payload.path)
         ? state.presentation.slideCount
@@ -2257,20 +2249,10 @@ function PresentationSummary({
           </span>
         </div>
       </div>
-      <button
-        type="button"
-        className="native-presentation-open"
-        onClick={() => void window.flProyector.openPresentation(String(payload.path || ""))}
-      >
-        <ExternalLink /> Abrir con PowerPoint del sistema
-      </button>
-      {payload.nativeOnly ? (
-        <>
-          <small>El modo nativo conserva efectos, transiciones y audio originales.</small>
-        </>
-      ) : (
-        <small>La vista integrada es compatible con diapositivas simples. Para conservar todos los efectos y medios originales, abrila con PowerPoint.</small>
-      )}
+      <small>
+        La presentación se reproduce dentro de FL Proyector, respetando el orden
+        de sus animaciones y transiciones compatibles.
+      </small>
     </div>
   );
 }
@@ -2657,11 +2639,6 @@ function ItemEditor({
         {item.type === "presentation" && (
           <>
             <div className="file-path">{String(p.path || "")}</div>
-            {p.nativeOnly && (
-              <p className="native-presentation-note">
-                Se abrirá con PowerPoint del sistema para conservar sus efectos.
-              </p>
-            )}
           </>
         )}
         <div className="inspector-actions">
