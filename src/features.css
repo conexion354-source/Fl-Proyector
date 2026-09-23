@@ -3598,26 +3598,6 @@
   stroke: #746bff;
   stroke-width: 1.5;
 }
-.native-presentation-layer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: #e5e7eb;
-  text-align: center;
-}
-.native-presentation-layer svg {
-  width: 54px;
-  height: 54px;
-  fill: none;
-  stroke: #746bff;
-  stroke-width: 1.5;
-}
-.native-presentation-layer span { color: #9ca3b3; font-size: 14px; }
-.presentation-preview.native-presentation-layer { gap: 3px; font-size: 7px; }
-.presentation-preview.native-presentation-layer svg { width: 19px; height: 19px; }
-.presentation-preview.native-presentation-layer span { font-size: 6px; }
 .presentation-preview .presentation-loading {
   font-size: 8px;
   gap: 4px;

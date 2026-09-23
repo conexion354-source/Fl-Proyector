@@ -309,8 +309,6 @@ export type PresentationState = {
   /** A command token advances PowerPoint builds before changing slide. */
   navigationId: number;
   navigationDirection: -1 | 1;
-  /** Windows delegates complex decks to Microsoft PowerPoint itself. */
-  nativePlayback?: boolean;
   visible: boolean;
   previewSlides?: string[];
 };
@@ -426,7 +424,6 @@ export const initialProjectionState: ProjectionState = {
     slideCount: 0,
     navigationId: 0,
     navigationDirection: 1,
-    nativePlayback: false,
     visible: false,
   },
   video: { playing: false, loop: true, volume: 1, muted: false, seekTime: 0, commandId: 0, duration: 0, currentTime: 0 },

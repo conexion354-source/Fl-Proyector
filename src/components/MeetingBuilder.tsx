@@ -986,9 +986,7 @@ export function MeetingBuilder({
 
   const firePresentation = (item: MeetingItem, requestedIndex = 0) => {
     const payload = item.payload as any;
-    const useNativePowerPoint =
-      window.flProyector.platform === "win32" && Boolean(payload.path);
-    if (payload.nativeOnly && !useNativePowerPoint) {
+    if (payload.nativeOnly) {
       // Legacy binary files keep their animations, timings and embedded media
       // only when their native presentation app renders them.
       void window.flProyector.openPresentation(String(payload.path || ""));
@@ -1010,11 +1008,6 @@ export function MeetingBuilder({
     );
     const restoredBackground = releaseMeetingVideoBackground();
     setOnAirItemId(item.id);
-    if (useNativePowerPoint)
-      void window.flProyector.openPresentation(String(payload.path)).then((result) => {
-        if (!result.ok)
-          console.error("No se pudo iniciar Microsoft PowerPoint", result.error);
-      });
     update({
       blackout: false,
       logo: false,
@@ -1031,7 +1024,6 @@ export function MeetingBuilder({
         slideCount,
         navigationId: state.presentation.navigationId,
         navigationDirection: 1,
-        nativePlayback: useNativePowerPoint,
         visible: true,
       },
     });
@@ -1044,17 +1036,6 @@ export function MeetingBuilder({
       state.presentation.path === String(payload.path);
     if (!isActive) {
       firePresentation(item, 0);
-      return;
-    }
-    if (state.presentation.nativePlayback) {
-      void window.flProyector.navigateNativePresentation(direction).then((result) => {
-        if (!result.ok) {
-          console.error("No se pudo avanzar Microsoft PowerPoint", result.error);
-          return;
-        }
-        if (result.slideIndex !== undefined)
-          update({ presentation: { slideIndex: result.slideIndex } });
-      });
       return;
     }
     update({
@@ -1148,7 +1129,6 @@ export function MeetingBuilder({
             slideCount: 1,
             navigationId: state.presentation.navigationId,
             navigationDirection: 1,
-            nativePlayback: false,
             visible: true,
           },
         });
@@ -1247,10 +1227,10 @@ export function MeetingBuilder({
       const pages = announcementPages(payload);
       next.text = { ...state.text, html: pages[Number(payload.announcementPage || 0)] || pages[0], kind: "anuncio", visible: true, position: payload.position || "center", fontSize: Number(payload.fontSize || 64), color: payload.color || "#ffffff", backgroundColor: payload.backgroundColor || "rgba(0,0,0,.55)", align: payload.align || "center", borderRadius: Number(payload.borderRadius || 0), template: payload.template || "plain", animation: payload.animation || "fade", shadowEnabled: payload.shadowEnabled !== false, shadowColor: payload.shadowColor || "#000000", shadowBlur: Number(payload.shadowBlur ?? 14) };
     } else if (item.type === "presentation") {
-      next.presentation = { path: String(payload.path || ""), url: String(payload.url || ""), name: String(payload.name || item.title), previewSlides: payload.previewSlides as string[] | undefined, slideIndex: 0, slideCount: Number(payload.slideCount || 0), navigationId: state.presentation.navigationId, navigationDirection: 1, nativePlayback: false, visible: true };
+      next.presentation = { path: String(payload.path || ""), url: String(payload.url || ""), name: String(payload.name || item.title), previewSlides: payload.previewSlides as string[] | undefined, slideIndex: 0, slideCount: Number(payload.slideCount || 0), navigationId: state.presentation.navigationId, navigationDirection: 1, visible: true };
       next.text = { ...state.text, visible: false };
     } else if (source?.kind === "image") {
-      next.presentation = { path: null, url: source.url, name: source.name, previewSlides: [source.url], slideIndex: 0, slideCount: 1, navigationId: state.presentation.navigationId, navigationDirection: 1, nativePlayback: false, visible: true };
+      next.presentation = { path: null, url: source.url, name: source.name, previewSlides: [source.url], slideIndex: 0, slideCount: 1, navigationId: state.presentation.navigationId, navigationDirection: 1, visible: true };
       next.text = { ...state.text, visible: false };
     }
     setPreviewDraft(next);

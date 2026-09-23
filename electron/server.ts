@@ -102,7 +102,6 @@ type CollaboratorSource = {
 export function startRemoteServer(
   getState: () => ProjectionState,
   applyPatch: (patch: ProjectionPatch) => void,
-  navigateNativePresentation: (direction: -1 | 1) => void,
   bible: BibleRemoteSource,
   multimedia: MultimediaRemoteSource,
   collaborator: CollaboratorSource,
@@ -565,10 +564,6 @@ export function startRemoteServer(
     const direction = Number(req.body?.direction);
     const current = getState().presentation;
     if (current.visible && (direction === -1 || direction === 1)) {
-      if (current.nativePlayback) {
-        navigateNativePresentation(direction as -1 | 1);
-        return res.status(204).end();
-      }
       applyPatch({
         presentation: {
           navigationId: Number(current.navigationId || 0) + 1,
@@ -661,10 +656,6 @@ export function startRemoteServer(
       socket.on("remote:presentation", (direction: -1 | 1) => {
         const current = getState().presentation;
         if (!current.visible || ![-1, 1].includes(direction)) return;
-        if (current.nativePlayback) {
-          navigateNativePresentation(direction);
-          return;
-        }
         applyPatch({
           presentation: {
             navigationId: Number(current.navigationId || 0) + 1,

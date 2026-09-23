@@ -133,16 +133,7 @@ declare global {
         nativeOnly?: boolean;
       } | null>;
       readPresentation(path: string): Promise<Uint8Array>;
-      openPresentation(path: string): Promise<{
-        ok: boolean;
-        slideIndex?: number;
-        error?: string;
-      }>;
-      navigateNativePresentation(direction: -1 | 1): Promise<{
-        ok: boolean;
-        slideIndex?: number;
-        error?: string;
-      }>;
+      openPresentation(path: string): Promise<string>;
       openExternal(url: string): Promise<boolean>;
       getUpdateStatus(): Promise<UpdateStatus>;
       getReleaseHistory(): Promise<ReleaseHistoryEntry[]>;
