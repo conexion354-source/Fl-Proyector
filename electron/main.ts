@@ -130,6 +130,7 @@ let churchAssetsDir = "";
 let updaterConfigured = false;
 let liveAudienceCaptureTimer: ReturnType<typeof setTimeout> | null = null;
 let liveAudienceCaptureRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let nativePresentationPath: string | null = null;
 const openverseSearchCache = new Map<
   string,
   { expiresAt: number; value: OpenverseSearchResponse }
@@ -507,6 +508,8 @@ function registerAutoUpdaterEvents() {
 }
 
 function mergeState(patch: ProjectionPatch) {
+  if (state.presentation.nativePlayback && patch.presentation?.visible === false)
+    stopNativePresentation();
   if (
     patch.video?.playing === true &&
     patch.video.loop === false &&
@@ -566,6 +569,112 @@ function mergeState(patch: ProjectionPatch) {
     floatingPreviewWindow.webContents.send("projection:state", previewState ?? state);
   remoteServer?.broadcast(liveState);
   scheduleLiveAudienceFrame();
+}
+
+type NativePresentationResult = {
+  ok: boolean;
+  slideIndex?: number;
+  error?: string;
+};
+
+function runPowerShell(script: string, presentationPath?: string) {
+  return new Promise<string>((resolve, reject) => {
+    const child = spawn(
+      "powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-STA", "-Command", script],
+      {
+        windowsHide: true,
+        env: {
+          ...process.env,
+          ...(presentationPath ? { FL_PRESENTATION_PATH: presentationPath } : {}),
+        },
+      },
+    );
+    let output = "";
+    let error = "";
+    child.stdout.on("data", (chunk) => (output += String(chunk)));
+    child.stderr.on("data", (chunk) => (error += String(chunk)));
+    child.once("error", reject);
+    child.once("close", (code) => {
+      if (code === 0) return resolve(output.trim());
+      reject(new Error(error.trim() || "Microsoft PowerPoint no respondió."));
+    });
+  });
+}
+
+async function startNativePresentation(path: string): Promise<NativePresentationResult> {
+  if (process.platform !== "win32")
+    return { ok: false, error: "La reproducción nativa está disponible en Windows." };
+  try {
+    await runPowerShell(String.raw`
+$ErrorActionPreference = 'Stop'
+$path = $env:FL_PRESENTATION_PATH
+if (-not $path -or -not (Test-Path -LiteralPath $path)) { throw 'No se encontró el archivo de PowerPoint.' }
+try { $powerPoint = [Runtime.InteropServices.Marshal]::GetActiveObject('PowerPoint.Application') } catch { $powerPoint = New-Object -ComObject PowerPoint.Application }
+$powerPoint.Visible = $true
+$presentation = $null
+foreach ($candidate in $powerPoint.Presentations) { if ($candidate.FullName -eq $path) { $presentation = $candidate; break } }
+if (-not $presentation) { $presentation = $powerPoint.Presentations.Open($path, $false, $false, $true) }
+if ($powerPoint.SlideShowWindows.Count -eq 0) { $presentation.SlideShowSettings.Run() | Out-Null }
+`, path);
+    nativePresentationPath = path;
+    return { ok: true, slideIndex: 0 };
+  } catch (reason) {
+    return {
+      ok: false,
+      error: reason instanceof Error ? reason.message : String(reason),
+    };
+  }
+}
+
+async function navigateNativePresentation(
+  direction: -1 | 1,
+): Promise<NativePresentationResult> {
+  if (process.platform !== "win32" || !nativePresentationPath)
+    return { ok: false, error: "No hay una presentación nativa activa." };
+  try {
+    const slide = await runPowerShell(String.raw`
+$ErrorActionPreference = 'Stop'
+try { $powerPoint = [Runtime.InteropServices.Marshal]::GetActiveObject('PowerPoint.Application') } catch { throw 'Microsoft PowerPoint no está abierto.' }
+if ($powerPoint.SlideShowWindows.Count -eq 0) { throw 'La presentación no está en modo diapositivas.' }
+$view = $powerPoint.SlideShowWindows.Item(1).View
+if ('${direction}' -eq '1') { $view.Next() } else { $view.Previous() }
+$view.CurrentShowPosition
+`);
+    const position = Number(slide.trim());
+    return {
+      ok: true,
+      ...(Number.isFinite(position) && position > 0
+        ? { slideIndex: position - 1 }
+        : {}),
+    };
+  } catch (reason) {
+    return {
+      ok: false,
+      error: reason instanceof Error ? reason.message : String(reason),
+    };
+  }
+}
+
+function stopNativePresentation() {
+  nativePresentationPath = null;
+  if (process.platform !== "win32") return;
+  void runPowerShell(String.raw`
+$ErrorActionPreference = 'SilentlyContinue'
+$powerPoint = [Runtime.InteropServices.Marshal]::GetActiveObject('PowerPoint.Application')
+if ($powerPoint -and $powerPoint.SlideShowWindows.Count -gt 0) { $powerPoint.SlideShowWindows.Item(1).View.Exit() }
+`).catch(() => undefined);
+}
+
+function moveNativePresentation(direction: -1 | 1) {
+  void navigateNativePresentation(direction).then((result) => {
+    if (!result.ok) {
+      console.warn("No se pudo avanzar PowerPoint nativo:", result.error);
+      return;
+    }
+    if (result.slideIndex !== undefined)
+      mergeState({ presentation: { slideIndex: result.slideIndex } });
+  });
 }
 
 function currentLiveState() {
@@ -1440,9 +1549,14 @@ function projectRemoteMultimedia(itemId: number) {
       return;
     }
     const slideCount = Number(payload.slideCount || (payload.previewSlides as unknown[] | undefined)?.length || 0);
+    const nativePlayback = process.platform === "win32" && Boolean(payload.path);
+    if (nativePlayback)
+      void startNativePresentation(String(payload.path)).then((result) => {
+        if (!result.ok) console.warn("No se pudo abrir PowerPoint nativo:", result.error);
+      });
     mergeState({
       ...remoteBasePatch(), blackout: false, logo: false, text: { visible: false }, lowerThird: { visible: false },
-      presentation: { path: String(payload.path || ""), url: String(payload.url || ""), name: String(payload.name || item.title), previewSlides: payload.previewSlides as string[] | undefined, slideIndex: 0, slideCount, navigationId: state.presentation.navigationId, navigationDirection: 1, visible: true },
+      presentation: { path: String(payload.path || ""), url: String(payload.url || ""), name: String(payload.name || item.title), previewSlides: payload.previewSlides as string[] | undefined, slideIndex: 0, slideCount, navigationId: state.presentation.navigationId, navigationDirection: 1, nativePlayback, visible: true },
     });
     return;
   }
@@ -1472,7 +1586,7 @@ function projectRemoteMultimedia(itemId: number) {
   if (source.kind === "image") {
     mergeState({
       ...remoteBasePatch(), blackout: false, logo: false, text: { visible: false }, lowerThird: { visible: false },
-      presentation: { path: null, url: source.url, name: source.name, previewSlides: [source.url], slideIndex: 0, slideCount: 1, navigationId: state.presentation.navigationId, navigationDirection: 1, visible: true },
+      presentation: { path: null, url: source.url, name: source.name, previewSlides: [source.url], slideIndex: 0, slideCount: 1, navigationId: state.presentation.navigationId, navigationDirection: 1, nativePlayback: false, visible: true },
     });
     return;
   }
@@ -1796,7 +1910,7 @@ if (hasSingleInstanceLock)
         pathToFileURL(decodeURIComponent(url.pathname.slice(1))).toString(),
       );
     });
-    remoteServer = startRemoteServer(() => state, mergeState, {
+    remoteServer = startRemoteServer(() => state, mergeState, moveNativePresentation, {
       listVersions: () => database.listBibleVersions(true),
       listBooks: (versionId) => database.listBibleBooks(versionId),
       listVerses: (versionId, book, chapter) =>
@@ -2455,8 +2569,14 @@ if (hasSingleInstanceLock)
         throw new Error("El archivo de PowerPoint está vacío o dañado.");
       return content;
     });
-    ipcMain.handle("presentation:open", (_event, path: string) =>
-      shell.openPath(path),
+    ipcMain.handle("presentation:open", async (_event, path: string) => {
+      const source = String(path || "");
+      if (process.platform === "win32") return startNativePresentation(source);
+      const error = await shell.openPath(source);
+      return error ? { ok: false, error } : { ok: true };
+    });
+    ipcMain.handle("presentation:navigate-native", (_event, direction: -1 | 1) =>
+      navigateNativePresentation(direction === -1 ? -1 : 1),
     );
     await createControlWindow();
     const savedDisplaySettings = database.getDisplaySettings();

@@ -683,6 +683,17 @@ function PresentationLayer({
   if (!presentation.visible)
     return <div className="presentation-layer layer-hidden" />;
 
+  if (presentation.nativePlayback)
+    return (
+      <div
+        className={`presentation-layer layer-visible native-presentation-layer ${preview ? "presentation-preview" : ""}`}
+      >
+        <PresentationIcon />
+        <strong>Microsoft PowerPoint</strong>
+        <span>Reproducción nativa en curso</span>
+      </div>
+    );
+
   return (
     <div
       className={`presentation-layer layer-visible ${preview ? "presentation-preview" : ""}`}
