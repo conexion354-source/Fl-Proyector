@@ -561,13 +561,10 @@ export function startRemoteServer(
     const direction = Number(req.body?.direction);
     const current = getState().presentation;
     if (current.visible && (direction === -1 || direction === 1)) {
-      const requestedIndex = Math.max(0, current.slideIndex + direction);
       applyPatch({
         presentation: {
-          slideIndex:
-            current.slideCount > 0
-              ? Math.min(requestedIndex, Math.max(0, current.slideCount - 1))
-              : requestedIndex,
+          navigationId: Number(current.navigationId || 0) + 1,
+          navigationDirection: direction as -1 | 1,
         },
       });
     }
@@ -656,11 +653,12 @@ export function startRemoteServer(
       socket.on("remote:presentation", (direction: -1 | 1) => {
         const current = getState().presentation;
         if (!current.visible || ![-1, 1].includes(direction)) return;
-        const requestedIndex = Math.max(0, current.slideIndex + direction);
-        const slideIndex = current.slideCount > 0
-          ? Math.min(requestedIndex, Math.max(0, current.slideCount - 1))
-          : requestedIndex;
-        applyPatch({ presentation: { slideIndex } });
+        applyPatch({
+          presentation: {
+            navigationId: Number(current.navigationId || 0) + 1,
+            navigationDirection: direction,
+          },
+        });
       });
     }
     socket.on("live:join", (code: string) => {

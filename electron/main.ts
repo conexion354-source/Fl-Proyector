@@ -620,14 +620,14 @@ function scheduleLiveAudienceFrame() {
     await captureLiveAudienceFrame();
     const capturedState = currentLiveState();
     if (!capturedState.presentation.visible) return;
-    const presentationKey = `${capturedState.presentation.url}|${capturedState.presentation.slideIndex}`;
+    const presentationKey = `${capturedState.presentation.url}|${capturedState.presentation.navigationId}`;
     let retries = 2;
     const retry = () => {
       liveAudienceCaptureRetryTimer = setTimeout(async () => {
         liveAudienceCaptureRetryTimer = null;
         if (
           !remoteServer?.needsLiveFrame(currentLiveState()) ||
-          `${currentLiveState().presentation.url}|${currentLiveState().presentation.slideIndex}` !==
+          `${currentLiveState().presentation.url}|${currentLiveState().presentation.navigationId}` !==
             presentationKey
         )
           return;
@@ -1442,7 +1442,7 @@ function projectRemoteMultimedia(itemId: number) {
     const slideCount = Number(payload.slideCount || (payload.previewSlides as unknown[] | undefined)?.length || 0);
     mergeState({
       ...remoteBasePatch(), blackout: false, logo: false, text: { visible: false }, lowerThird: { visible: false },
-      presentation: { path: String(payload.path || ""), url: String(payload.url || ""), name: String(payload.name || item.title), previewSlides: payload.previewSlides as string[] | undefined, slideIndex: 0, slideCount, visible: true },
+      presentation: { path: String(payload.path || ""), url: String(payload.url || ""), name: String(payload.name || item.title), previewSlides: payload.previewSlides as string[] | undefined, slideIndex: 0, slideCount, navigationId: state.presentation.navigationId, navigationDirection: 1, visible: true },
     });
     return;
   }
@@ -1472,7 +1472,7 @@ function projectRemoteMultimedia(itemId: number) {
   if (source.kind === "image") {
     mergeState({
       ...remoteBasePatch(), blackout: false, logo: false, text: { visible: false }, lowerThird: { visible: false },
-      presentation: { path: null, url: source.url, name: source.name, previewSlides: [source.url], slideIndex: 0, slideCount: 1, visible: true },
+      presentation: { path: null, url: source.url, name: source.name, previewSlides: [source.url], slideIndex: 0, slideCount: 1, navigationId: state.presentation.navigationId, navigationDirection: 1, visible: true },
     });
     return;
   }

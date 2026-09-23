@@ -306,6 +306,9 @@ export type PresentationState = {
   name: string;
   slideIndex: number;
   slideCount: number;
+  /** A command token advances PowerPoint builds before changing slide. */
+  navigationId: number;
+  navigationDirection: -1 | 1;
   visible: boolean;
   previewSlides?: string[];
 };
@@ -419,6 +422,8 @@ export const initialProjectionState: ProjectionState = {
     name: "",
     slideIndex: 0,
     slideCount: 0,
+    navigationId: 0,
+    navigationDirection: 1,
     visible: false,
   },
   video: { playing: false, loop: true, volume: 1, muted: false, seekTime: 0, commandId: 0, duration: 0, currentTime: 0 },

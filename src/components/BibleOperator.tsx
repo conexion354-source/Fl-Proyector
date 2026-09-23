@@ -415,6 +415,7 @@ export function BibleOperator({
     const handler = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (
+        !event.isTrusted ||
         !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(
           event.key,
         ) ||

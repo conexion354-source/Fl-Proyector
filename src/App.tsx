@@ -225,7 +225,7 @@ export function App() {
       await window.flProyector.clearProjectionContent();
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat || isEditableTarget(event.target)) return;
+      if (!event.isTrusted || event.repeat || isEditableTarget(event.target)) return;
       const pressed = normalizeShortcut(event).toLowerCase();
       const action = (Object.entries(loadShortcuts()) as [ShortcutAction, string][])
         .find(([, shortcut]) => shortcut.trim().toLowerCase() === pressed)?.[0];
@@ -602,6 +602,14 @@ export function App() {
               onPresentationSlideCount={(count) => {
                 if (!isSettings && count !== state.presentation.slideCount)
                   update({ presentation: { slideCount: count } });
+              }}
+              onPresentationSlideChange={(slideIndex) => {
+                if (
+                  !isSettings &&
+                  state.presentation.visible &&
+                  slideIndex !== state.presentation.slideIndex
+                )
+                  update({ presentation: { slideIndex } });
               }}
             />
             {!isSettings && <div className={`preview-label ${previewPanelMode === "prepare" ? "prepare" : ""}`}>
@@ -1108,13 +1116,10 @@ function LiveContentControls({
     const count = state.presentation.slideCount;
     const index = state.presentation.slideIndex;
     const move = (direction: -1 | 1) => {
-      const requestedIndex = Math.max(0, index + direction);
       update({
         presentation: {
-          slideIndex:
-            count > 0
-              ? Math.min(requestedIndex, Math.max(count - 1, 0))
-              : requestedIndex,
+          navigationId: state.presentation.navigationId + 1,
+          navigationDirection: direction,
         },
       });
     };
@@ -1129,14 +1134,11 @@ function LiveContentControls({
           <strong>{count || "—"}</strong>
         </div>
         <div className="live-presentation-buttons">
-          <button disabled={index === 0} onClick={() => move(-1)}>
+          <button onClick={() => move(-1)}>
             <ChevronLeft />
             Anterior
           </button>
-          <button
-            disabled={count > 0 && index >= count - 1}
-            onClick={() => move(1)}
-          >
+          <button onClick={() => move(1)}>
             Siguiente
             <ChevronRight />
           </button>

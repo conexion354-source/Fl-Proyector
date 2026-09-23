@@ -1022,6 +1022,8 @@ export function MeetingBuilder({
         previewSlides: payload.previewSlides,
         slideIndex,
         slideCount,
+        navigationId: state.presentation.navigationId,
+        navigationDirection: 1,
         visible: true,
       },
     });
@@ -1032,17 +1034,22 @@ export function MeetingBuilder({
     const isActive =
       state.presentation.visible &&
       state.presentation.path === String(payload.path);
-    const current = isActive
-      ? state.presentation.slideIndex
-      : direction > 0
-        ? -1
-        : 0;
-    firePresentation(item, current + direction);
+    if (!isActive) {
+      firePresentation(item, 0);
+      return;
+    }
+    update({
+      presentation: {
+        navigationId: state.presentation.navigationId + 1,
+        navigationDirection: direction,
+      },
+    });
   };
 
   useEffect(() => {
     const handleKeys = (event: KeyboardEvent) => {
       if (
+        !event.isTrusted ||
         !selected ||
         editing ||
         picker ||
@@ -1051,17 +1058,6 @@ export function MeetingBuilder({
         )
       )
         return;
-      if (
-        selected.type === "presentation" &&
-        ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
-      ) {
-        event.preventDefault();
-        movePresentation(
-          selected,
-          ["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1,
-        );
-        return;
-      }
       if (!["song", "bible"].includes(selected.type)) return;
       const song =
         selected.type === "song"
@@ -1131,6 +1127,8 @@ export function MeetingBuilder({
             previewSlides: [background.url],
             slideIndex: 0,
             slideCount: 1,
+            navigationId: state.presentation.navigationId,
+            navigationDirection: 1,
             visible: true,
           },
         });
@@ -1229,10 +1227,10 @@ export function MeetingBuilder({
       const pages = announcementPages(payload);
       next.text = { ...state.text, html: pages[Number(payload.announcementPage || 0)] || pages[0], kind: "anuncio", visible: true, position: payload.position || "center", fontSize: Number(payload.fontSize || 64), color: payload.color || "#ffffff", backgroundColor: payload.backgroundColor || "rgba(0,0,0,.55)", align: payload.align || "center", borderRadius: Number(payload.borderRadius || 0), template: payload.template || "plain", animation: payload.animation || "fade", shadowEnabled: payload.shadowEnabled !== false, shadowColor: payload.shadowColor || "#000000", shadowBlur: Number(payload.shadowBlur ?? 14) };
     } else if (item.type === "presentation") {
-      next.presentation = { path: String(payload.path || ""), url: String(payload.url || ""), name: String(payload.name || item.title), previewSlides: payload.previewSlides as string[] | undefined, slideIndex: 0, slideCount: Number(payload.slideCount || 0), visible: true };
+      next.presentation = { path: String(payload.path || ""), url: String(payload.url || ""), name: String(payload.name || item.title), previewSlides: payload.previewSlides as string[] | undefined, slideIndex: 0, slideCount: Number(payload.slideCount || 0), navigationId: state.presentation.navigationId, navigationDirection: 1, visible: true };
       next.text = { ...state.text, visible: false };
     } else if (source?.kind === "image") {
-      next.presentation = { path: null, url: source.url, name: source.name, previewSlides: [source.url], slideIndex: 0, slideCount: 1, visible: true };
+      next.presentation = { path: null, url: source.url, name: source.name, previewSlides: [source.url], slideIndex: 0, slideCount: 1, navigationId: state.presentation.navigationId, navigationDirection: 1, visible: true };
       next.text = { ...state.text, visible: false };
     }
     setPreviewDraft(next);
@@ -2271,7 +2269,7 @@ function PresentationSummary({
           <small>El modo nativo conserva efectos, transiciones y audio originales.</small>
         </>
       ) : (
-        <small>El visor integrado muestra diapositivas; el modo nativo conserva efectos y transiciones.</small>
+        <small>El visor integrado reproduce cada aparición y transición al avanzar.</small>
       )}
     </div>
   );

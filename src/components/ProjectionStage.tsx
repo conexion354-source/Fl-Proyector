@@ -19,6 +19,7 @@ type Props = {
    * keep the exact safety fitting used by the physical projector. */
   designPreview?: boolean;
   onPresentationSlideCount?: (count: number) => void;
+  onPresentationSlideChange?: (index: number) => void;
   onVideoMetadata?: (duration: number) => void;
   onVideoTime?: (time: number) => void;
   onVideoEnded?: () => void;
@@ -60,6 +61,7 @@ export function ProjectionStage({
   preview = false,
   designPreview = false,
   onPresentationSlideCount,
+  onPresentationSlideChange,
   onVideoMetadata,
   onVideoTime,
   onVideoEnded,
@@ -540,6 +542,7 @@ export function ProjectionStage({
         presentation={state.presentation}
         preview={preview}
         onSlideCount={onPresentationSlideCount}
+        onSlideChange={onPresentationSlideChange}
       />
 
       <div
@@ -579,20 +582,25 @@ function PresentationLayer({
   presentation,
   preview,
   onSlideCount,
+  onSlideChange,
 }: {
   presentation: ProjectionState["presentation"];
   preview: boolean;
   onSlideCount?: (count: number) => void;
+  onSlideChange?: (index: number) => void;
 }) {
   const viewer = useRef<PowerPointViewerHandle>(null);
   const [content, setContent] = useState<Uint8Array | null>(null);
   const [error, setError] = useState("");
+  const [viewerMode, setViewerMode] = useState("edit");
   const navigationTimer = useRef<number | null>(null);
+  const seenNavigationId = useRef(0);
   const mockSlide = presentation.previewSlides?.[presentation.slideIndex];
 
   useEffect(() => {
     setContent(null);
     setError("");
+    setViewerMode("edit");
     if (
       (!presentation.path && !presentation.url) ||
       presentation.previewSlides?.length
@@ -630,33 +638,47 @@ function PresentationLayer({
     if (!content || !presentation.visible) return;
     if (navigationTimer.current !== null)
       window.clearTimeout(navigationTimer.current);
-    // PowerPoint parsing and remote taps can overlap. A short trailing delay
-    // sends only the last requested slide and switches to presentation mode
-    // before navigating, avoiding editor flashes and renderer stalls.
-    navigationTimer.current = window.setTimeout(() => {
-      navigationTimer.current = null;
+    const enterPresentation = () => {
       try {
-        viewer.current?.setMode("present");
-        // The viewer applies presentation mode asynchronously. Navigating in
-        // the same tick can leave the editor canvas visible and skip slide
-        // transitions, especially when a remote device taps quickly.
-        window.setTimeout(() => {
-          try {
-            viewer.current?.goTo(Math.max(0, presentation.slideIndex));
-          } catch (reason) {
-            console.error("No se pudo cambiar la diapositiva", reason);
-          }
-        }, 180);
+        const handle = viewer.current;
+        if (!handle) {
+          navigationTimer.current = window.setTimeout(enterPresentation, 100);
+          return;
+        }
+        handle.setMode("present");
+        // Do not call goTo here: it jumps straight to the final canvas of a
+        // slide and bypasses its opening animation groups. Entering present
+        // mode starts at the first slide and lets its own timeline seed it.
+        navigationTimer.current = null;
       } catch (reason) {
-        console.error("No se pudo cambiar la diapositiva", reason);
+        console.error("No se pudo iniciar la presentación", reason);
       }
-    }, 90);
+    };
+    navigationTimer.current = window.setTimeout(enterPresentation, 90);
     return () => {
       if (navigationTimer.current !== null)
         window.clearTimeout(navigationTimer.current);
       navigationTimer.current = null;
     };
-  }, [content, presentation.slideIndex, presentation.visible]);
+  }, [content, presentation.path, presentation.url, presentation.visible]);
+
+  useEffect(() => {
+    const navigationId = Number(presentation.navigationId || 0);
+    if (!content || !presentation.visible || navigationId <= seenNavigationId.current)
+      return;
+    if (viewerMode !== "present") return;
+    seenNavigationId.current = navigationId;
+    // The viewer's own presentation handler advances pending animation builds
+    // first. It moves to the next slide only after the last build, matching
+    // PowerPoint's normal “Siguiente” behavior.
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: presentation.navigationDirection === -1 ? "ArrowLeft" : "ArrowRight",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  }, [content, presentation.navigationDirection, presentation.navigationId, presentation.visible, viewerMode]);
 
   if (!presentation.visible)
     return <div className="presentation-layer layer-hidden" />;
@@ -688,6 +710,8 @@ function PresentationLayer({
             canEdit={false}
             defaultLocale="en"
             onSlideCountChange={onSlideCount}
+            onActiveSlideChange={onSlideChange}
+            onModeChange={setViewerMode}
           />
         </PresentationErrorBoundary>
       ) : (
