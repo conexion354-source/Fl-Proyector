@@ -615,7 +615,8 @@ $powerPoint.Visible = $true
 $presentation = $null
 foreach ($candidate in $powerPoint.Presentations) { if ($candidate.FullName -eq $path) { $presentation = $candidate; break } }
 if (-not $presentation) { $presentation = $powerPoint.Presentations.Open($path, $false, $false, $true) }
-if ($powerPoint.SlideShowWindows.Count -eq 0) { $presentation.SlideShowSettings.Run() | Out-Null }
+if ($powerPoint.SlideShowWindows.Count -gt 0) { $powerPoint.SlideShowWindows.Item(1).View.Exit() }
+$presentation.SlideShowSettings.Run() | Out-Null
 `, path);
     nativePresentationPath = path;
     return { ok: true, slideIndex: 0 };
