@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld("flProyector", {
   getState: () => ipcRenderer.invoke("projection:get-state"),
   getLiveState: () => ipcRenderer.invoke("projection:get-live-state"),
   updateState: (patch) => ipcRenderer.invoke("projection:update-state", patch),
+  setPersistentBackground: (patch) =>
+    ipcRenderer.invoke("projection:set-persistent-background", patch),
   getProjectionFrozen: () => ipcRenderer.invoke("projection:freeze:get"),
   setProjectionFrozen: (frozen) => ipcRenderer.invoke("projection:freeze:set", frozen),
   getFloatingPreviewOpen: () => ipcRenderer.invoke("preview:window:get"),
@@ -110,6 +112,8 @@ contextBridge.exposeInMainWorld("flProyector", {
   getCollaboratorCode: () => ipcRenderer.invoke("settings:collaborator:get"),
   saveCollaboratorCode: (code) =>
     ipcRenderer.invoke("settings:collaborator:set", code),
+  getSavedAlerts: () => ipcRenderer.invoke("settings:alerts:get"),
+  saveSavedAlerts: (alerts) => ipcRenderer.invoke("settings:alerts:set", alerts),
   listMeetings: () => ipcRenderer.invoke("meetings:list"),
   createMeeting: (name, date) =>
     ipcRenderer.invoke("meetings:create", name, date),

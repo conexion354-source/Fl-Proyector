@@ -21,6 +21,7 @@ import type {
   ReleaseHistoryEntry,
   Song,
   SongCategory,
+  SavedAlert,
   UpdateStatus,
 } from "../shared/types";
 
@@ -30,6 +31,7 @@ declare global {
       getState(): Promise<ProjectionState>;
       getLiveState(): Promise<ProjectionState>;
       updateState(patch: ProjectionPatch): Promise<void>;
+      setPersistentBackground(patch: ProjectionPatch): Promise<void>;
       getProjectionFrozen(): Promise<boolean>;
       setProjectionFrozen(frozen: boolean): Promise<boolean>;
       getFloatingPreviewOpen(): Promise<boolean>;
@@ -73,6 +75,8 @@ declare global {
       setTags(id: number, tags: string[]): Promise<void>;
       updateMediaDetails(id: number, name: string, tags: string[]): Promise<void>;
       editMediaTags(id: number, tags: string[]): Promise<string[] | null>;
+      getSavedAlerts(): Promise<SavedAlert[]>;
+      saveSavedAlerts(alerts: SavedAlert[]): Promise<void>;
       deleteMedia(id: number): Promise<boolean>;
       onMediaChanged(callback: () => void): () => void;
       listSongs(search?: string, categoryId?: number | null): Promise<Song[]>;

@@ -830,8 +830,26 @@ function VideoLayer({
     if (!video) return;
     video.volume = Math.max(0, Math.min(1, playback.volume));
     video.muted = preview || playback.muted;
-    if (playback.playing) video.play().catch(() => {});
-    else video.pause();
+    if (!playback.playing) {
+      video.pause();
+      return;
+    }
+    // A stopped video can retain its `ended` flag in Chromium even after its
+    // currentTime was reset. Seeking it to the beginning before Play makes
+    // the next remote "Reproducir" deterministic.
+    if (
+      video.ended ||
+      (video.duration > 0 && video.duration - video.currentTime <= 0.05)
+    ) {
+      try {
+        video.currentTime = 0;
+      } catch {}
+      // Do not wait only for `seeked`: certain MP4s do not emit it when the
+      // element was stopped at zero, leaving the remote Play command inert.
+      video.play().catch(() => {});
+      return;
+    }
+    video.play().catch(() => {});
   }, [playback.playing, playback.volume, playback.muted, preview]);
   useEffect(() => {
     const video = ref.current;
@@ -842,8 +860,11 @@ function VideoLayer({
           ? Math.max(0, video.duration - (playback.playing ? 0.05 : 0))
           : playback.seekTime;
         const target = Math.max(0, Math.min(playback.seekTime, upperBound));
-        if (typeof video.fastSeek === "function") video.fastSeek(target);
-        else video.currentTime = target;
+        // `fastSeek` can leave some high-bitrate MP4 files stuck in Chromium
+        // on Windows. The regular media seek is slower by a few milliseconds
+        // but is dependable and lets Play/Stop remain responsive afterwards.
+        if (Math.abs(video.currentTime - target) > 0.03)
+          video.currentTime = target;
       }
     } catch {}
   }, [playback.commandId, playback.seekTime]);

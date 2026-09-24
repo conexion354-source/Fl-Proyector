@@ -4212,6 +4212,8 @@
   font: 700 11px inherit;
 }
 .alert-control-row .alert-action svg { width: 15px; }
+.saved-alerts{display:grid;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border,#2b3341)}
+.saved-alerts-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px}.saved-alerts-heading b{font-size:13px}.saved-alerts-heading small{color:var(--muted,#9ba5b8);font-size:11px}.saved-alert-list{display:grid;gap:6px;max-height:190px;overflow:auto}.saved-alert-item{display:grid;grid-template-columns:minmax(0,1fr) 30px;gap:6px}.saved-alert-item>button:first-child{display:flex;align-items:center;gap:8px;min-width:0;height:34px;padding:0 9px;text-align:left;color:var(--text,#eef2ff);background:var(--panel,#171c28);border:1px solid var(--border,#30394b);border-radius:8px;font:650 12px inherit}.saved-alert-item>button:first-child:hover{border-color:#7560ff;background:#27204a}.saved-alert-item svg{width:14px;height:14px;flex:0 0 auto}.saved-alert-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.saved-alert-delete{display:grid;place-items:center;width:30px;height:34px;padding:0;color:var(--muted,#9ba5b8);background:transparent;border:1px solid var(--border,#30394b);border-radius:8px}.saved-alert-delete:hover{color:#ffb4ba;border-color:#b93d4b;background:#351c24}
 
 .projection-text:has(> .live-audience-projection) {
   inset: 2% !important;
@@ -4252,3 +4254,7 @@
   text-wrap:balance;
 }
 .live-audience-projection > img { display:block; width:auto; height:100%; min-height:0; max-width:100%; max-height:100%; aspect-ratio:1; object-fit:contain; padding:.055em; border:.055em solid #fff; border-radius:.12em; background:#fff; box-shadow:0 .08em .28em rgba(0,0,0,.32); }
+
+.saved-alert-list{padding-right:3px;overflow-y:auto;overscroll-behavior:contain}
+.saved-alert-item{grid-template-columns:minmax(0,1fr)}
+.saved-alert-edit{display:grid;place-items:center;width:30px;height:34px;padding:0;color:var(--muted,#9ba5b8);background:transparent;border:1px solid var(--border,#30394b);border-radius:8px}.saved-alert-edit:hover{color:#c8c1ff;border-color:#7560ff;background:#27204a}

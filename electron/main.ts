@@ -542,6 +542,8 @@ function mergeState(patch: ProjectionPatch) {
   if (
     !state.video.loop &&
     state.video.playing &&
+    patch.video?.playing === undefined &&
+    patch.video?.commandId === undefined &&
     state.video.duration > 0 &&
     state.video.duration - state.video.currentTime <= 0.45 &&
     !videoFinishScheduled
@@ -1124,9 +1126,12 @@ const validMedia = (name: string) =>
 const mediaUrl = (path: string) =>
   `fl-media://local/${encodeURIComponent(path)}`;
 
-// An .mp4 may still use HEVC or an unsupported audio stream. Normalize every
-// imported video to the browser-safe H.264 + AAC format.
-const needsVideoConversion = (extension: string) => videoExtensions.includes(extension);
+// Chromium can play ordinary MP4 and WebM files directly. Converting those
+// files again made imports fail on some Windows machines when FFmpeg could not
+// read a codec that Chromium itself could play. Keep conversion for legacy
+// containers that need it, but preserve the files modern browsers understand.
+const needsVideoConversion = (extension: string) =>
+  videoExtensions.includes(extension) && ![".mp4", ".webm"].includes(extension);
 
 async function transcodeVideoToMp4(source: string, destination: string) {
   if (!ffmpegPath) {
@@ -1370,7 +1375,11 @@ function clearRemoteMultimedia() {
 }
 
 function finishVideoPlayback() {
-  if (state.video.loop || !videoReturnBackground) return;
+  // A native `pause`/`ended` event can arrive a moment after the operator
+  // pressed Stop. In that case the video was deliberately paused and must
+  // remain selected so the remote Reproducir button can start it again.
+  if (!state.video.playing || state.video.loop || !videoReturnBackground)
+    return;
   if (remoteActiveMediaItemId !== null) {
     clearRemoteMultimedia();
     return;
@@ -1516,6 +1525,33 @@ async function importMediaFile(source: string) {
   const destination = join(mediaDir, basename(source));
   if (source !== destination) await copyFile(source, destination);
   return destination;
+}
+
+function restoreLastBackground() {
+  const saved = database.getLastBackground();
+  if (!saved?.id) return;
+  const media = database.listMedia(mediaUrl).find((item) => item.id === saved.id);
+  if (!media) {
+    database.saveLastBackground(initialProjectionState.background);
+    return;
+  }
+  state.background = {
+    ...initialProjectionState.background,
+    ...saved,
+    id: media.id,
+    url: media.url,
+    name: media.name,
+    kind: media.kind,
+  };
+  state.video = {
+    ...state.video,
+    playing: media.kind === "video",
+    loop: true,
+    seekTime: 0,
+    currentTime: 0,
+    duration: 0,
+    commandId: state.video.commandId + 1,
+  };
 }
 
 async function openverseRequest(endpoint: URL) {
@@ -1860,8 +1896,11 @@ if (hasSingleInstanceLock)
         if (controlWindow && !controlWindow.isDestroyed())
           controlWindow.webContents.send("library:changed", scope);
       },
+    }, {
+      list: () => database.getSavedAlerts(),
     });
     await syncMedia();
+    restoreLastBackground();
     chokidar
       .watch(mediaDir, { ignoreInitial: true })
       .on("all", () => syncMedia());
@@ -1977,6 +2016,13 @@ if (hasSingleInstanceLock)
       "projection:update-state",
       (_event, patch: ProjectionPatch) => mergeState(patch),
     );
+    ipcMain.handle(
+      "projection:set-persistent-background",
+      (_event, patch: ProjectionPatch) => {
+        mergeState(patch);
+        database.saveLastBackground(state.background);
+      },
+    );
     ipcMain.handle("projection:video-ended", finishVideoPlayback);
     ipcMain.handle("projection:open", openProjection);
     ipcMain.handle("projection:close", () => {
@@ -2011,6 +2057,10 @@ if (hasSingleInstanceLock)
     );
     ipcMain.handle("remote:full-control:set", (_event, enabled: boolean) =>
       remoteServer.setFullControlEnabled(Boolean(enabled)),
+    );
+    ipcMain.handle("settings:alerts:get", () => database.getSavedAlerts());
+    ipcMain.handle("settings:alerts:set", (_event, alerts) =>
+      database.saveSavedAlerts(Array.isArray(alerts) ? alerts : []),
     );
     ipcMain.handle("live-audience:status", () =>
       remoteServer.getLiveAudienceStatus(),

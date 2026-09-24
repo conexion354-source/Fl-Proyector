@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import type {
   BibleBook,
   BibleDisplaySettings,
+  BackgroundState,
   BibleVerse,
   BibleVersion,
   ChurchSettings,
@@ -12,11 +13,13 @@ import type {
   Song,
   SongCategory,
   SongDisplaySettings,
+  SavedAlert,
 } from "../shared/types.js";
 import {
   initialBibleDisplaySettings,
   initialChurchSettings,
   initialDisplaySettings,
+  initialProjectionState,
   initialSongDisplaySettings,
 } from "../shared/types.js";
 
@@ -479,6 +482,48 @@ export class AppDatabase {
         "INSERT INTO settings(key,value) VALUES ('song-display',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
       )
       .run(JSON.stringify(settings));
+  }
+  getLastBackground(): BackgroundState | null {
+    const row = this.db
+      .prepare("SELECT value FROM settings WHERE key='last-background'")
+      .get() as { value: string } | undefined;
+    if (!row) return null;
+    try {
+      return {
+        ...initialProjectionState.background,
+        ...JSON.parse(row.value),
+      } as BackgroundState;
+    } catch {
+      return null;
+    }
+  }
+  saveLastBackground(background: BackgroundState) {
+    this.db
+      .prepare(
+        "INSERT INTO settings(key,value) VALUES ('last-background',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      )
+      .run(JSON.stringify(background));
+  }
+  getSavedAlerts(): SavedAlert[] {
+    const row = this.db
+      .prepare("SELECT value FROM settings WHERE key='saved-alerts'")
+      .get() as { value: string } | undefined;
+    if (!row) return [];
+    try {
+      const saved = JSON.parse(row.value);
+      return Array.isArray(saved) ? saved.filter((item): item is SavedAlert =>
+        item && typeof item.id === "string" && typeof item.message === "string",
+      ) : [];
+    } catch {
+      return [];
+    }
+  }
+  saveSavedAlerts(alerts: SavedAlert[]) {
+    this.db
+      .prepare(
+        "INSERT INTO settings(key,value) VALUES ('saved-alerts',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      )
+      .run(JSON.stringify(alerts));
   }
   getCollaboratorCode() {
     return (

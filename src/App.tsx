@@ -33,6 +33,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { MeetingBuilder } from "./components/MeetingBuilder";
 import { RemotePanel } from "./components/RemotePanel";
 import { LiveAudienceDialog } from "./components/LiveAudienceDialog";
+import { Win11ContextMenu } from "./components/Win11ContextMenu";
 import { Win11SettingsDialog } from "./components/Win11SettingsDialog";
 import { HelpDialog } from "./components/HelpDialog";
 import {
@@ -51,6 +52,7 @@ import {
   type DisplayInfo,
   type DisplaySettings,
   type LiveAudienceStatus,
+  type SavedAlert,
   type UpdateStatus,
 } from "../shared/types";
 
@@ -94,6 +96,13 @@ export function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [overlaySettings, setOverlaySettings] = useState<"timer" | "clock" | null>(null);
   const [showAlertSettings, setShowAlertSettings] = useState(false);
+  const [savedAlerts, setSavedAlerts] = useState<SavedAlert[]>([]);
+  const [editingSavedAlert, setEditingSavedAlert] = useState<SavedAlert | null>(null);
+  const [savedAlertContext, setSavedAlertContext] = useState<{
+    alert: SavedAlert;
+    x: number;
+    y: number;
+  } | null>(null);
   const [showLiveAudienceDialog, setShowLiveAudienceDialog] = useState(false);
   const [liveAudienceStatus, setLiveAudienceStatus] = useState<LiveAudienceStatus>({ active: false, code: null, viewers: 0 });
   const [liveAudienceQr, setLiveAudienceQr] = useState("");
@@ -270,6 +279,13 @@ export function App() {
       localStorage.removeItem("fl-overlay-alert");
     }
   }, [update]);
+  useEffect(() => {
+    window.flProyector.getSavedAlerts().then(setSavedAlerts);
+  }, []);
+  const saveAlertList = (next: SavedAlert[]) => {
+    setSavedAlerts(next);
+    void window.flProyector.saveSavedAlerts(next);
+  };
   useEffect(() => {
     const migrationKey = "fl-fluent-theme-v1";
     if (!localStorage.getItem(migrationKey)) {
@@ -529,7 +545,8 @@ export function App() {
           {tab === "canciones" && (
             <SongLibrary
               meetingId={meetingId}
-              onAddToMeeting={(itemId) => {
+              onAddToMeeting={(targetMeetingId, itemId) => {
+                setMeetingId(targetMeetingId);
                 setFocusedMeetingItemId(itemId);
                 setTab("reuniones");
               }}
@@ -793,6 +810,35 @@ export function App() {
                 {state.alert.visible ? "Ocultar alerta" : "Alertas"}
               </button>
             </div>
+            <section className="saved-alerts" aria-label="Alertas guardadas">
+              <div className="saved-alerts-heading">
+                <b>Alertas guardadas</b>
+                <small>{savedAlerts.length ? `${savedAlerts.length} lista${savedAlerts.length === 1 ? "" : "s"}` : "Guardá una desde Alertas"}</small>
+              </div>
+              {savedAlerts.length > 0 && (
+                <div className="saved-alert-list">
+                  {savedAlerts.map((alert) => (
+                    <div className="saved-alert-item" key={alert.id}>
+                      <button
+                        type="button"
+                        title="Clic: mostrar u ocultar · Clic derecho: editar"
+                        onClick={() => {
+                          const isLive = state.alert.visible && state.alert.message === alert.message;
+                          update({ alert: isLive ? { visible: false } : { ...alert, visible: true } });
+                        }}
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          setSavedAlertContext({ alert, x: event.clientX, y: event.clientY });
+                        }}
+                      >
+                        <BellRing />
+                        <span>{state.alert.visible && state.alert.message === alert.message ? `${alert.name} · En vivo` : alert.name}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
           </>}
         </aside>}
@@ -819,13 +865,64 @@ export function App() {
       )}
       {showAlertSettings && (
         <AlertSettingsDialog
-          alert={state.alert}
-          onClose={() => setShowAlertSettings(false)}
+          alert={editingSavedAlert ? { ...state.alert, ...editingSavedAlert, visible: false } : state.alert}
+          onClose={() => {
+            setShowAlertSettings(false);
+            setEditingSavedAlert(null);
+          }}
           onSave={(values) => {
             localStorage.setItem("fl-overlay-alert", JSON.stringify(values));
             update({ alert: values });
+            const existing = editingSavedAlert ?? savedAlerts.find(
+              (alert) => alert.message.toLocaleLowerCase() === values.message.toLocaleLowerCase(),
+            );
+            const saved: SavedAlert = {
+              ...values,
+              id: existing?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              name: values.message,
+            };
+            saveAlertList(
+              existing
+                ? savedAlerts.map((alert) => alert.id === existing.id ? saved : alert)
+                : [...savedAlerts, saved],
+            );
             setShowAlertSettings(false);
+            setEditingSavedAlert(null);
           }}
+        />
+      )}
+      {savedAlertContext && (
+        <Win11ContextMenu
+          x={savedAlertContext.x}
+          y={savedAlertContext.y}
+          onClose={() => setSavedAlertContext(null)}
+          ariaLabel={`Opciones de ${savedAlertContext.alert.name}`}
+          items={[
+            {
+              label: "Editar alerta",
+              icon: <Settings />,
+              onClick: () => {
+                setEditingSavedAlert(savedAlertContext.alert);
+                setShowAlertSettings(true);
+              },
+            },
+            {
+              label: "Cambiar color",
+              icon: <BellRing />,
+              onClick: () => {
+                setEditingSavedAlert(savedAlertContext.alert);
+                setShowAlertSettings(true);
+              },
+            },
+            {
+              label: "Eliminar alerta",
+              icon: <X />,
+              danger: true,
+              onClick: () => saveAlertList(
+                savedAlerts.filter((item) => item.id !== savedAlertContext.alert.id),
+              ),
+            },
+          ]}
         />
       )}
       {showLiveAudienceDialog && (
@@ -1153,7 +1250,6 @@ function LiveContentControls({
     update({
       video: {
         seekTime: target,
-        currentTime: target,
         commandId: state.video.commandId + 1,
       },
     });

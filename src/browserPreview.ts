@@ -88,6 +88,7 @@ if (!window.flProyector) {
       };
       stateListeners.forEach((listener) => listener(state));
     },
+    setPersistentBackground: async (patch: any) => api.updateState(patch),
     setPreviewState: async (next: any) => {
       if (next) state = next;
       stateListeners.forEach((listener) => listener(state));
@@ -341,6 +342,16 @@ if (!window.flProyector) {
     getCollaboratorCode: async () => localStorage.getItem("fl-collaborator-code") || "",
     saveCollaboratorCode: async (code: string) => {
       localStorage.setItem("fl-collaborator-code", code);
+    },
+    getSavedAlerts: async () => {
+      try {
+        return JSON.parse(localStorage.getItem("fl-saved-alerts") || "[]");
+      } catch {
+        return [];
+      }
+    },
+    saveSavedAlerts: async (alerts: any[]) => {
+      localStorage.setItem("fl-saved-alerts", JSON.stringify(alerts));
     },
     listMeetings: async () => meetings,
     createMeeting: async (name: string, date: string) => {

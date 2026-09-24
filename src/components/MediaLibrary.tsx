@@ -104,8 +104,24 @@ export function MediaLibrary({ state, update }: Props) {
       ),
     [media, query],
   );
+  const applyGlobalBackground = (patch: ProjectionPatch) => {
+    // During a desktop update the renderer can refresh a moment before its
+    // preload bridge does. Keep the selector usable in that brief transition;
+    // the new bridge persists the preference, while the fallback still changes
+    // the projected background immediately.
+    const persistent = (
+      window.flProyector as unknown as Partial<{
+        setPersistentBackground: (next: ProjectionPatch) => Promise<void>;
+      }>
+    ).setPersistentBackground;
+    if (typeof persistent !== "function") {
+      update(patch);
+      return Promise.resolve();
+    }
+    return persistent(patch).catch(() => update(patch));
+  };
   const select = (item: MediaItem) =>
-    update({
+    applyGlobalBackground({
       background: {
         id: item.id,
         url: item.url,
@@ -130,10 +146,8 @@ export function MediaLibrary({ state, update }: Props) {
     try {
       setMedia(await window.flProyector.chooseMediaFiles());
       setAddDialogOpen(false);
-    } catch {
-      setImportError(
-        "No se pudo procesar uno de los archivos. Verificá que el video no esté dañado.",
-      );
+    } catch (error) {
+      setImportError(readableError(error, "No se pudo importar el archivo."));
     } finally {
       setImporting(false);
     }
@@ -180,10 +194,8 @@ export function MediaLibrary({ state, update }: Props) {
     setImportError("");
     try {
       setMedia(await window.flProyector.importDroppedFiles(files));
-    } catch {
-      setImportError(
-        "No se pudo procesar uno de los archivos. Verificá que el video no esté dañado.",
-      );
+    } catch (error) {
+      setImportError(readableError(error, "No se pudo importar el archivo."));
     } finally {
       setImporting(false);
     }
@@ -228,7 +240,7 @@ export function MediaLibrary({ state, update }: Props) {
     try {
       await window.flProyector.deleteMedia(pendingDelete.id);
       if (state.background.id === pendingDelete.id)
-        update({
+        await applyGlobalBackground({
           background: { id: null, url: null, name: "", kind: null },
           video: { playing: false, loop: true },
         });

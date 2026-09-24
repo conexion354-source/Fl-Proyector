@@ -323,6 +323,11 @@ export type OverlayAlert = {
   animation: "none" | "pulse" | "scroll" | "bounce";
 };
 
+export type SavedAlert = Omit<OverlayAlert, "visible"> & {
+  id: string;
+  name: string;
+};
+
 export type ProjectionState = {
   outputViewport: {
     width: number;

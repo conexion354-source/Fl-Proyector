@@ -169,7 +169,7 @@ export function SongLibrary({
   onAddToMeeting,
 }: {
   meetingId: number | null;
-  onAddToMeeting: (itemId: number) => void;
+  onAddToMeeting: (meetingId: number, itemId: number) => void;
 }) {
   const [songs, setSongs] = useState<Song[]>([]);
   const [totalSongs, setTotalSongs] = useState(0);
@@ -199,6 +199,7 @@ export function SongLibrary({
   const [assignNewCategory, setAssignNewCategory] = useState(false);
   const [editing, setEditing] = useState(false);
   const [addingToMeeting, setAddingToMeeting] = useState(false);
+  const [newMeeting, setNewMeeting] = useState<{ name: string; date: string } | null>(null);
   const [editorRevision, setEditorRevision] = useState(0);
   // This is deliberately a reading preference, not song data: it only
   // changes how large the stanza cards look in this desktop editor.
@@ -546,17 +547,8 @@ export function SongLibrary({
         : "La estrofa fue actualizada.",
     );
   };
-  const send = async () => {
+  const addToMeeting = async (targetMeetingId: number) => {
     if (!selected.id) return;
-    let targetMeetingId = meetingId;
-    if (!targetMeetingId) {
-      const meetings = await window.flProyector.listMeetings();
-      targetMeetingId = meetings[0]?.id ?? null;
-    }
-    if (!targetMeetingId) {
-      alert("Primero creá una reunión para agregar esta canción.");
-      return;
-    }
     setAddingToMeeting(true);
     try {
       const itemId = await window.flProyector.saveMeetingItem({
@@ -566,7 +558,28 @@ export function SongLibrary({
         color: "#8b5cf6",
         payload: { songId: selected.id, backgroundId: null },
       });
-      onAddToMeeting(itemId);
+      onAddToMeeting(targetMeetingId, itemId);
+    } finally {
+      setAddingToMeeting(false);
+    }
+  };
+  const send = async () => {
+    if (!selected.id) return;
+    if (meetingId) return addToMeeting(meetingId);
+    const meetings = await window.flProyector.listMeetings();
+    if (meetings[0]) return addToMeeting(meetings[0].id);
+    setNewMeeting({ name: "", date: new Date().toISOString().slice(0, 10) });
+  };
+  const createMeetingAndAddSong = async () => {
+    if (!newMeeting?.name.trim()) return;
+    setAddingToMeeting(true);
+    try {
+      const id = await window.flProyector.createMeeting(
+        newMeeting.name.trim(),
+        newMeeting.date || null,
+      );
+      setNewMeeting(null);
+      await addToMeeting(id);
     } finally {
       setAddingToMeeting(false);
     }
@@ -891,6 +904,58 @@ export function SongLibrary({
         </>
         )}
       </div>
+      {newMeeting && (
+        <div className="modal-backdrop">
+          <form
+            className="meeting-dialog"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void createMeetingAndAddSong();
+            }}
+          >
+            <button
+              type="button"
+              className="dialog-close"
+              aria-label="Cerrar"
+              onClick={() => setNewMeeting(null)}
+            >
+              <X />
+            </button>
+            <span className="eyebrow">Agregar canción a una reunión</span>
+            <h2>Creá la primera reunión</h2>
+            <p>Esta canción se agregará automáticamente al guardarla.</p>
+            <label>
+              Nombre de la reunión
+              <input
+                autoFocus
+                value={newMeeting.name}
+                onChange={(event) =>
+                  setNewMeeting({ ...newMeeting, name: event.target.value })
+                }
+                placeholder="Ej. Culto domingo por la mañana"
+              />
+            </label>
+            <label>
+              Fecha
+              <input
+                type="date"
+                value={newMeeting.date}
+                onChange={(event) =>
+                  setNewMeeting({ ...newMeeting, date: event.target.value })
+                }
+              />
+            </label>
+            <div>
+              <button type="button" onClick={() => setNewMeeting(null)}>
+                Cancelar
+              </button>
+              <button className="primary" disabled={!newMeeting.name.trim() || addingToMeeting}>
+                {addingToMeeting ? "Guardando…" : "Crear y agregar canción"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
       {sectionContextMenu && (
         <Win11ContextMenu
           x={sectionContextMenu.x}
