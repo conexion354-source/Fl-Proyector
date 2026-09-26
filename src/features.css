@@ -760,6 +760,10 @@
   background: #252141;
   border-color: #665cff;
 }
+.verse-list > button.focused:not(.selected) {
+  border-color: #5ee28f;
+  box-shadow: inset 3px 0 #5ee28f;
+}
 .verse-list b {
   font-size: 13px;
   font-weight: 850;

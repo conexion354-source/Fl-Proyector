@@ -151,6 +151,14 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.44",
+    title: "Navegación de versículos sin filtros",
+    publishedAt: "2026-09-26T00:00:00Z",
+    changes: [
+      "Al elegir manualmente un capítulo o versículo, la Biblia conserva el capítulo completo y centra el versículo elegido.",
+    ],
+  },
+  {
     version: "10.11.43",
     title: "Fondos y videos de reunión con ajuste independiente",
     publishedAt: "2026-09-26T00:00:00Z",

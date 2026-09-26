@@ -158,7 +158,7 @@ export function BibleOperator({
   const [verses, setVerses] = useState<BibleVerse[]>([]),
     [activeVerse, setActiveVerse] = useState(savedPosition.current.activeVerse),
     [query, setQuery] = useState(""),
-    [verseFilter, setVerseFilter] = useState("");
+    [focusedVerse, setFocusedVerse] = useState("");
   const [activeSlides, setActiveSlides] = useState<BibleSlide[]>([]),
     [activeSlide, setActiveSlide] = useState(savedPosition.current.activeSlide);
   const [highlightSelection, setHighlightSelection] = useState<{
@@ -241,9 +241,9 @@ export function BibleOperator({
   const maxChapters = books.find((value) => value.book === book)?.chapters ?? 1;
   const verseKey = (verse: BibleVerse) =>
     `${verse.book}-${verse.chapter}-${verse.verse}`;
-  const displayedVerses = verseFilter
-    ? verses.filter((verse) => String(verse.verse) === verseFilter)
-    : verses;
+  // Choosing a verse is navigation, not a filter. Keep the complete chapter
+  // visible so the operator retains surrounding context.
+  const displayedVerses = verses;
   const projectSlide = (slides: BibleSlide[], index: number) => {
     const safe = Math.max(0, Math.min(index, slides.length - 1)),
       slide = slides[safe];
@@ -403,14 +403,17 @@ export function BibleOperator({
     );
   }, [versionId, book, chapter, activeVerse, activeSlide]);
   useEffect(() => {
-    if (!activeVerse) return;
+    const focusedKey = focusedVerse || activeVerse;
+    if (!focusedKey) return;
     const frame = requestAnimationFrame(() =>
       document
-        .querySelector<HTMLButtonElement>(".verse-list > button.selected")
+        .querySelector<HTMLButtonElement>(
+          ".verse-list > button.focused, .verse-list > button.selected",
+        )
         ?.scrollIntoView({ block: "center" }),
     );
     return () => cancelAnimationFrame(frame);
-  }, [activeVerse, verses]);
+  }, [activeVerse, focusedVerse, verses]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -511,7 +514,7 @@ export function BibleOperator({
               setBook(nextBook);
               setChapter(1);
               setQuery("");
-              setVerseFilter("");
+              setFocusedVerse("");
             }}
           />
         </div>
@@ -522,7 +525,7 @@ export function BibleOperator({
             onChange={(e) => {
               setChapter(Number(e.target.value));
               setQuery("");
-              setVerseFilter("");
+              setFocusedVerse("");
             }}
           >
             {Array.from({ length: maxChapters }, (_, index) => (
@@ -533,12 +536,18 @@ export function BibleOperator({
         <label>
           Versículo
           <select
-            value={verseFilter}
-            onChange={(e) => setVerseFilter(e.target.value)}
+            value={focusedVerse}
+            onChange={(e) => {
+              const value = e.target.value;
+              const verse = verses.find(
+                (candidate) => verseKey(candidate) === value,
+              );
+              setFocusedVerse(verse ? verseKey(verse) : "");
+            }}
           >
-            <option value="">Todos</option>
+            <option value="">Ir al versículo…</option>
             {verses.map((verse) => (
-              <option value={verse.verse} key={verseKey(verse)}>
+              <option value={verseKey(verse)} key={verseKey(verse)}>
                 {verse.verse}
               </option>
             ))}
@@ -567,7 +576,9 @@ export function BibleOperator({
               const key = verseKey(verse);
               return (
                 <button
-                  className={activeVerse === key ? "selected" : ""}
+                  className={`${activeVerse === key ? "selected" : ""} ${
+                    focusedVerse === key ? "focused" : ""
+                  }`.trim()}
                   onMouseUp={(event) => selectPhrase(verse, event.currentTarget)}
                   onTouchEnd={(event) =>
                     window.setTimeout(
