@@ -151,6 +151,15 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.41",
+    title: "Fondos completos y control remoto de video confiable",
+    publishedAt: "2026-09-26T00:00:00Z",
+    changes: [
+      "Los fondos de imagen y video conservan la imagen completa al proyectarse, incluso con otra proporción de pantalla.",
+      "Se estabilizó Detener y Reproducir en el control remoto y se retiró temporalmente el adelanto de video.",
+    ],
+  },
+  {
     version: "10.11.20",
     title: "Actualizaciones visibles y fondos Openverse más confiables",
     publishedAt: "2026-09-19T00:00:00Z",

@@ -30,7 +30,7 @@ import type {
 
 // This is served by the projector itself. Update checks for the remote never
 // need an Internet connection: the phone compares against the PC on its LAN.
-const remoteClientVersion = "10.11.40";
+const remoteClientVersion = "10.11.41";
 
 type LiveAudiencePayload =
   | {
