@@ -76,10 +76,10 @@ export function ProjectionStage({
   const [currentUrl, setCurrentUrl] = useState<string | null>(
     state.background.url,
   );
-  // A video is content, not a decorative crop: preserve every frame whatever
-  // its source aspect ratio.
-  const requestedMediaFit =
-    state.background.kind === "video" ? "contain" : "cover";
+  // A projected background must always remain fully visible. This applies to
+  // both images and videos, including when its aspect ratio differs from the
+  // projector output; only foreground content manages its own layout.
+  const requestedMediaFit = "contain";
   const [previousMediaFit, setPreviousMediaFit] = useState<
     "cover" | "contain"
   >("cover");
