@@ -1174,6 +1174,13 @@ html[data-theme="light"] .sidebar .sidebar-toggle:hover {
 .projection-background video {
   object-fit: cover;
 }
+/* Backgrounds deliberately fill the output without cropping. This is kept
+   scoped to the background layer so PowerPoints and foreground media retain
+   their proportional layout. */
+.projection-background > img,
+.projection-background > video {
+  object-fit: fill !important;
+}
 .background-filters {
   z-index: 3;
   transition:

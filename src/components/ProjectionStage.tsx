@@ -76,15 +76,17 @@ export function ProjectionStage({
   const [currentUrl, setCurrentUrl] = useState<string | null>(
     state.background.url,
   );
-  // A projected background must always remain fully visible. This applies to
-  // both images and videos, including when its aspect ratio differs from the
-  // projector output; only foreground content manages its own layout.
-  const requestedMediaFit = "contain";
+  // Backgrounds are the only media that must occupy the full output canvas.
+  // Use `fill` instead of cropping a different aspect ratio; foreground media
+  // (such as presentations) keeps its own aspect ratio and layout.
+  const requestedMediaFit = "fill";
   const [previousMediaFit, setPreviousMediaFit] = useState<
-    "cover" | "contain"
-  >("cover");
+    "cover" | "contain" | "fill"
+  >("fill");
   const oldUrl = useRef(state.background.url);
-  const oldMediaFit = useRef<"cover" | "contain">(requestedMediaFit);
+  const oldMediaFit = useRef<"cover" | "contain" | "fill">(
+    requestedMediaFit,
+  );
   const textRef = useRef<HTMLDivElement>(null);
   const [fitTextSize, setFitTextSize] = useState(state.text.fontSize);
   const [contentScale, setContentScale] = useState(preview ? 0.2 : 1);
@@ -750,7 +752,7 @@ function MediaLayer({
   className: string;
   playback: ProjectionState["video"];
   preview: boolean;
-  fit: "cover" | "contain";
+  fit: "cover" | "contain" | "fill";
   onMetadata?: (duration: number) => void;
   onTime?: (time: number) => void;
   onEnded?: () => void;
@@ -791,7 +793,7 @@ function VideoLayer({
   className: string;
   playback: ProjectionState["video"];
   preview: boolean;
-  fit: "cover" | "contain";
+  fit: "cover" | "contain" | "fill";
   onMetadata?: (duration: number) => void;
   onTime?: (time: number) => void;
   onEnded?: () => void;

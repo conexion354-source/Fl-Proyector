@@ -151,6 +151,14 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.42",
+    title: "Fondos ajustados al marco completo",
+    publishedAt: "2026-09-26T00:00:00Z",
+    changes: [
+      "Los fondos de imagen y video se ajustan al tamaño de salida completo sin recortarse, aun con otra resolución.",
+    ],
+  },
+  {
     version: "10.11.41",
     title: "Fondos completos y control remoto de video confiable",
     publishedAt: "2026-09-26T00:00:00Z",
