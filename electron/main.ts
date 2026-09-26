@@ -151,6 +151,14 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.43",
+    title: "Fondos y videos de reunión con ajuste independiente",
+    publishedAt: "2026-09-26T00:00:00Z",
+    changes: [
+      "Los fondos ocupan toda la salida, mientras que los videos de reuniones conservan su resolución y proporción original.",
+    ],
+  },
+  {
     version: "10.11.42",
     title: "Fondos ajustados al marco completo",
     publishedAt: "2026-09-26T00:00:00Z",

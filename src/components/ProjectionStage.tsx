@@ -76,10 +76,10 @@ export function ProjectionStage({
   const [currentUrl, setCurrentUrl] = useState<string | null>(
     state.background.url,
   );
-  // Backgrounds are the only media that must occupy the full output canvas.
-  // Use `fill` instead of cropping a different aspect ratio; foreground media
-  // (such as presentations) keeps its own aspect ratio and layout.
-  const requestedMediaFit = "fill";
+  // Library backgrounds fill the complete output. A video started from a
+  // meeting is content, however, so it must retain its original proportion.
+  const requestedMediaFit =
+    state.background.kind === "video" && !state.video.loop ? "contain" : "fill";
   const [previousMediaFit, setPreviousMediaFit] = useState<
     "cover" | "contain" | "fill"
   >("fill");
@@ -757,16 +757,17 @@ function MediaLayer({
   onTime?: (time: number) => void;
   onEnded?: () => void;
 }) {
+  const fittedClassName = `${className} projection-media-fit-${fit}`;
   if (
     url.startsWith("data:image/") ||
     /\.(png|jpe?g|webp|gif|avif|bmp)(?:$|%)/i.test(decodeURIComponent(url))
   )
-    return <img className={className} src={url} style={{ objectFit: fit }} />;
+    return <img className={fittedClassName} src={url} />;
   return (
     <VideoLayer
       url={url}
       speed={speed}
-      className={className}
+      className={fittedClassName}
       playback={playback}
       preview={preview}
       fit={fit}
@@ -909,7 +910,6 @@ function VideoLayer({
       ref={ref}
       className={className}
       src={url}
-      style={{ objectFit: fit }}
       autoPlay
       loop={playback.loop}
       preload="auto"
