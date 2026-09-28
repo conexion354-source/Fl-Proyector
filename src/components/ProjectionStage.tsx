@@ -1,6 +1,7 @@
 import {
   Component,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -15,6 +16,9 @@ import type { ProjectionState } from "../../shared/types";
 type Props = {
   state: ProjectionState;
   preview?: boolean;
+  /** Renders a preview on a full-size virtual output canvas before scaling it
+   * down. This preserves the exact browser line wrapping of the projector. */
+  faithfulPreview?: boolean;
   /** Song-design preview shows the requested size directly while live previews
    * keep the exact safety fitting used by the physical projector. */
   designPreview?: boolean;
@@ -24,6 +28,52 @@ type Props = {
   onVideoTime?: (time: number) => void;
   onVideoEnded?: () => void;
 };
+
+/**
+ * A small DOM preview normally lays text out at a tiny font size. Font hinting
+ * and fixed-pixel decorations can then produce different line breaks from the
+ * real projection. This wrapper lays out the stage at the output's native CSS
+ * size and scales the finished canvas down only after layout.
+ */
+export function ProjectionPreview(props: Omit<Props, "preview" | "faithfulPreview">) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const viewport = props.state.outputViewport ?? { width: 1920, height: 1080 };
+
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const measure = () => {
+      const next = Math.max(
+        0.01,
+        Math.min(
+          host.clientWidth / Math.max(1, viewport.width),
+          host.clientHeight / Math.max(1, viewport.height),
+        ),
+      );
+      setScale((current) => (Math.abs(current - next) > 0.001 ? next : current));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [viewport.width, viewport.height]);
+
+  return (
+    <div className="faithful-preview-host" ref={hostRef}>
+      <div
+        className="faithful-preview-canvas"
+        style={{
+          width: viewport.width,
+          height: viewport.height,
+          transform: `translate(-50%, -50%) scale(${scale})`,
+        }}
+      >
+        <ProjectionStage {...props} preview faithfulPreview />
+      </div>
+    </div>
+  );
+}
 
 class PresentationErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
@@ -59,6 +109,7 @@ const BIBLE_REFERENCE_GAP_SCALE = 0.55;
 export function ProjectionStage({
   state,
   preview = false,
+  faithfulPreview = false,
   designPreview = false,
   onPresentationSlideCount,
   onPresentationSlideChange,
@@ -445,11 +496,14 @@ export function ProjectionStage({
 
   return (
     <div
-      className={`projection-stage ${preview ? "preview-stage" : ""}`}
+      className={`projection-stage ${preview ? "preview-stage" : ""} ${faithfulPreview ? "faithful-preview-stage" : ""}`}
       style={
         preview
           ? ({
-              "--preview-text-size": `${Math.max(8, state.text.fontSize * 0.28)}px`,
+              "--preview-text-size": `${Math.max(
+                8,
+                state.text.fontSize * (faithfulPreview ? 1 : 0.28),
+              )}px`,
             } as CSSProperties)
           : undefined
       }
@@ -490,7 +544,8 @@ export function ProjectionStage({
       </div>
 
       <div
-        key={`${state.text.kind}-${state.text.visible}-${state.text.html}-${state.text.animation}`}
+        // Keep this layer mounted while its visibility changes so the exit
+        // transition can finish when the operator clears projected text.
         ref={textRef}
         className={`projection-text position-${state.text.position} template-${state.text.template} projection-animation-${state.text.kind === "anuncio" ? state.text.animation : "none"} ${projectionSafeArea ? "projection-safe-area" : ""} ${bibleSafeArea ? "bible-safe-area" : ""} ${bibleFill ? "bible-fill" : ""} ${fitText ? "auto-fit-text" : ""} ${state.text.visible ? "layer-visible" : "layer-hidden"}`}
         style={textStyle}
@@ -498,7 +553,7 @@ export function ProjectionStage({
       />
       {state.text.kind === "canto" && state.text.title && (
         <div
-          className={`song-title-banner title-position-${state.text.titlePosition} title-style-${state.text.titleStyle}`}
+          className={`song-title-banner title-position-${state.text.titlePosition} title-style-${state.text.titleStyle} ${state.text.visible ? "layer-visible" : "layer-hidden"}`}
           style={{
             color: state.text.titleColor,
             fontFamily: state.songStyle.titleFontFamily || state.text.fontFamily,
@@ -506,7 +561,7 @@ export function ProjectionStage({
               state.text.titleStyle === "none"
                 ? "transparent"
                 : state.text.titleBackground,
-            fontSize: `${state.text.titleFontSize * (preview ? 0.28 : 1)}px`,
+            fontSize: `${state.text.titleFontSize * (preview && !faithfulPreview ? 0.28 : 1)}px`,
             textTransform: state.songStyle.uppercase ? "uppercase" : "none",
             textShadow: state.text.shadowEnabled
               ? `0 3px ${state.text.shadowBlur}px ${state.text.shadowColor}`
@@ -523,7 +578,7 @@ export function ProjectionStage({
           className={`projection-alert overlay-${state.alert.position} alert-animation-${state.alert.animation}`}
           style={{
             color: state.alert.color,
-            fontSize: `${state.alert.fontSize * (preview ? 0.28 : 1)}px`,
+            fontSize: `${state.alert.fontSize * (preview && !faithfulPreview ? 0.28 : 1)}px`,
           }}
         >
           <span>{state.alert.message}</span>

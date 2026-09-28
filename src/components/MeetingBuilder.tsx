@@ -19,7 +19,6 @@ import {
   Music2,
   Minus,
   Palette,
-  Play,
   Plus,
   Presentation,
   Save,
@@ -40,7 +39,7 @@ import type {
   ProjectionState,
   Song,
 } from "../../shared/types";
-import { ProjectionStage } from "./ProjectionStage";
+import { ProjectionPreview } from "./ProjectionStage";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import { RichTextToolbar } from "./RichTextToolbar";
 import { Win11ContextMenu } from "./Win11ContextMenu";
@@ -1472,7 +1471,10 @@ export function MeetingBuilder({
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                onClick={() => setSelected(item)}
+                onClick={() => {
+                  setSelected(item);
+                  void fire(item);
+                }}
                 key={item.id}
               >
                 <GripVertical className="grip" />
@@ -1483,26 +1485,7 @@ export function MeetingBuilder({
                   <strong>{item.title}</strong>
                   <span>{itemLabels[item.type]}</span>
                 </div>
-                <button
-                  className={itemOnAir ? "on-air" : ""}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setSelected(item);
-                    fire(item);
-                  }}
-                >
-                  {itemOnAir ? (
-                    <>
-                      <X />
-                      QUITAR
-                    </>
-                  ) : (
-                    <>
-                      <Play fill="currentColor" />
-                      AL AIRE
-                    </>
-                  )}
-                </button>
+                {itemOnAir && <em className="rundown-on-air">AL AIRE</em>}
               </article>
             );
           })}
@@ -1912,7 +1895,7 @@ export function MeetingBuilder({
               <button type="button" className="dialog-close" aria-label="Cerrar" onClick={() => { setPreviewDraft(null); void window.flProyector.clearPreviewState(); }}><X /></button>
             </header>
             <p>Así se vería en la pantalla. Todavía no se envió al proyector.</p>
-            <div className="preview-only-frame" style={{ aspectRatio: previewAspectRatio }}><ProjectionStage state={previewDraft} preview /></div>
+            <div className="preview-only-frame" style={{ aspectRatio: previewAspectRatio }}><ProjectionPreview state={previewDraft} /></div>
           </div>
         </div>
       )}
@@ -3241,7 +3224,7 @@ function AnnouncementPreview({
         </div>
       </div>
       <div className="designer-preview" style={{ aspectRatio: previewAspectRatio }}>
-        <ProjectionStage state={previewState} preview />
+        <ProjectionPreview state={previewState} />
       </div>
       <p>Esta pantalla representa cómo se verá el anuncio en el proyector.</p>
     </aside>

@@ -1225,7 +1225,15 @@ html[data-theme="light"] .sidebar .sidebar-toggle:hover {
   text-shadow:
     0 3px 14px #000,
     0 1px 3px #000;
-  transition: opacity 0.5s;
+  /* Text remains mounted briefly when it is cleared, so the operator gets a
+     clean, broadcast-style exit instead of a sudden visual cut. */
+  transition:
+    opacity 260ms ease-out,
+    filter 260ms ease-out;
+  will-change: opacity, filter;
+}
+.projection-text.layer-hidden {
+  filter: blur(2px);
 }
 .projection-text p {
   margin: 0.18em 0;
@@ -1253,6 +1261,13 @@ html[data-theme="light"] .sidebar .sidebar-toggle:hover {
   line-height: 1.15;
   text-align: center;
   box-shadow: 0 8px 24px #0007;
+  transition:
+    opacity 240ms ease-out,
+    filter 240ms ease-out;
+  will-change: opacity, filter;
+}
+.song-title-banner.layer-hidden {
+  filter: blur(2px);
 }
 .song-title-banner.title-style-none {
   box-shadow: none;
@@ -1382,7 +1397,31 @@ html[data-theme="light"] .sidebar .sidebar-toggle:hover {
   font-size: 24px;
   font-weight: 800;
   letter-spacing: 0.25em;
-  transition: opacity 0.5s;
+  transform: scale(1);
+  transform-origin: center;
+  transition:
+    opacity 420ms cubic-bezier(0.22, 0.8, 0.28, 1),
+    transform 520ms cubic-bezier(0.22, 0.8, 0.28, 1);
+  will-change: opacity, transform;
+}
+.logo-layer.layer-hidden {
+  transform: scale(1.035);
+}
+.logo-layer .church-logo,
+.logo-layer .logo-mark,
+.logo-layer .church-identity {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity 300ms ease-out 80ms,
+    transform 460ms cubic-bezier(0.22, 0.8, 0.28, 1) 80ms;
+}
+.logo-layer.layer-hidden .church-logo,
+.logo-layer.layer-hidden .logo-mark,
+.logo-layer.layer-hidden .church-identity {
+  opacity: 0;
+  transform: translateY(14px) scale(0.96);
+  transition-delay: 0ms;
 }
 .logo-mark {
   width: min(42vw, 42vh, 520px);

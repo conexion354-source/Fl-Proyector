@@ -151,6 +151,16 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.45",
+    title: "Operador bíblico y vista previa mejorados",
+    publishedAt: "2026-09-27T00:00:00Z",
+    changes: [
+      "La navegación bíblica vuelve a usar selectores simples y permite avanzar con Enter entre versión, libro, capítulo y versículo.",
+      "La vista previa ahora usa el mismo marco de salida para representar con precisión los saltos de línea del proyector.",
+      "Las reuniones se controlan con un clic sobre cada elemento y las alertas y el historial bíblico se integran al flujo de proyección.",
+    ],
+  },
+  {
     version: "10.11.44",
     title: "Navegación de versículos sin filtros",
     publishedAt: "2026-09-26T00:00:00Z",

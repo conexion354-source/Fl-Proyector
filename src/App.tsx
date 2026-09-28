@@ -25,7 +25,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import { ProjectionStage } from "./components/ProjectionStage";
+import { ProjectionPreview } from "./components/ProjectionStage";
 import { MediaLibrary } from "./components/MediaLibrary";
 import { SongLibrary } from "./components/SongLibrary";
 import { BibleOperator } from "./components/BibleOperator";
@@ -360,7 +360,8 @@ export function App() {
   const projectLiveAudienceQr = async (qr = liveAudienceQr) => {
     if (!qr) return;
     if (!liveAudienceQrOnAir) beforeLiveAudienceQr.current = structuredClone(state);
-    await window.flProyector.openProjection();
+    // The QR is content for the configured projector. Do not create a new
+    // floating output window merely because the operator shares the QR.
     await update({
       blackout: false,
       logo: false,
@@ -553,7 +554,7 @@ export function App() {
             />
           )}{" "}
           {tab === "fondos" && <MediaLibrary state={state} update={update} />}{" "}
-          {tab === "biblia" && <BibleOperator state={state} update={update} />}{" "}
+          {tab === "biblia" && <BibleOperator state={state} update={update} projectionFrozen={projectionFrozen} />}{" "}
           {tab === "remoto" && (
             <RemotePanel urls={status.remoteUrls} />
           )}{" "}
@@ -610,9 +611,8 @@ export function App() {
             </span>
           </div>
           <div className="preview-frame" style={{ aspectRatio: previewAspectRatio, backgroundColor: activeDisplaySettings.backgroundColor }}>
-            <ProjectionStage
+            <ProjectionPreview
               state={isSettings ? (settingsPreview ?? state) : previewPanelMode === "live" ? liveState : state}
-              preview
               designPreview={isSettings && settingsPreview?.text.kind === "canto"}
               onVideoMetadata={isSettings ? undefined : handleVideoMetadata}
               onVideoTime={isSettings ? undefined : handleVideoTime}
