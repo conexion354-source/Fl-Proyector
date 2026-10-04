@@ -130,6 +130,7 @@ let churchAssetsDir = "";
 let updaterConfigured = false;
 let liveAudienceCaptureTimer: ReturnType<typeof setTimeout> | null = null;
 let liveAudienceCaptureRetryTimer: ReturnType<typeof setTimeout> | null = null;
+const remoteLanUrl = "http://fl-proyector.local:3001";
 const openverseSearchCache = new Map<
   string,
   { expiresAt: number; value: OpenverseSearchResponse }
@@ -150,6 +151,16 @@ let updateStatus: UpdateStatus = {
 };
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
+  {
+    version: "10.11.46",
+    title: "Control remoto que acompaña cada red",
+    publishedAt: "2026-10-04T00:00:00Z",
+    changes: [
+      "El QR y la web app usan ahora una dirección local estable: al cambiar de Wi-Fi, el teléfono busca el sistema de esa iglesia sin depender de Internet ni de una IP anterior.",
+      "La detección automática conserva el QR y las direcciones directas como respaldo para redes que bloqueen el descubrimiento local.",
+      "Se incorporan las mejoras recientes de estabilidad al proyectar canciones largas y el botón de limpiar más discreto en el control remoto.",
+    ],
+  },
   {
     version: "10.11.45",
     title: "Operador bíblico y vista previa mejorados",
@@ -1319,7 +1330,7 @@ function localNetworkAddresses() {
 function enableWindowsRemoteAccess() {
   if (process.platform !== "win32") return Promise.resolve(true);
   return new Promise<boolean>((resolve) => {
-    const ruleArguments = [
+    const remoteRuleArguments = [
       "advfirewall",
       "firewall",
       "add",
@@ -1333,12 +1344,31 @@ function enableWindowsRemoteAccess() {
       "profile=any",
       "enable=yes",
     ];
-    const escapedArguments = ruleArguments
-      .map((value) => `'${value.replace(/'/g, "''")}'`)
-      .join(",");
+    const discoveryRuleArguments = [
+      "advfirewall",
+      "firewall",
+      "add",
+      "rule",
+      "name=FL Proyector - Descubrimiento local",
+      "dir=in",
+      "action=allow",
+      "protocol=UDP",
+      "localport=5353",
+      "remoteip=localsubnet",
+      "profile=any",
+      "enable=yes",
+    ];
+    const escapeArguments = (argumentsList: string[]) =>
+      argumentsList
+        .map((value) => `'${value.replace(/'/g, "''")}'`)
+        .join(",");
+    const escapedRemoteArguments = escapeArguments(remoteRuleArguments);
+    const escapedDiscoveryArguments = escapeArguments(discoveryRuleArguments);
     const command = [
-      `$process = Start-Process -FilePath 'netsh.exe' -ArgumentList @(${escapedArguments}) -Verb RunAs -Wait -PassThru`,
-      "exit $process.ExitCode",
+      `$remote = Start-Process -FilePath 'netsh.exe' -ArgumentList @(${escapedRemoteArguments}) -Verb RunAs -Wait -PassThru`,
+      "if ($remote.ExitCode -ne 0) { exit $remote.ExitCode }",
+      `$discovery = Start-Process -FilePath 'netsh.exe' -ArgumentList @(${escapedDiscoveryArguments}) -Verb RunAs -Wait -PassThru`,
+      "exit $discovery.ExitCode",
     ].join("; ");
     const child = spawn(
       "powershell.exe",
@@ -2091,7 +2121,12 @@ if (hasSingleInstanceLock)
           scaleFactor: display.scaleFactor,
           primary: display.id === screen.getPrimaryDisplay().id,
         })),
-        remoteUrls: addresses.map((address) => `http://${address}:3001`),
+        // The stable mDNS address is shown first so a new QR/web-app install
+        // follows the projector across Wi-Fi networks without preserving a
+        // DHCP IP from the previous church. Direct addresses remain fallback.
+        remoteUrls: remoteServer?.isAvailable()
+          ? [remoteLanUrl, ...addresses.map((address) => `http://${address}:3001`)]
+          : [],
       };
     });
     ipcMain.handle("remote:enable-windows-access", enableWindowsRemoteAccess);

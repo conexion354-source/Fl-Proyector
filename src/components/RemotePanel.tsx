@@ -95,7 +95,8 @@ export function RemotePanel({
               </div>
               <p className="remote-webapp-note">
                 Abrila en el navegador y elegí <b>Instalar app</b> o <b>Agregar a pantalla de inicio</b>.
-                Después podés usar <b>Biblia</b> o <b>Multimedia</b> mientras ambos equipos estén en la misma red.
+                Después detectará el sistema de la red Wi-Fi actual y cargará sus reuniones; no necesita Internet.
+                Si una red bloquea la detección, escaneá este QR nuevamente.
               </p>
               {window.flProyector.platform === "win32" && (
                 <div className={`remote-firewall ${firewallResult ?? ""}`}>

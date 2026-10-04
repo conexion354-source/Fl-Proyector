@@ -5,6 +5,7 @@ import { createHash, randomInt, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import Bonjour from "bonjour-service";
 import { collaboratorHtml } from "./collaboratorPage.js";
 import {
   shouldSplitBibleVerse,
@@ -30,7 +31,11 @@ import type {
 
 // This is served by the projector itself. Update checks for the remote never
 // need an Internet connection: the phone compares against the PC on its LAN.
-const remoteClientVersion = "10.11.45";
+const remoteClientVersion = "10.11.46";
+// This hostname is answered only inside the current Wi-Fi/LAN through mDNS.
+// It deliberately does not require an Internet connection or a fixed IP.
+const remoteLanHostname = "fl-proyector.local";
+const remoteLanOrigin = `http://${remoteLanHostname}:3001`;
 
 type LiveAudiencePayload =
   | {
@@ -115,6 +120,8 @@ export function startRemoteServer(
   const app = express();
   const server = createServer(app);
   const io = new Server(server, { cors: { origin: "*" } });
+  const bonjour = new Bonjour();
+  let lanService: ReturnType<Bonjour["publish"]> | null = null;
   let liveCode: string | null = null;
   let livePayload: LiveAudiencePayload | null = null;
   let liveFrame: { hash: string; jpeg: Buffer } | null = null;
@@ -256,7 +263,14 @@ export function startRemoteServer(
       // The installed iOS web app uses this tiny public LAN endpoint to find
       // the projector again after DHCP gives the PC a different address.
       .set("Access-Control-Allow-Origin", "*")
-      .json({ service: "fl-proyector", name: "FL Proyector", port: 3001, remoteVersion: remoteClientVersion }),
+      .json({
+        service: "fl-proyector",
+        name: getState().church.name.trim() || "FL Proyector",
+        port: 3001,
+        hostname: remoteLanHostname,
+        origin: remoteLanOrigin,
+        remoteVersion: remoteClientVersion,
+      }),
   );
   app.get("/api/remote/app-version", (_req, res) =>
     res.set("Cache-Control", "no-store").json({
@@ -721,6 +735,30 @@ export function startRemoteServer(
   server.once("listening", () => {
     available = true;
     console.info("[remote-server] listo en puerto 3001");
+    // iPhone/iPad web apps and the Android shell can now always start from
+    // fl-proyector.local. On another church's Wi-Fi, mDNS resolves this same
+    // local name to that church's PC instead of retaining the previous IP.
+    try {
+      lanService = bonjour.publish({
+        name: `FL Proyector ${getState().church.name.trim() || "Iglesia"}`,
+        type: "fl-proyector",
+        protocol: "tcp",
+        port: 3001,
+        host: remoteLanHostname,
+        disableIPv6: true,
+        txt: {
+          service: "fl-proyector",
+          version: remoteClientVersion,
+          church: getState().church.name.trim() || "FL Proyector",
+          origin: remoteLanOrigin,
+        },
+      });
+      console.info(`[remote-server] descubrible como ${remoteLanOrigin}`);
+    } catch (error) {
+      // Direct IP and QR fallback remain available if a restrictive network
+      // blocks multicast discovery.
+      console.warn("[remote-server] no se pudo anunciar mDNS", error);
+    }
   });
   server.on("error", (error) => {
     available = false;
@@ -729,6 +767,8 @@ export function startRemoteServer(
   server.listen(3001, "0.0.0.0");
   return {
     close: () => {
+      lanService?.stop();
+      bonjour.destroy();
       io.close();
       server.close();
     },
@@ -829,12 +869,13 @@ const remoteHtml = String.raw`<!doctype html>
     .home{display:grid;gap:13px;margin:auto 0}.home h1{font-size:30px;margin:0}.home .sub{margin:0 0 10px}.mode{display:flex;align-items:center;gap:15px;width:100%;padding:20px;text-align:left;color:#f5f7ff;background:#171c28;border:1px solid #30394b;border-radius:17px;font:inherit}.mode i{display:grid;place-items:center;width:44px;height:44px;border-radius:13px;font-style:normal;font-size:23px;background:#5b42ea}.mode b,.mode span{display:block}.mode span{margin-top:4px;color:#aab3c7;font-size:13px;font-weight:500}.view-toolbar{display:flex;align-items:center;gap:8px;flex:0 0 auto;min-height:42px;margin:0 0 10px}.view-toolbar-title{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f5f7ff;font-size:14px;font-weight:800}.back{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:86px;height:38px;padding:0 11px;color:#ded9ff;background:#191d2a;border:1px solid #343c50;border-radius:10px;font:750 14px inherit;touch-action:manipulation}.back:active,.clear-live:active{transform:scale(.95)}.clear-live{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;padding:0;color:#ffb8bf;background:#351c24;border:1px solid #73313d;border-radius:10px;touch-action:manipulation}.clear-live svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.media-picker{display:flex;gap:8px;margin:0 0 14px}.media-picker select{flex:1}.media-list{display:grid;align-content:start;grid-auto-rows:min-content;gap:9px;overflow:auto;min-height:0;flex:1;padding:0 2px}.media-item{overflow:hidden;text-align:left;color:#f5f7ff;background:#171c28;border:1px solid #30394b;border-radius:14px;font:inherit}.media-launch{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:68px;padding:14px 15px;text-align:left;color:inherit;background:transparent;border:0;font:inherit}.media-item b,.media-item span{display:block}.media-item span{color:#aab3c7;font-size:12px;margin-top:4px}.badge{padding:5px 7px;border-radius:7px;background:#2d2752;color:#c8c1ff;font-size:10px;font-weight:800}.media-item.live{background:#123526;border-color:#37d67a;box-shadow:0 0 0 1px #37d67a55}.media-item.live .badge{background:#1c6b43;color:#eafff1}.item-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 12px}.item-controls button{color:#fff;background:#2c6544;border:1px solid #4aa971;border-radius:9px;padding:10px;font:700 12px inherit}.item-video-controls{border-top:1px solid #37d67a44;padding-top:11px}.seek-label,.volume-label{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:0 12px 10px;color:#b8d6c4;font-size:11px;font-weight:700}.volume-label{grid-template-columns:auto 1fr}.seek-label input,.volume-label input{width:100%;accent-color:#37d67a}.transport{margin-top:14px;padding:13px;background:#171c28;border:1px solid #30394b;border-radius:14px}.transport-title{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#aab3c7;margin-bottom:11px}.transport-row{display:flex;gap:8px}.transport button{flex:1;color:#fff;background:#332b68;border:1px solid #5549a1;border-radius:10px;padding:11px;font:700 13px inherit}.transport input{width:100%;margin-top:5px}.song-list{display:grid;align-content:start;gap:9px;overflow:auto;min-height:0;flex:1;padding:0 2px 8px}.song-card{overflow:hidden;border:1px solid #30394b;border-radius:14px;background:#171c28}.song-card>button{display:flex;align-items:center;justify-content:space-between;width:100%;padding:15px;color:#f5f7ff;background:transparent;border:0;text-align:left;font:inherit}.song-card small{display:block;margin-top:4px;color:#aab3c7}.song-card.live{border-color:#37d67a}.song-sections{display:grid;gap:8px;padding:0 11px 11px}.song-section{display:block;width:100%;padding:12px;text-align:left;color:#edf0f9;background:#111622;border:1px solid #343e52;border-radius:10px;font:inherit}.song-section b{display:block;margin-bottom:6px;color:#a99cff;font-size:11px;text-transform:uppercase}.song-section span{display:-webkit-box;overflow:hidden;color:#c5ccda;font-size:13px;line-height:1.35;-webkit-line-clamp:3;-webkit-box-orient:vertical}.song-section.active{border-color:#37d67a;background:#123526}.highlight-menu{position:fixed;z-index:20;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:8px;padding:8px;background:#eef0f8;border:1px solid #fff;border-radius:999px;box-shadow:0 12px 32px #0008}.highlight-menu button{width:30px;height:30px;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 5px #0005}.highlight-menu .clear-highlight{width:auto;padding:0 11px;border:0;border-radius:999px;background:#252b38;color:#fff;font:700 12px inherit}body[data-view="bible"] header,body[data-view="media"] header,body[data-view="songs"] header{display:none}body[data-view="bible"] #bible-view>h1,body[data-view="bible"] #bible-view>.sub,body[data-view="media"] #media-view>h1,body[data-view="media"] #media-view>.sub,body[data-view="songs"] #songs-view>h1,body[data-view="songs"] #songs-view>.sub{display:none}
     .song-list{gap:11px;padding-bottom:14px}.song-sections{position:relative;z-index:1;gap:10px;padding-bottom:12px}.song-section{position:relative;z-index:2;min-height:76px;padding:13px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:#37d67a44}.song-section{touch-action:manipulation}.song-section b{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}.song-section b:after{content:"PROYECTAR";color:#8893a8;font-size:9px;letter-spacing:.04em}.song-section.active{box-shadow:inset 3px 0 #37d67a}.song-section.active b{color:#63e99d}.song-section.active b:after{content:"EN VIVO";color:#63e99d}.song-nav{display:grid;grid-template-columns:1fr minmax(96px,auto) 1fr;gap:8px;align-items:center;flex:0 0 auto;margin-top:10px;padding:10px;border:1px solid #315341;border-radius:13px;background:#12251c;box-shadow:0 -10px 28px #080b1199}.song-nav button{min-width:0;height:42px;padding:0 10px;border:1px solid #4aa971;border-radius:10px;color:#effff5;background:#24583b;font:750 12px inherit;touch-action:manipulation}.song-nav button:disabled{opacity:.38}.song-nav-status{min-width:0;text-align:center}.song-nav-status b,.song-nav-status span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.song-nav-status b{color:#63e99d;font-size:11px;text-transform:uppercase}.song-nav-status span{margin-top:3px;color:#b8d6c4;font-size:10px}@media (pointer:coarse){.song-section{min-height:88px;padding:15px}}
     .song-picker-card{display:flex;align-items:center;gap:10px;width:100%;min-height:76px;padding:16px;text-align:left;color:#f5f7ff;background:#171c28;border:1px solid #30394b;border-radius:15px;font:inherit;cursor:pointer;touch-action:manipulation}.song-picker-card:active{transform:scale(.985)}.song-picker-card.live{border-color:#37d67a;background:#123526;box-shadow:0 0 0 1px #37d67a55}.song-picker-card>span{min-width:0;flex:1}.song-picker-card b,.song-picker-card small{display:block}.song-picker-card b{font-size:17px}.song-picker-card small{margin-top:5px;color:#aab3c7;font-size:12px;line-height:1.35}.song-picker-card em{color:#a99cff;font-style:normal;font-size:29px;font-weight:300}.song-context{min-width:0;margin:0 0 14px;padding:11px 13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid #3a455a;border-radius:10px;background:#111622;color:#f5f7ff;font-size:14px;font-weight:700}.item-video-controls .item-controls{grid-template-columns:repeat(3,minmax(0,1fr))}.song-detail{display:grid;gap:11px}.song-detail-header{display:block;min-width:0;padding:15px 16px;background:#171c28;border:1px solid #30394b;border-radius:14px}.song-detail-header b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:18px}.song-detail .song-sections{padding:0}.song-detail .song-section{min-height:94px;padding:15px}.song-detail .song-section span{-webkit-line-clamp:4;font-size:14px;line-height:1.42}.remote-update{position:fixed;z-index:30;left:12px;right:12px;bottom:max(14px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:10px;padding:11px 13px;background:#e8e4ff;color:#17132a;border-radius:13px;box-shadow:0 14px 32px #0008;font-size:12px;font-weight:750}.remote-update span{flex:1}.remote-update button{min-height:34px;padding:0 11px;border:0;border-radius:8px;background:#513cd4;color:#fff;font:800 12px inherit}#bible-view,#media-view,#songs-view{min-height:0;flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .clear-live{color:#aeb8ca;background:#171c28;border-color:#343c50;border-radius:11px;box-shadow:inset 0 1px #ffffff08;transition:color .16s ease,border-color .16s ease,background .16s ease,transform .12s ease}.clear-live:hover{color:#ffc0c7;background:#29202a;border-color:#8f4955}.clear-live svg{width:18px;height:18px}
     @media(max-width:430px){.app{padding-left:12px;padding-right:12px}.picker{grid-template-columns:1fr 1.1fr}.field.chapter{grid-column:1/-1}.verse{padding:14px}.text{font-size:15px}}
   </style>
 </head><body><main class="app">
   <header><div class="brand"><span class="logo"></span><span>FL PROYECTOR</span></div><div class="header-actions"><button id="install-app" class="install-app" hidden>Instalar app</button><span id="status" class="status">Conectando</span></div></header>
   <section id="remote-home" class="home"><h1>Control remoto</h1><p class="sub">Elegí qué querés controlar.</p><button id="open-bible" class="mode"><i>▤</i><span><b>Biblia</b><span>Versión, libro, capítulo y versículos.</span></span></button><button id="open-media" class="mode"><i>▶</i><span><b>Multimedia</b><span>Videos, imágenes y PowerPoints de una reunión.</span></span></button><button id="open-songs" class="mode" hidden><i>♫</i><span><b>Canciones del culto</b><span>Elegí una canción y proyectá sus estrofas.</span></span></button><button id="open-alerts" class="mode" hidden><i>!</i><span><b>Alertas</b><span>Lanzá avisos guardados sobre la proyección.</span></span></button></section>
-  <section id="bible-view" hidden><div class="view-toolbar"><button class="back" aria-label="Volver al inicio">← Volver</button><span class="view-toolbar-title">Biblia</span><button id="clear-live" class="clear-live" aria-label="Quitar versículo del aire" title="Quitar del aire"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="m8 9 8 8M16 9l-8 8M9 21h6"/></svg></button></div><h1>Biblia</h1><p class="sub">Elegí el pasaje y tocá un versículo para proyectarlo.</p>
+  <section id="bible-view" hidden><div class="view-toolbar"><button class="back" aria-label="Volver al inicio">← Volver</button><span class="view-toolbar-title">Biblia</span><button id="clear-live" class="clear-live" aria-label="Quitar versículo del aire" title="Quitar del aire"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 4.5 5 5L10 19H5v-5l9.5-9.5Z"/><path d="m12.5 6.5 5 5M4 19h16"/></svg></button></div><h1>Biblia</h1><p class="sub">Elegí el pasaje y tocá un versículo para proyectarlo.</p>
   <section class="picker" aria-label="Selector de pasaje">
     <div class="field"><label for="version">Versión</label><select id="version"></select></div>
     <div class="field"><label for="book">Libro</label><select id="book"></select></div>
@@ -842,7 +883,7 @@ const remoteHtml = String.raw`<!doctype html>
   </section>
   <div class="hint"><strong id="heading">Versículos</strong><span>Toque para proyectar</span></div><section id="verses" class="verses"><div class="loading">Cargando Biblia…</div></section></section>
   <section id="media-view" hidden><div class="view-toolbar"><button class="back" aria-label="Volver al inicio">← Volver</button><span class="view-toolbar-title">Multimedia</span></div><h1>Multimedia</h1><p class="sub">Videos, imágenes y PowerPoints de una reunión.</p><div class="media-picker"><select id="media-meeting"></select></div><section id="media-list" class="media-list"><div class="loading">Cargando reuniones…</div></section><div id="transport"></div></section>
-  <section id="songs-view" hidden><div class="view-toolbar"><button class="back" aria-label="Volver al inicio">← Volver</button><span class="view-toolbar-title">Canciones del culto</span><button id="clear-song" class="clear-live" aria-label="Quitar canción del aire" title="Quitar del aire"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="m8 9 8 8M16 9l-8 8M9 21h6"/></svg></button></div><h1>Canciones</h1><p class="sub">Elegí la reunión, la canción y la estrofa.</p><div id="song-meeting-picker" class="media-picker"><select id="song-meeting"></select></div><div id="song-context" class="song-context" hidden></div><section id="song-list" class="song-list"><div class="loading">Cargando canciones…</div></section><div id="song-nav" class="song-nav" hidden><button data-song-step="-1">← Anterior</button><div class="song-nav-status"><b id="song-nav-label">En vivo</b><span id="song-nav-title">Canción</span></div><button data-song-step="1">Siguiente →</button></div></section>
+  <section id="songs-view" hidden><div class="view-toolbar"><button class="back" aria-label="Volver al inicio">← Volver</button><span class="view-toolbar-title">Canciones del culto</span><button id="clear-song" class="clear-live" aria-label="Quitar canción del aire" title="Quitar del aire"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 4.5 5 5L10 19H5v-5l9.5-9.5Z"/><path d="m12.5 6.5 5 5M4 19h16"/></svg></button></div><h1>Canciones</h1><p class="sub">Elegí la reunión, la canción y la estrofa.</p><div id="song-meeting-picker" class="media-picker"><select id="song-meeting"></select></div><div id="song-context" class="song-context" hidden></div><section id="song-list" class="song-list"><div class="loading">Cargando canciones…</div></section><div id="song-nav" class="song-nav" hidden><button data-song-step="-1">← Anterior</button><div class="song-nav-status"><b id="song-nav-label">En vivo</b><span id="song-nav-title">Canción</span></div><button data-song-step="1">Siguiente →</button></div></section>
   <section id="alerts-view" hidden><style>.alerts-list{display:grid;align-content:start;gap:9px;overflow:auto;min-height:0;flex:1;padding:0 2px}.remote-alert{display:flex;align-items:center;gap:11px;width:100%;padding:15px;text-align:left;color:#f5f7ff;background:#171c28;border:1px solid #30394b;border-radius:14px;font:inherit}.remote-alert:active{transform:scale(.985)}.remote-alert i{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:#572130;color:#ffb9c0;font-style:normal}.remote-alert span{min-width:0;flex:1}.remote-alert b,.remote-alert small{display:block}.remote-alert small{margin-top:4px;color:#aab3c7;font-size:12px}.remote-alert.live{border-color:#f04d5d;background:#351c24}.remote-alert-stop{margin-top:10px;width:100%;padding:12px;border:1px solid #73313d;border-radius:10px;color:#ffb8bf;background:#351c24;font:750 13px inherit}</style><div class="view-toolbar"><button class="back" aria-label="Volver al inicio">← Volver</button><span class="view-toolbar-title">Alertas</span></div><h1>Alertas</h1><p class="sub">Tocá una alerta guardada para mostrarla.</p><section id="alerts-list" class="alerts-list"><div class="loading">Cargando alertas…</div></section><button id="hide-alert" class="remote-alert-stop">Ocultar alerta</button></section>
 </main><div id="highlight-menu" class="highlight-menu" hidden><button data-highlight="#fff176" style="background:#fff176" aria-label="Resaltador amarillo"></button><button data-highlight="#a7f3d0" style="background:#a7f3d0" aria-label="Resaltador verde"></button><button data-highlight="#bfdbfe" style="background:#bfdbfe" aria-label="Resaltador celeste"></button><button data-highlight="#fbcfe8" style="background:#fbcfe8" aria-label="Resaltador rosa"></button><button class="clear-highlight" data-highlight="">Quitar</button></div><div id="remote-update" class="remote-update" hidden><span>Nueva versión disponible.</span><button id="remote-update-reload" type="button">Actualizar</button></div><div id="toast" class="toast" role="status"></div><script src="/socket.io/socket.io.js"></script><script>
   (function(){
@@ -934,6 +975,12 @@ const remoteHtml = String.raw`<!doctype html>
   function showRemoteUpdate(){remoteUpdate.hidden=false;}
   remoteUpdateReload.onclick=function(){location.reload();};
   if("serviceWorker" in navigator)navigator.serviceWorker.getRegistration().then(function(registration){if(!registration)return;navigator.serviceWorker.addEventListener("controllerchange",showRemoteUpdate);registration.update().catch(function(){});if(registration.waiting)showRemoteUpdate();registration.addEventListener("updatefound",function(){var worker=registration.installing;if(!worker)return;worker.addEventListener("statechange",function(){if(worker.state==="installed"&&navigator.serviceWorker.controller)showRemoteUpdate();});});});
+  // Always try the stable local hostname first. This also lets a previously
+  // installed app recover from a cached page after the phone joins another
+  // church's Wi-Fi, without knowing that network's IP range.
+  var lanOrigin="http://fl-proyector.local:3001",legacyCandidateOrigins=candidateOrigins;
+  candidateOrigins=function(){var candidates=[lanOrigin],legacy=legacyCandidateOrigins();legacy.forEach(function(origin){if(candidates.indexOf(origin)<0)candidates.push(origin);});return candidates;};
+  if(location.origin!==lanOrigin)setTimeout(function(){discover(lanOrigin).then(function(origin){if(origin){localStorage.setItem("fl-remote-server",origin);location.replace(origin);}});},350);
   document.getElementById("clear-live").onclick=function(){command("/api/remote/clear").then(function(){selectedVerse=-1;renderVerses();notify("Versículo quitado del aire");});};
   })();
 </script></body></html>`;

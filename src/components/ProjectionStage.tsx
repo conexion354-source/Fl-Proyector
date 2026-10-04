@@ -106,6 +106,23 @@ const MAX_BALANCED_FILL_SCALE = 1.12;
 const BIBLE_REFERENCE_HEIGHT_SCALE = 2;
 const BIBLE_REFERENCE_GAP_SCALE = 0.55;
 
+// Stable song sizing used to remeasure every stanza on every click.  That
+// means a song with 12 parts could force 144 synchronous DOM layouts per
+// projection (12 binary-search steps × 12 stanzas), and the live preview can
+// request the same work too.  Keep the result in output-relative pixels so it
+// can be reused by the projector and its scaled previews alike.
+const songFitCache = new Map<string, number>();
+const MAX_SONG_FIT_CACHE_ENTRIES = 80;
+
+function rememberSongFit(key: string, fontSizeAtScaleOne: number) {
+  if (songFitCache.has(key)) songFitCache.delete(key);
+  songFitCache.set(key, fontSizeAtScaleOne);
+  if (songFitCache.size > MAX_SONG_FIT_CACHE_ENTRIES) {
+    const oldest = songFitCache.keys().next().value;
+    if (oldest) songFitCache.delete(oldest);
+  }
+}
+
 export function ProjectionStage({
   state,
   preview = false,
@@ -218,6 +235,22 @@ export function ProjectionStage({
         isSong && state.songStyle.stableFontSize
           ? state.text.sourceSongStanzas?.filter(Boolean) ?? []
           : [];
+      // Do not use the current stanza alone as cache identity: the point of a
+      // stable song size is that it fits every stanza in the same song.
+      const songFitCacheKey =
+        isSong && stableSongStanzas.length
+          ? [
+              outputViewport.width,
+              outputViewport.height,
+              configuredHorizontal,
+              configuredVertical,
+              state.text.fontFamily,
+              state.text.fontSize,
+              state.songStyle.minimumFontSize,
+              state.songStyle.uppercase,
+              stableSongStanzas.join("\u001f"),
+            ].join("|")
+          : null;
       const evaluate = (horizontalMargin: number, verticalMargin: number) => {
         if (isProjectableText) {
           element.style.left = `${horizontalMargin}%`;
@@ -332,6 +365,19 @@ export function ProjectionStage({
           stableSongStanzas.length
             ? stableSongStanzas.every((stanza) => contentFits(fontSize, stanza))
             : contentFits(fontSize);
+        const cachedSongFit = songFitCacheKey
+          ? songFitCache.get(songFitCacheKey)
+          : undefined;
+        if (cachedSongFit !== undefined) {
+          const cachedAtCurrentScale = cachedSongFit * scale;
+          applyCandidate(cachedAtCurrentScale);
+          return {
+            fontSize: cachedAtCurrentScale,
+            referenceScale: 1,
+            horizontalMargin,
+            verticalMargin,
+          };
+        }
         for (let step = 0; step < 12; step++) {
           const middle = (low + high) / 2;
           applyCandidate(middle);
@@ -343,6 +389,7 @@ export function ProjectionStage({
         // Leave the DOM at the accepted value even when React can reuse the
         // previous state value and therefore skip a render.
         applyCandidate(best);
+        if (songFitCacheKey) rememberSongFit(songFitCacheKey, best / scale);
         return {
           fontSize: best,
           // The reference is an independent lower-third. Keeping it at its
