@@ -2,6 +2,60 @@ import type { BibleDisplaySettings } from "./types.js";
 
 export type ProjectionDimensions = { width: number; height: number };
 
+// Bible navigation calls these helpers repeatedly while an operator moves with
+// the arrows. Cache the pure layout decisions so a long chapter never causes
+// dozens of canvas measurements on the renderer (especially noticeable on
+// lower-powered Windows PCs).
+const layoutCache = new Map<string, boolean | string[]>();
+const MAX_LAYOUT_CACHE_ENTRIES = 480;
+
+const cacheKey = (
+  text: string,
+  settings: BibleDisplaySettings,
+  viewport: ProjectionDimensions | undefined,
+) =>
+  [
+    text,
+    settings.textFontFamily,
+    settings.textFontSize,
+    settings.referenceFontSize,
+    settings.horizontalMargin,
+    settings.verticalMargin,
+    settings.uppercase,
+    settings.showReference,
+    settings.showVersion,
+    viewport?.width ?? 1920,
+    viewport?.height ?? 1080,
+  ].join("|");
+
+const cacheRead = <T extends boolean | string[]>(key: string): T | undefined => {
+  const value = layoutCache.get(key) as T | undefined;
+  if (value !== undefined) {
+    // A tiny LRU: recently used verses remain cheap during arrow navigation.
+    layoutCache.delete(key);
+    layoutCache.set(key, value);
+  }
+  return value;
+};
+
+const cacheWrite = <T extends boolean | string[]>(key: string, value: T) => {
+  layoutCache.set(key, value);
+  if (layoutCache.size > MAX_LAYOUT_CACHE_ENTRIES)
+    layoutCache.delete(layoutCache.keys().next().value!);
+  return value;
+};
+
+export function bibleSplitOverrideKey(
+  version: string,
+  book: string,
+  chapter: number,
+  verse: string | number,
+) {
+  return `${version.trim().toLocaleLowerCase("es-AR")}|${book
+    .trim()
+    .toLocaleLowerCase("es-AR")}|${chapter}|${verse}`;
+}
+
 const fontWidthScale = (fontFamily: string) => {
   const family = fontFamily.toLocaleLowerCase("en-US");
   if (family.includes("bebas")) return 0.68;
@@ -169,9 +223,15 @@ export function shouldSplitBibleVerse(
   settings: BibleDisplaySettings,
   viewport?: ProjectionDimensions,
 ) {
-  if (!isLongBibleVerse(text, settings, viewport)) return false;
+  const key = `split?/${cacheKey(text, settings, viewport)}`;
+  const cached = cacheRead<boolean>(key);
+  if (cached !== undefined) return cached;
+  if (!isLongBibleVerse(text, settings, viewport)) return cacheWrite(key, false);
   const subtleFloor = Math.max(12, settings.textFontSize * 0.88);
-  return fittedBibleFontSize(text, settings, viewport, 12) < subtleFloor;
+  return cacheWrite(
+    key,
+    fittedBibleFontSize(text, settings, viewport, 12) < subtleFloor,
+  );
 }
 
 const recommendationSample =
@@ -196,6 +256,9 @@ export function splitBibleVerse(
   viewport?: ProjectionDimensions,
 ) {
   if (!shouldSplitBibleVerse(text, settings, viewport)) return [text];
+  const key = `split/${cacheKey(text, settings, viewport)}`;
+  const cached = cacheRead<string[]>(key);
+  if (cached) return cached;
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (words.length < 2) return [text];
   const maximumLines = bibleTextCapacity(settings, viewport).lines;
@@ -211,11 +274,20 @@ export function splitBibleVerse(
     const overflow =
       Math.max(0, leftLines - maximumLines) +
       Math.max(0, rightLines - maximumLines);
-    const punctuation = /[.!?][”"')\]]?$/.test(words[index - 1])
-      ? 0
-      : /[,;:][”"')\]]?$/.test(words[index - 1])
-        ? 1
-        : 3;
+    const previousWord = words[index - 1];
+    const nextWords = words.slice(index, index + 3).join(" ").toLocaleLowerCase("es-AR");
+    // Prefer the end of a complete thought first, then a natural pause or a
+    // new clause. Balance remains important, but never at the expense of a
+    // visibly awkward split in the middle of a phrase.
+    const punctuation = /[.!?][”"')\]]?$/.test(previousWord)
+      ? -7
+      : /[;:][”"')\]]?$/.test(previousWord)
+        ? -5
+        : /,[”"')\]]?$/.test(previousWord)
+          ? -3
+          : /^(pero|porque|aunque|mientras|cuando|entonces|sin embargo|por tanto|para que|y |e )/.test(nextWords)
+            ? -2
+            : 3;
     const score =
       overflow * 100 +
       Math.abs(leftLines - rightLines) * 6 +
@@ -228,8 +300,8 @@ export function splitBibleVerse(
   }
   // It is always exactly A/B. If a particularly long half still needs help,
   // the renderer performs the final small safety reduction without clipping.
-  return [
+  return cacheWrite(key, [
     words.slice(0, bestIndex).join(" "),
     words.slice(bestIndex).join(" "),
-  ].filter(Boolean);
+  ].filter(Boolean));
 }

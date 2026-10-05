@@ -19,9 +19,6 @@ type Props = {
   /** Renders a preview on a full-size virtual output canvas before scaling it
    * down. This preserves the exact browser line wrapping of the projector. */
   faithfulPreview?: boolean;
-  /** Song-design preview shows the requested size directly while live previews
-   * keep the exact safety fitting used by the physical projector. */
-  designPreview?: boolean;
   onPresentationSlideCount?: (count: number) => void;
   onPresentationSlideChange?: (index: number) => void;
   onVideoMetadata?: (duration: number) => void;
@@ -99,10 +96,12 @@ const forceUppercaseHtml = (html: string) =>
     `${prefix}${text.toLocaleUpperCase("es-AR")}`,
   );
 
-// "Rellenar pantalla" may enlarge a short passage, but keeping that growth
-// close to the preferred size avoids a jarring type-size jump when the next
-// verse needs the automatic safety reduction.
-const MAX_BALANCED_FILL_SCALE = 1.12;
+// Auto-size should use the available output, not merely protect against
+// clipping.  The ceiling still prevents a one-word verse or a short chorus
+// from becoming comically large, while allowing the readable size to grow
+// substantially when the layout genuinely has room for it.
+const MAX_BIBLE_FILL_SCALE = 2.6;
+const MAX_SONG_FILL_SCALE = 3.1;
 const BIBLE_REFERENCE_HEIGHT_SCALE = 2;
 const BIBLE_REFERENCE_GAP_SCALE = 0.55;
 
@@ -127,7 +126,6 @@ export function ProjectionStage({
   state,
   preview = false,
   faithfulPreview = false,
-  designPreview = false,
   onPresentationSlideCount,
   onPresentationSlideChange,
   onVideoMetadata,
@@ -216,11 +214,14 @@ export function ProjectionStage({
       setContentScale((current) =>
         Math.abs(current - scale) > 0.002 ? scale : current,
       );
-      // Bible text has one configured size. It may shrink only to prevent a
-      // cut; it never expands short verses to "fill" unused screen space.
-      const shouldFillBible = false;
       const isSong = state.text.kind === "canto";
       const isBible = state.text.kind === "biblia";
+      // Equivalent to EasyWorship's "Resize text to fit element": calculate
+      // the largest safe size in the usable rectangle. Stable songs evaluate
+      // all their sections together, so their visual scale never jumps.
+      const shouldMaximizeText = isBible
+        ? state.bibleStyle.autoFit
+        : state.songStyle.autoFit;
       const configuredHorizontal = isSong
         ? state.songStyle.horizontalMargin ?? 8
         : isBible
@@ -258,16 +259,16 @@ export function ProjectionStage({
           element.style.top = `${verticalMargin}%`;
           element.style.bottom = `${verticalMargin}%`;
         }
-        // In fill mode the configured size is the visual anchor. A short verse
-        // may grow subtly, but never enough to look like a different design
-        // from the following (longer) verse.
+        // The preferred size is a floor, not an artificial ceiling. Measuring
+        // the real DOM lets a short verse or stanza fill the space while long
+        // text remains intact and is reduced only when it truly needs to be.
         const responsiveCeiling = Math.max(
           requestedSize,
-          Math.min(element.clientWidth * 0.24, element.clientHeight * 0.58),
+          Math.min(element.clientWidth * 0.32, element.clientHeight * 0.7),
         );
         const balancedFillCeiling = Math.min(
           responsiveCeiling,
-          requestedSize * MAX_BALANCED_FILL_SCALE,
+          requestedSize * (isSong ? MAX_SONG_FILL_SCALE : MAX_BIBLE_FILL_SCALE),
         );
         const configuredMinimum = isSong
           ? state.songStyle.minimumFontSize * scale
@@ -275,7 +276,7 @@ export function ProjectionStage({
             ? 7 * scale
             : 8 * scale;
         let low = Math.min(requestedSize, Math.max(2, configuredMinimum)),
-          high = shouldFillBible ? balancedFillCeiling : requestedSize,
+          high = shouldMaximizeText ? balancedFillCeiling : requestedSize,
           best = low;
         const applyCandidate = (fontSize: number) => {
           element.style.fontSize = `${fontSize}px`;
@@ -443,11 +444,13 @@ export function ProjectionStage({
     state.bibleStyle.verticalMargin,
     state.bibleStyle.fillScreen,
     state.bibleStyle.autoFit,
+    state.bibleStyle.minimumFontSize,
     state.bibleStyle.referenceFontSize,
     state.bibleStyle.referencePosition,
     state.bibleStyle.referenceStyle,
     state.songStyle.uppercase,
     state.songStyle.autoFit,
+    state.songStyle.minimumFontSize,
     state.songStyle.stableFontSize,
     state.songStyle.horizontalMargin,
     state.songStyle.verticalMargin,
@@ -467,10 +470,10 @@ export function ProjectionStage({
   const projectionSafeArea = bibleSafeArea || songSafeArea;
   const bibleFill = bibleSafeArea && state.bibleStyle.fillScreen;
   // Safety fitting is never optional for projected lyrics: clipping text is
-  // worse than a measured reduction, especially in live meetings.
-  // The design preview must mirror the configured size immediately. The
-  // actual output still uses the safety fit to prevent clipping on a projector.
-  const fitText = projectionSafeArea && !designPreview;
+  // worse than a measured reduction, especially in live meetings. Settings
+  // preview runs on the same virtual output canvas, so it must use this exact
+  // calculation too; otherwise it can falsely show clipped type.
+  const fitText = projectionSafeArea;
   const uppercase =
     (state.text.kind === "biblia" && state.bibleStyle.uppercase) ||
     (state.text.kind === "canto" && state.songStyle.uppercase);

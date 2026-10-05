@@ -600,31 +600,27 @@
   gap: 5px;
   padding-right: 5px;
 }
-.verse-list > button {
+.verse-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  border: 1px solid #242a34;
+  background: #11141a;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.verse-entry:hover { border-color: #404859; }
+.verse-entry.selected { background: #252141; border-color: #665cff; }
+.verse-entry.focused:not(.selected) { border-color: #5ee28f; box-shadow: inset 3px 0 #5ee28f; }
+.verse-full {
   display: grid;
   grid-template-columns: 125px 1fr;
   gap: 12px;
   text-align: left;
-  border: 1px solid #242a34;
-  background: #11141a;
-  border-radius: 7px;
+  border: 0;
+  background: transparent;
   padding: 12px;
   color: #bbc1cd;
   cursor: pointer;
-}
-.verse-list > button:hover {
-  border-color: #404859;
-}
-.verse-list > button.selected {
-  background: #252141;
-  border-color: #665cff;
-}
-.verse-list > button.focused:not(.selected) {
-  border-color: #5ee28f;
-  box-shadow: inset 3px 0 #5ee28f;
-}
-.verse-list > button.verse-part {
-  border-left: 3px solid #7465f5;
 }
 .verse-list b {
   font-size: 13px;
@@ -637,6 +633,34 @@
   line-height: 1.45;
   user-select: text;
 }
+.verse-full small {
+  display: inline-block;
+  margin-left: 5px;
+  color: #8f98aa;
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.verse-split-actions {
+  display: flex;
+  align-items: stretch;
+  border-left: 1px solid #2d3440;
+}
+.verse-split-actions button {
+  min-width: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-left: 1px solid #2d3440;
+  background: #171b25;
+  color: #aaa4ff;
+  font: 800 11px inherit;
+  cursor: pointer;
+}
+.verse-split-actions button:first-child { border-left: 0; }
+.verse-split-actions button:hover, .verse-split-actions button.selected { background: #35305e; color: #fff; }
+.verse-split-actions .verse-split-edit { display: grid; place-items: center; min-width: 29px; color: #8993a6; }
+.verse-split-edit svg { width: 13px; height: 13px; }
 .bible-highlight-picker {
   position: fixed;
   z-index: 30;
@@ -667,6 +691,45 @@
   border: 0;
   background: transparent;
 }
+.bible-split-dialog-backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #03050ab8;
+}
+.bible-split-dialog {
+  width: min(690px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  overflow: hidden;
+  padding: 19px;
+  border: 1px solid #414b61;
+  border-radius: 13px;
+  background: #131824;
+  box-shadow: 0 24px 60px #000b;
+}
+.bible-split-dialog header { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.bible-split-dialog header span { color: #9d91ff; font-size: 10px; font-weight: 850; letter-spacing: .1em; }
+.bible-split-dialog h3 { margin: 3px 0 0; font-size: 19px; }
+.bible-split-dialog header button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 7px; background: #222938; color: #bac3d6; cursor: pointer; }
+.bible-split-dialog header svg { width: 17px; height: 17px; }
+.bible-split-help { margin: -6px 0 0; color: #939daf; font-size: 12px; }
+.bible-split-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bible-split-preview > div { min-height: 92px; padding: 11px; border: 1px solid #33405a; border-radius: 8px; background: #10151e; }
+.bible-split-preview b { color: #b2a8ff; font-size: 11px; }
+.bible-split-preview p { margin: 6px 0 0; color: #d7dcea; font-size: 13px; line-height: 1.45; }
+.bible-split-words { display: flex; flex-wrap: wrap; gap: 5px; max-height: 205px; overflow: auto; padding: 3px; }
+.bible-split-words button { border: 1px solid #374154; border-radius: 5px; padding: 5px 7px; background: #171d28; color: #aeb8c9; font: 600 12px inherit; cursor: pointer; }
+.bible-split-words button.before { background: #30275c; border-color: #7766df; color: #f0edff; }
+.bible-split-dialog footer { display: flex; justify-content: flex-end; gap: 8px; }
+.bible-split-dialog footer button { min-height: 34px; padding: 0 12px; border-radius: 7px; font: 750 12px inherit; cursor: pointer; }
+.bible-split-dialog footer .secondary { border: 1px solid #3a4558; background: transparent; color: #b6c0d2; }
+.bible-split-dialog footer .primary { border: 1px solid #7c69f6; background: #6557d7; color: white; }
 .bible-workspace {
   flex: 1;
   min-height: 0;
@@ -2644,6 +2707,12 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+.projection-text.projection-safe-area,
+.projection-text.projection-safe-area p {
+  /* Chromium balances the final lines within the same measured width. This
+     avoids a lonely last word/short line without changing the safe bounds. */
+  text-wrap: balance;
 }
 .projection-text.projection-safe-area.position-center {
   justify-content: center;

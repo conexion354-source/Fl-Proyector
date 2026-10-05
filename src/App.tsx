@@ -613,7 +613,6 @@ export function App() {
           <div className="preview-frame" style={{ aspectRatio: previewAspectRatio, backgroundColor: activeDisplaySettings.backgroundColor }}>
             <ProjectionPreview
               state={isSettings ? (settingsPreview ?? state) : previewPanelMode === "live" ? liveState : state}
-              designPreview={isSettings && settingsPreview?.text.kind === "canto"}
               onVideoMetadata={isSettings ? undefined : handleVideoMetadata}
               onVideoTime={isSettings ? undefined : handleVideoTime}
               onPresentationSlideCount={(count) => {

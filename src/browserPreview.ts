@@ -334,6 +334,8 @@ if (!window.flProyector) {
       state = { ...state, bibleStyle: settings };
       stateListeners.forEach((listener) => listener(state));
     },
+    getBibleSplitOverrides: async () => ({}),
+    saveBibleSplitOverrides: async () => {},
     getSongDisplaySettings: async () => state.songStyle,
     saveSongDisplaySettings: async (settings: any) => {
       state = { ...state, songStyle: settings };

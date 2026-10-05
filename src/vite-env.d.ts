@@ -105,6 +105,8 @@ declare global {
       pickChurchLogo(): Promise<{ path: string; url: string } | null>;
       getBibleDisplaySettings(): Promise<BibleDisplaySettings>;
       saveBibleDisplaySettings(settings: BibleDisplaySettings): Promise<void>;
+      getBibleSplitOverrides(): Promise<Record<string, number>>;
+      saveBibleSplitOverrides(overrides: Record<string, number>): Promise<void>;
       getSongDisplaySettings(): Promise<SongDisplaySettings>;
       saveSongDisplaySettings(settings: SongDisplaySettings): Promise<void>;
       getCollaboratorCode(): Promise<string>;

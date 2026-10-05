@@ -15,6 +15,13 @@ export type BibleSlide = {
   version: string;
 };
 
+export type BibleSlideMode = "automatic" | "full" | "split";
+
+export type BibleSlideOptions = {
+  mode?: BibleSlideMode;
+  splitAtWord?: number;
+};
+
 const escapeHtml = (value: string) =>
   value.replace(
     /[&<>"']/g,
@@ -34,14 +41,24 @@ export function buildBibleSlides(
   version: string,
   settings: BibleDisplaySettings,
   viewport?: ProjectionDimensions,
+  options: BibleSlideOptions = {},
 ): BibleSlide[] {
   // A/B is used only when the passage cannot physically fit at the configured
   // size. It is divided once; the renderer handles any final safety reduction.
-  const pieces =
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const automaticSplit =
     settings.longVerseMode !== "auto-fit" &&
     shouldSplitBibleVerse(text, settings, viewport) &&
-    text.trim().split(/\s+/).length > 1
-      ? splitBibleVerse(text, settings, viewport)
+    words.length > 1;
+  const wantsSplit =
+    options.mode === "split" ||
+    (options.mode !== "full" && automaticSplit);
+  const manualSplitAt = Math.floor(options.splitAtWord ?? 0);
+  const pieces =
+    wantsSplit && words.length > 1
+      ? manualSplitAt > 0 && manualSplitAt < words.length
+        ? [words.slice(0, manualSplitAt).join(" "), words.slice(manualSplitAt).join(" ")]
+        : splitBibleVerse(text, settings, viewport)
       : [text];
   return pieces.map((piece, index) => {
     const fontSize = settings.textFontSize;

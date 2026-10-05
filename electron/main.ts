@@ -119,6 +119,7 @@ let tagsDialogWindow: BrowserWindow | null = null;
 let projectionDisplayId: number | null = null;
 let state: ProjectionState = structuredClone(initialProjectionState);
 let database: AppDatabase;
+let bibleSplitOverrides: Record<string, number> = {};
 let remoteServer: ReturnType<typeof startRemoteServer>;
 let remoteActiveMediaItemId: number | null = null;
 let remoteReturnState: Pick<ProjectionState, "background" | "video"> | null = null;
@@ -151,6 +152,16 @@ let updateStatus: UpdateStatus = {
 };
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
+  {
+    version: "10.11.47",
+    title: "Versículos completos y división cuidada",
+    publishedAt: "2026-10-05T00:00:00Z",
+    changes: [
+      "Cada versículo vuelve a estar disponible completo; A/B aparece solamente como alternativa cuando el texto requiere una división.",
+      "Las divisiones A/B se pueden ajustar palabra por palabra y quedan guardadas para cada versículo y versión bíblica.",
+      "Se optimizó el cálculo de textos largos para una navegación más fluida, especialmente en equipos Windows.",
+    ],
+  },
   {
     version: "10.11.46",
     title: "Control remoto que acompaña cada red",
@@ -1870,6 +1881,7 @@ if (hasSingleInstanceLock)
     database.removeBundledDemoMeeting();
     state.church = hydrateChurch(database.getChurchSettings());
     state.bibleStyle = database.getBibleDisplaySettings();
+    bibleSplitOverrides = database.getBibleSplitOverrides();
     state.songStyle = database.getSongDisplaySettings();
     state.outputViewport = projectionViewport(database.getDisplaySettings());
     // Windows may report a new usable size after changing scaling, resolution,
@@ -2495,6 +2507,25 @@ if (hasSingleInstanceLock)
       (_event, settings: BibleDisplaySettings) => {
         database.saveBibleDisplaySettings(settings);
         mergeState({ bibleStyle: settings });
+      },
+    );
+    ipcMain.handle("settings:bible-splits:get", () => bibleSplitOverrides);
+    ipcMain.handle(
+      "settings:bible-splits:set",
+      (_event, raw: unknown) => {
+        const entries = Object.entries(
+          raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {},
+        )
+          .filter(
+            ([key, value]) =>
+              key.length <= 320 &&
+              typeof value === "number" &&
+              Number.isInteger(value) &&
+              value > 0,
+          )
+          .slice(0, 1200) as [string, number][];
+        bibleSplitOverrides = Object.fromEntries(entries);
+        database.saveBibleSplitOverrides(bibleSplitOverrides);
       },
     );
     ipcMain.handle("settings:songs:get", () =>

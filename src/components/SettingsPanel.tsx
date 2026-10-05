@@ -406,8 +406,8 @@ export function SettingsPanel({
   const saveBible = async () => {
     const nextBible = {
       ...bible,
-      // Projection safety is built in. Never enlarge a short verse just to
-      // fill space: that makes consecutive passages look inconsistent.
+      // Projection safety and automatic use of the configured output area are
+      // built in, so settings preview and the physical projector agree.
       autoFit: true,
       fillScreen: false,
       referenceFontSize: normalizedSize(

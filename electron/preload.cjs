@@ -106,6 +106,9 @@ contextBridge.exposeInMainWorld("flProyector", {
   getBibleDisplaySettings: () => ipcRenderer.invoke("settings:bible:get"),
   saveBibleDisplaySettings: (settings) =>
     ipcRenderer.invoke("settings:bible:set", settings),
+  getBibleSplitOverrides: () => ipcRenderer.invoke("settings:bible-splits:get"),
+  saveBibleSplitOverrides: (overrides) =>
+    ipcRenderer.invoke("settings:bible-splits:set", overrides),
   getSongDisplaySettings: () => ipcRenderer.invoke("settings:songs:get"),
   saveSongDisplaySettings: (settings) =>
     ipcRenderer.invoke("settings:songs:set", settings),

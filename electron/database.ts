@@ -468,6 +468,35 @@ export class AppDatabase {
       )
       .run(JSON.stringify(settings));
   }
+  getBibleSplitOverrides(): Record<string, number> {
+    const row = this.db
+      .prepare("SELECT value FROM settings WHERE key='bible-split-overrides'")
+      .get() as { value: string } | undefined;
+    if (!row) return {};
+    try {
+      const saved = JSON.parse(row.value) as Record<string, unknown>;
+      const entries = Object.entries(saved)
+          .filter(
+            ([key, value]) =>
+              key.length <= 320 &&
+              typeof value === "number" &&
+              Number.isInteger(value) &&
+              value > 0,
+          )
+          .slice(0, 1200)
+          .map(([key, value]) => [key, value as number] as const);
+      return Object.fromEntries(entries);
+    } catch {
+      return {};
+    }
+  }
+  saveBibleSplitOverrides(overrides: Record<string, number>) {
+    this.db
+      .prepare(
+        "INSERT INTO settings(key,value) VALUES ('bible-split-overrides',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      )
+      .run(JSON.stringify(overrides));
+  }
   getSongDisplaySettings(): SongDisplaySettings {
     const row = this.db
       .prepare("SELECT value FROM settings WHERE key='song-display'")

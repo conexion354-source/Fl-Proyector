@@ -8,10 +8,6 @@ import { fileURLToPath } from "node:url";
 import Bonjour from "bonjour-service";
 import { collaboratorHtml } from "./collaboratorPage.js";
 import {
-  shouldSplitBibleVerse,
-  splitBibleVerse,
-} from "../shared/bibleLayout.js";
-import {
   normalizeSongSectionTypes,
   songSectionLabel,
   splitSongStanzas,
@@ -31,7 +27,7 @@ import type {
 
 // This is served by the projector itself. Update checks for the remote never
 // need an Internet connection: the phone compares against the PC on its LAN.
-const remoteClientVersion = "10.11.46";
+const remoteClientVersion = "10.11.47";
 // This hostname is answered only inside the current Wi-Fi/LAN through mDNS.
 // It deliberately does not require an Internet connection or a fixed IP.
 const remoteLanHostname = "fl-proyector.local";
@@ -463,29 +459,10 @@ export function startRemoteServer(
       decodeURIComponent(req.params.book),
       chapter,
     );
-    // The phone must show exactly the same selectable A/B pieces as the
-    // desktop operator when that setting is enabled.
-    const bibleStyle = getState().bibleStyle;
-    if (bibleStyle.longVerseMode === "auto-fit")
-      return res.json(verses);
-    return res.json(
-      verses.flatMap<unknown>((verse) => {
-        if (!shouldSplitBibleVerse(verse.text, bibleStyle, getState().outputViewport))
-          return [verse];
-        const parts = splitBibleVerse(
-          verse.text,
-          bibleStyle,
-          getState().outputViewport,
-        );
-        return parts.map((text, index) => ({
-          ...verse,
-          text,
-          // The controller uses this label in the list and in the reference
-          // sent to projection, e.g. Juan 3:16a / Juan 3:16b.
-          verse: `${verse.verse}${parts.length > 1 ? String.fromCharCode(97 + Math.min(index, 25)) : ""}`,
-        }));
-      }),
-    );
+    // Full verses are the safe default for every controller. The desktop can
+    // additionally offer a deliberately chosen A/B split; the phone must not
+    // receive an automatic half and lose the complete passage.
+    return res.json(verses);
   });
   app.get("/api/remote/meetings", (_req, res) =>
     res.json(multimedia.listMeetings().map(({ id, name, itemCount }) => ({ id, name, itemCount }))),
