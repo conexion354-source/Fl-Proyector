@@ -153,6 +153,15 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.48",
+    title: "Lista bíblica estable en Windows",
+    publishedAt: "2026-10-20T00:00:00Z",
+    changes: [
+      "Se corrigió la visualización de los versículos en Windows para que las tarjetas no queden como barras vacías.",
+      "La lista bíblica conserva ahora medidas y colores seguros con los temas claro y oscuro.",
+    ],
+  },
+  {
     version: "10.11.47",
     title: "Versículos completos y división cuidada",
     publishedAt: "2026-10-05T00:00:00Z",

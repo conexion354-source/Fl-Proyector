@@ -270,9 +270,9 @@ html[data-theme="light"] .app-shell :is(.song-rich-editor,.announcement-editor) 
 .rundown > .win11-empty-state { height:calc(100% - 80px); }
 .rundown-list > .win11-empty-state { min-height:180px; }
 .song-list > .win11-empty-state { flex:none; }
-.bible-toolbar,.bible-verse-column,.bible-slide-column,.bible-column-heading,.verse-list>button,.bible-slide-list>button { color:var(--fl-text)!important; border-color:var(--fl-border)!important; background:var(--fl-surface)!important; }
-.verse-list>button,.bible-slide-list>button { border-radius:6px; box-shadow:var(--fl-shadow); }
-.verse-list>button.selected,.bible-slide-list>button.selected { color:var(--fl-text)!important; border-color:var(--fl-accent)!important; background:var(--fl-accent-soft)!important; box-shadow:inset 3px 0 var(--fl-accent); }
+.bible-toolbar,.bible-verse-column,.bible-slide-column,.bible-column-heading,.verse-list>button,.verse-entry,.bible-slide-list>button { color:var(--fl-text)!important; border-color:var(--fl-border)!important; background:var(--fl-surface)!important; }
+.verse-list>button,.verse-entry,.bible-slide-list>button { border-radius:6px; box-shadow:var(--fl-shadow); }
+.verse-list>button.selected,.verse-entry.selected,.bible-slide-list>button.selected { color:var(--fl-text)!important; border-color:var(--fl-accent)!important; background:var(--fl-accent-soft)!important; box-shadow:inset 3px 0 var(--fl-accent); }
 
 /* Dialogs */
 .modal-backdrop { background:#00000059; backdrop-filter:blur(2px); }
@@ -1410,7 +1410,7 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
 
 .app-shell :is(
   .settings-card,.bible-versions-card,.bible-toolbar,.bible-verse-column,
-  .bible-slide-column,.bible-column-heading,.verse-list>button,
+  .bible-slide-column,.bible-column-heading,.verse-list>button,.verse-entry,
   .bible-slide-list>button,.media-card,.remote-connect-card,
   .remote-feature-grid article,.collaborator-card,.live-media-controls,
   .background-controls,.master-grid button,.add-item-row button,

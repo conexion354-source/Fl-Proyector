@@ -603,8 +603,10 @@
 .verse-entry {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 58px;
   border: 1px solid #242a34;
   background: #11141a;
+  color: #d9dfeb;
   border-radius: 7px;
   overflow: hidden;
 }
@@ -614,12 +616,13 @@
 .verse-full {
   display: grid;
   grid-template-columns: 125px 1fr;
+  min-height: 56px;
   gap: 12px;
   text-align: left;
   border: 0;
   background: transparent;
   padding: 12px;
-  color: #bbc1cd;
+  color: inherit;
   cursor: pointer;
 }
 .verse-list b {
