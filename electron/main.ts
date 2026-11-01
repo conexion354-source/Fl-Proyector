@@ -153,6 +153,16 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.49",
+    title: "Fondos en movimiento más estables",
+    publishedAt: "2026-11-01T00:00:00Z",
+    changes: [
+      "Los fondos de video en bucle se reinician de forma controlada al terminar y ya no recargan el archivo durante la reproducción.",
+      "Se suavizó la barra de avance de video y se corrigieron bordes duplicados en los buscadores.",
+      "La lista bíblica aprovecha mejor el espacio, evita recortar versículos largos y elimina etiquetas innecesarias.",
+    ],
+  },
+  {
     version: "10.11.48",
     title: "Lista bíblica estable en Windows",
     publishedAt: "2026-10-20T00:00:00Z",

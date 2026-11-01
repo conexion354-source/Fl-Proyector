@@ -604,11 +604,16 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   min-height: 58px;
+  height: auto;
+  flex: 0 0 auto;
+  align-items: stretch;
   border: 1px solid #242a34;
   background: #11141a;
   color: #d9dfeb;
   border-radius: 7px;
-  overflow: hidden;
+  /* Do not clip an extra wrapped line when Windows uses a different text
+     metric or display scaling than macOS. */
+  overflow: visible;
 }
 .verse-entry:hover { border-color: #404859; }
 .verse-entry.selected { background: #252141; border-color: #665cff; }
@@ -617,6 +622,8 @@
   display: grid;
   grid-template-columns: 125px 1fr;
   min-height: 56px;
+  height: auto;
+  align-items: start;
   gap: 12px;
   text-align: left;
   border: 0;
@@ -632,18 +639,12 @@
   letter-spacing: 0.01em;
 }
 .verse-list span {
+  min-width: 0;
+  overflow: visible;
+  white-space: normal;
   font-size: 12px;
   line-height: 1.45;
   user-select: text;
-}
-.verse-full small {
-  display: inline-block;
-  margin-left: 5px;
-  color: #8f98aa;
-  font-size: 8px;
-  font-weight: 750;
-  letter-spacing: .06em;
-  text-transform: uppercase;
 }
 .verse-split-actions {
   display: flex;
@@ -1948,10 +1949,55 @@
 }
 .video-transport input,
 .video-volume input {
+  --range-progress: 0%;
   width: 100%;
   height: 18px;
-  accent-color: #746bff;
+  margin: 0;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+}
+.video-transport input::-webkit-slider-runnable-track,
+.video-volume input::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 1px solid #4d5562;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #746bff 0 var(--range-progress), #e2e5e9 var(--range-progress) 100%);
+}
+.video-transport input::-webkit-slider-thumb,
+.video-volume input::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border: 2px solid #f1f3f6;
+  border-radius: 50%;
+  background: #746bff;
+  box-shadow: 0 1px 5px #0008;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.video-transport input::-moz-range-track,
+.video-volume input::-moz-range-track {
+  height: 6px;
+  border: 1px solid #4d5562;
+  border-radius: 999px;
+  background: #e2e5e9;
+}
+.video-transport input::-moz-range-progress,
+.video-volume input::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: #746bff;
+}
+.video-transport input::-moz-range-thumb,
+.video-volume input::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #f1f3f6;
+  border-radius: 50%;
+  background: #746bff;
+  box-shadow: 0 1px 5px #0008;
 }
 .video-transport span {
   color: #8d95a4;

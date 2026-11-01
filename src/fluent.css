@@ -1445,6 +1445,17 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
 .app-shell :is(input,textarea)::placeholder { color:var(--fl-muted)!important; opacity:.8; }
 .app-shell :is(input,select,textarea):disabled { opacity:.55; }
 
+/* Search controls already provide their own outer field. Keep the actual
+   input transparent so the global form-field theme cannot draw a second box
+   inside it (most visible with Windows display scaling). */
+.app-shell :is(.search,.song-search,.bible-search,.picker-search,.openverse-search-input) > input {
+  border:0!important;
+  border-bottom-color:transparent!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  border-radius:0!important;
+}
+
 .app-shell :is(
   .toolbar,.song-library-toolbar,.rich-editor,.color-picker-popover,
   .bible-highlight-picker

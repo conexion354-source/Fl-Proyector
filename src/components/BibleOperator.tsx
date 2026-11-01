@@ -505,12 +505,6 @@ export function BibleOperator({
 
   return (
     <section className="bible-page">
-      <div className="section-title">
-        <div>
-          <span className="eyebrow">OPERADOR BÍBLICO OFFLINE</span>
-          <h2>Biblia</h2>
-        </div>
-      </div>
       <div className="bible-toolbar">
         <label>
           Versión
@@ -683,7 +677,7 @@ export function BibleOperator({
                       send(verse);
                     }}
                   >
-                    <b>{fullSlide?.label} <small>Completo</small></b>
+                    <b>{fullSlide?.label}</b>
                     <span dangerouslySetInnerHTML={{ __html: fullSlide?.contentHtml || "" }} />
                   </button>
                   {splitSlides.length > 1 && (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import QRCode from "qrcode";
 import {
   MonitorPlay,
@@ -92,6 +92,7 @@ export function App() {
   });
   const [videoTime, setVideoTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
+  const videoClock = useRef({ time: 0, observedAt: performance.now() });
   const lastVideoTelemetry = useRef({ time: -1, sentAt: 0 });
   const [showHelp, setShowHelp] = useState(false);
   const [overlaySettings, setOverlaySettings] = useState<"timer" | "clock" | null>(null);
@@ -312,10 +313,15 @@ export function App() {
     window.addEventListener("resize", keepColumnsUsable);
     return () => window.removeEventListener("resize", keepColumnsUsable);
   }, []);
+  const updateVideoTime = useCallback((time: number) => {
+    const safeTime = Math.max(0, Number.isFinite(time) ? time : 0);
+    videoClock.current = { time: safeTime, observedAt: performance.now() };
+    setVideoTime(safeTime);
+  }, []);
   useEffect(() => {
-    setVideoTime(0);
+    updateVideoTime(0);
     setVideoDuration(0);
-  }, [state.background.id, state.background.url]);
+  }, [state.background.id, state.background.url, updateVideoTime]);
   useEffect(() => {
     if (tab !== "ajustes") setSettingsPreview(null);
   }, [tab]);
@@ -325,7 +331,7 @@ export function App() {
       update({ video: { duration } });
   };
   const handleVideoTime = (time: number) => {
-    setVideoTime(time);
+    updateVideoTime(time);
     const now = Date.now();
     if (
       Number.isFinite(time) &&
@@ -336,6 +342,28 @@ export function App() {
       update({ video: { currentTime: time } });
     }
   };
+  useEffect(() => {
+    if (
+      state.background.kind !== "video" ||
+      !state.video.playing ||
+      videoDuration <= 0
+    )
+      return;
+    let frame = 0;
+    const animate = () => {
+      const elapsed = Math.max(0, (performance.now() - videoClock.current.observedAt) / 1000);
+      const raw = videoClock.current.time + elapsed * state.background.speed;
+      const next = state.video.loop
+        ? raw % videoDuration
+        : Math.min(videoDuration, raw);
+      setVideoTime((current) =>
+        Math.abs(current - next) > 0.004 ? next : current,
+      );
+      frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [state.background.kind, state.background.speed, state.video.loop, state.video.playing, videoDuration]);
   const timerRemaining = Math.max(0, state.timer.remaining - (state.timer.running ? Math.floor((Date.now() - state.timer.startedAt) / 1000) : 0));
   const openOverlaySettings = (kind: "timer" | "clock") => setOverlaySettings(kind);
   const startLiveAudience = async () => {
@@ -637,7 +665,7 @@ export function App() {
             update={update}
             videoTime={videoTime}
             videoDuration={videoDuration}
-            setVideoTime={setVideoTime}
+            setVideoTime={updateVideoTime}
           />
           <div className="master-controls">
             <span className="eyebrow">Controles maestros</span>
@@ -1243,6 +1271,10 @@ function LiveContentControls({
     );
   }
   if (state.background.kind !== "video") return null;
+  const videoProgress =
+    videoDuration > 0
+      ? Math.max(0, Math.min(100, (videoTime / videoDuration) * 100))
+      : 0;
   const seek = (value: number) => {
     const target = Math.max(0, Math.min(value, videoDuration || value));
     setVideoTime(target);
@@ -1278,6 +1310,7 @@ function LiveContentControls({
           max={Math.max(videoDuration, 1)}
           step="0.1"
           value={Math.min(videoTime, Math.max(videoDuration, 1))}
+          style={{ "--range-progress": `${videoProgress}%` } as CSSProperties}
           onInput={(event) => setVideoTime(Number(event.currentTarget.value))}
           onPointerUp={(event) => {
             seek(Number(event.currentTarget.value));
@@ -1302,6 +1335,7 @@ function LiveContentControls({
           max="1"
           step="0.01"
           value={state.video.volume}
+          style={{ "--range-progress": `${Math.max(0, Math.min(100, state.video.volume * 100))}%` } as CSSProperties}
           onChange={(event) =>
             update({
               video: { volume: Number(event.target.value), muted: false },

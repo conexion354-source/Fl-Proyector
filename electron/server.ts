@@ -27,7 +27,7 @@ import type {
 
 // This is served by the projector itself. Update checks for the remote never
 // need an Internet connection: the phone compares against the PC on its LAN.
-const remoteClientVersion = "10.11.48";
+const remoteClientVersion = "10.11.49";
 // This hostname is answered only inside the current Wi-Fi/LAN through mDNS.
 // It deliberately does not require an Internet connection or a fixed IP.
 const remoteLanHostname = "fl-proyector.local";

@@ -907,12 +907,34 @@ function VideoLayer({
   const ref = useRef<HTMLVideoElement>(null);
   const finishNotified = useRef(false);
   const resumeAfterSeek = useRef(false);
+  const loopRestartPending = useRef(false);
+  const lastPlaybackProgress = useRef({ time: -1, observedAt: Date.now(), recoveries: 0 });
   const restartBackgroundLoop = (video: HTMLVideoElement) => {
     if (!playback.loop || !playback.playing) return false;
+    if (loopRestartPending.current) return true;
+    loopRestartPending.current = true;
+    // Do not combine the browser's native `loop` implementation with an
+    // explicit seek. Chromium can otherwise retain the `ended` state at the
+    // boundary (most noticeably in a Windows projection window), leaving a
+    // background frozen on its last frame. Waiting for the seek to finish
+    // gives every loop the same deterministic restart path.
+    const resume = () => {
+      video.removeEventListener("seeked", resume);
+      loopRestartPending.current = false;
+      if (!playback.playing || !playback.loop) return;
+      video.play().catch(() => undefined);
+    };
     try {
+      video.pause();
+      video.removeEventListener("seeked", resume);
+      video.addEventListener("seeked", resume, { once: true });
       video.currentTime = 0;
-    } catch {}
-    video.play().catch(() => undefined);
+      // A seek to zero from an already-zero element may not dispatch seeked.
+      // In that case the media is not ended and can be resumed immediately.
+      if (!video.seeking && !video.ended) resume();
+    } catch {
+      video.play().catch(() => undefined);
+    }
     return true;
   };
   const notifyPlaybackEnded = (video: HTMLVideoElement) => {
@@ -980,7 +1002,8 @@ function VideoLayer({
     const video = ref.current;
     if (!video) return;
     const keepPlaying = () => {
-      if (preview || !playback.playing || !video.paused) return;
+      if (!playback.playing) return;
+      if (loopRestartPending.current) return;
       if (
         playback.loop &&
         (video.ended ||
@@ -989,10 +1012,66 @@ function VideoLayer({
         restartBackgroundLoop(video);
         return;
       }
+      const now = Date.now();
+      const moved =
+        lastPlaybackProgress.current.time < 0 ||
+        Math.abs(video.currentTime - lastPlaybackProgress.current.time) > 0.04 ||
+        // A loop boundary moves the clock back to zero but is healthy motion.
+        video.currentTime + 0.25 < lastPlaybackProgress.current.time;
+      if (moved) {
+        lastPlaybackProgress.current = {
+          time: video.currentTime,
+          observedAt: now,
+          recoveries: 0,
+        };
+        if (video.paused) video.play().catch(() => {});
+        return;
+      }
+      if (video.paused) {
+        video.play().catch(() => {});
+        return;
+      }
+      // Chromium can report a video as playing while its decoder is frozen,
+      // especially with high-frame-rate MP4 backgrounds on Windows. Nudge the
+      // media clock only after several seconds without progress; this avoids
+      // touching normal playback while recovering a stuck frame.
+      if (now - lastPlaybackProgress.current.observedAt < 3200) return;
+      const recoveries = lastPlaybackProgress.current.recoveries + 1;
+      if (playback.loop) {
+        // A looped background must never sit on a reload/decoder recovery
+        // screen.  Returning it to frame zero is both faster and more
+        // reliable than `load()` for the high-frame-rate MP4s used as
+        // backgrounds, and preserves the operator's loop intent.
+        lastPlaybackProgress.current = {
+          time: -1,
+          observedAt: now,
+          recoveries,
+        };
+        restartBackgroundLoop(video);
+        return;
+      }
+      try {
+        if (recoveries >= 2) {
+          // A frozen hardware decoder sometimes ignores a small seek. Reload
+          // the same source as a last resort; `canplay` below starts it again.
+          video.load();
+        } else {
+          const duration = video.duration;
+          video.currentTime =
+            Number.isFinite(duration) && duration > 0
+              ? Math.min(Math.max(0, duration - 0.08), video.currentTime + 0.08)
+              : video.currentTime + 0.08;
+        }
+      } catch {}
+      lastPlaybackProgress.current = {
+        time: recoveries >= 2 ? -1 : video.currentTime,
+        observedAt: now,
+        recoveries,
+      };
       video.play().catch(() => {});
     };
     const restart = () => {
-      if (preview || !playback.playing) return;
+      if (!playback.playing) return;
       if (video.ended && playback.loop) restartBackgroundLoop(video);
       else if (!video.ended) video.play().catch(() => {});
     };
@@ -1009,14 +1088,16 @@ function VideoLayer({
       video.removeEventListener("waiting", restart);
       video.removeEventListener("canplay", restart);
     };
-  }, [playback.playing, playback.loop, preview, url]);
+  }, [playback.playing, playback.loop, url]);
   return (
     <video
       ref={ref}
       className={className}
       src={url}
       autoPlay
-      loop={playback.loop}
+      // Looping is handled above through `onEnded`. Native media looping has
+      // been unreliable with certain high-frame-rate MP4 files on Windows.
+      loop={false}
       preload="auto"
       muted={preview || playback.muted}
       playsInline
@@ -1033,11 +1114,6 @@ function VideoLayer({
       onTimeUpdate={(event) => {
         const video = event.currentTarget;
         onTime?.(video.currentTime);
-        if (
-          video.duration > 0 &&
-          video.duration - video.currentTime <= 0.45
-        )
-          notifyPlaybackEnded(video);
       }}
       onSeeked={(event) => {
         const video = event.currentTarget;
@@ -1052,16 +1128,12 @@ function VideoLayer({
           playback.loop &&
           playback.playing &&
           (video.ended ||
-            (video.duration > 0 && video.duration - video.currentTime <= 0.25))
+            (video.duration > 0 && video.duration - video.currentTime <= 0.03))
         ) {
           restartBackgroundLoop(video);
           return;
         }
-        if (
-          playback.playing &&
-          video.duration > 0 &&
-          video.duration - video.currentTime <= 0.75
-        )
+        if (playback.playing && video.ended)
           notifyPlaybackEnded(video);
       }}
       onEnded={(event) => notifyPlaybackEnded(event.currentTarget)}
