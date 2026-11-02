@@ -153,7 +153,7 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
-    version: "10.11.51",
+    version: "10.11.52",
     title: "Instalador de macOS corregido",
     publishedAt: "2026-11-02T00:00:00Z",
     changes: [
