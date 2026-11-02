@@ -100,8 +100,13 @@ const forceUppercaseHtml = (html: string) =>
 // clipping.  The ceiling still prevents a one-word verse or a short chorus
 // from becoming comically large, while allowing the readable size to grow
 // substantially when the layout genuinely has room for it.
-const MAX_BIBLE_FILL_SCALE = 2.6;
-const MAX_SONG_FILL_SCALE = 3.1;
+// Auto-fit should protect consistency before it tries to occupy every spare
+// pixel. A short verse at 2.6× its configured size followed by a long one at
+// the minimum size is much harder to read than a deliberately modest change.
+// EasyWorship follows the same principle by treating the selected type size
+// as the normal visual scale and flowing text when it can no longer fit.
+const MAX_BIBLE_FILL_SCALE = 1.18;
+const MAX_SONG_FILL_SCALE = 1.25;
 const BIBLE_REFERENCE_HEIGHT_SCALE = 2;
 const BIBLE_REFERENCE_GAP_SCALE = 0.55;
 
@@ -259,9 +264,9 @@ export function ProjectionStage({
           element.style.top = `${verticalMargin}%`;
           element.style.bottom = `${verticalMargin}%`;
         }
-        // The preferred size is a floor, not an artificial ceiling. Measuring
-        // the real DOM lets a short verse or stanza fill the space while long
-        // text remains intact and is reduced only when it truly needs to be.
+        // The selected size is the normal reading scale. Short passages may
+        // grow a little, but never enough to make the next passage feel tiny
+        // by comparison.
         const responsiveCeiling = Math.max(
           requestedSize,
           Math.min(element.clientWidth * 0.32, element.clientHeight * 0.7),
@@ -273,7 +278,10 @@ export function ProjectionStage({
         const configuredMinimum = isSong
           ? state.songStyle.minimumFontSize * scale
           : isBible
-            ? 7 * scale
+            ? Math.min(
+                state.bibleStyle.textFontSize,
+                Math.max(18, state.bibleStyle.minimumFontSize),
+              ) * scale
             : 8 * scale;
         let low = Math.min(requestedSize, Math.max(2, configuredMinimum)),
           high = shouldMaximizeText ? balancedFillCeiling : requestedSize,

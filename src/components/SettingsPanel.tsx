@@ -1656,7 +1656,14 @@ export function SettingsPanel({
                             200,
                             setBibleTextFontSizeInput,
                             (textFontSize) =>
-                              setBible((value) => ({ ...value, textFontSize })),
+                              setBible((value) => ({
+                                ...value,
+                                textFontSize,
+                                minimumFontSize: Math.min(
+                                  value.minimumFontSize,
+                                  textFontSize,
+                                ),
+                              })),
                           )
                         }
                         onBlur={() =>
@@ -1665,7 +1672,15 @@ export function SettingsPanel({
                             24,
                             200,
                             bible.textFontSize,
-                            (textFontSize) => setBible((v) => ({ ...v, textFontSize })),
+                            (textFontSize) =>
+                              setBible((value) => ({
+                                ...value,
+                                textFontSize,
+                                minimumFontSize: Math.min(
+                                  value.minimumFontSize,
+                                  textFontSize,
+                                ),
+                              })),
                             setBibleTextFontSizeInput,
                           )
                         }
@@ -1678,6 +1693,27 @@ export function SettingsPanel({
                       />
                     </label>
                   </div>
+                  <label className="bible-minimum-font-size">
+                    Tamaño mínimo legible
+                    <input
+                      type="number"
+                      min="18"
+                      max={Math.max(18, bible.textFontSize)}
+                      value={Math.min(bible.minimumFontSize, bible.textFontSize)}
+                      onChange={(event) =>
+                        setBible((value) => ({
+                          ...value,
+                          minimumFontSize: Math.max(
+                            18,
+                            Math.min(value.textFontSize, Number(event.target.value) || 18),
+                          ),
+                        }))
+                      }
+                    />
+                    <small>
+                      Si un versículo no entra con este tamaño, se ofrecerá dividido en A/B.
+                    </small>
+                  </label>
                   <ColorDots
                     label="Color del versículo"
                     value={bible.textColor}

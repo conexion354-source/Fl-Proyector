@@ -21,6 +21,7 @@ import {
   Palette,
   Plus,
   Presentation,
+  Repeat2,
   Save,
   Search,
   Trash2,
@@ -762,6 +763,28 @@ export function MeetingBuilder({
   };
   const mediaById = (id: unknown) =>
     media.find((item) => item.id === Number(id));
+  const meetingMediaForItem = (item: MeetingItem) => {
+    if (item.type !== "media") return null;
+    const payload = item.payload as Record<string, unknown>;
+    return (
+      (payload.meetingMedia as MediaItem | undefined) ??
+      mediaById(payload.mediaId)
+    );
+  };
+  const isLoopableMeetingItem = (item: MeetingItem) =>
+    meetingMediaForItem(item)?.kind === "video";
+  const setMeetingItemLoop = async (item: MeetingItem, loop: boolean) => {
+    const changed = {
+      ...item,
+      payload: { ...item.payload, loop },
+    };
+    await window.flProyector.saveMeetingItem(changed);
+    setItems((current) =>
+      current.map((entry) => (entry.id === changed.id ? changed : entry)),
+    );
+    if (selected?.id === changed.id) setSelected(changed);
+    setContextMenu(null);
+  };
   const backgroundVideoState = (background?: MediaItem) =>
     background?.kind === "video"
       ? {
@@ -788,9 +811,7 @@ export function MeetingBuilder({
         state.presentation.path === String(payload.path || "")
       );
     if (item.type === "media") {
-      const source =
-        (payload.meetingMedia as MediaItem | undefined) ??
-        mediaById(payload.mediaId);
+      const source = meetingMediaForItem(item);
       if (!source) return false;
       if (source.kind === "image")
         return (
@@ -800,7 +821,7 @@ export function MeetingBuilder({
       return (
         state.background.kind === "video" &&
         state.background.url === source.url &&
-        !state.video.loop
+        state.video.playing
       );
     }
     // A collaborator can put a song on air without changing this window's
@@ -1142,7 +1163,10 @@ export function MeetingBuilder({
           background.kind === "video"
             ? {
                 playing: true,
-                loop: false,
+                // A meeting video is a one-time clip by default. The operator
+                // can turn it into a repeating background from its contextual
+                // menu without changing the global Fondos library.
+                loop: payload.loop === true,
                 seekTime: 0,
                 currentTime: 0,
                 duration: 0,
@@ -1616,6 +1640,18 @@ export function MeetingBuilder({
               label: "Asignar fondo",
               icon: <Image />,
               onClick: () => setBackgroundTarget(contextMenu.item),
+            }] : []),
+            ...(isLoopableMeetingItem(contextMenu.item) ? [{
+              label:
+                (contextMenu.item.payload as Record<string, unknown>).loop === true
+                  ? "Quitar reproducción en bucle"
+                  : "Reproducir en bucle",
+              icon: <Repeat2 />,
+              onClick: () =>
+                void setMeetingItemLoop(
+                  contextMenu.item,
+                  (contextMenu.item.payload as Record<string, unknown>).loop !== true,
+                ),
             }] : []),
             {
               label: "Cambiar color",

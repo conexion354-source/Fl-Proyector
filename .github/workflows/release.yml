@@ -1,0 +1,93 @@
+name: Publicar actualización para Windows y macOS
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Compilar ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows
+            runner: windows-latest
+            target: --win --x64
+            artifact: windows-release
+            files: |
+              release/*.exe
+              release/*.blockmap
+              release/latest.yml
+          - label: macOS Apple Silicon
+            runner: macos-14
+            target: --mac --arm64
+            artifact: macos-arm64-release
+            files: |
+              release/*.dmg
+              release/*.zip
+              release/latest-mac.yml
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Comprobar el proyecto
+        run: pnpm check
+
+      - name: Compilar la aplicación
+        run: pnpm build
+
+      - name: Crear instalador
+        env:
+          # Sin certificado de Apple el instalador se entrega sin firmar; la
+          # firma/notarización se puede incorporar después mediante secretos.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: pnpm exec electron-builder ${{ matrix.target }} --publish never
+
+      - name: Guardar instaladores para publicar
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          if-no-files-found: error
+          path: ${{ matrix.files }}
+
+  release:
+    name: Publicar versión en GitHub
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar instaladores
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Crear la versión y adjuntar instaladores
+        uses: softprops/action-gh-release@v2
+        with:
+          name: FL Proyector ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release-assets/**/*

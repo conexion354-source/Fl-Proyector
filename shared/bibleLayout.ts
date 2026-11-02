@@ -18,6 +18,7 @@ const cacheKey = (
     text,
     settings.textFontFamily,
     settings.textFontSize,
+    settings.minimumFontSize,
     settings.referenceFontSize,
     settings.horizontalMargin,
     settings.verticalMargin,
@@ -217,7 +218,11 @@ export function fittedBibleFontSize(
   return Math.min(ceiling, best);
 }
 
-/** A/B is reserved for passages that need more than a subtle 12% reduction. */
+/**
+ * A/B begins only when a verse cannot fit at the operator's configured
+ * readable minimum. Above that threshold the renderer simply makes the small,
+ * gradual adjustment needed to keep the verse complete on one slide.
+ */
 export function shouldSplitBibleVerse(
   text: string,
   settings: BibleDisplaySettings,
@@ -227,10 +232,17 @@ export function shouldSplitBibleVerse(
   const cached = cacheRead<boolean>(key);
   if (cached !== undefined) return cached;
   if (!isLongBibleVerse(text, settings, viewport)) return cacheWrite(key, false);
-  const subtleFloor = Math.max(12, settings.textFontSize * 0.88);
+  const readableMinimum = Math.min(
+    settings.textFontSize,
+    Math.max(18, settings.minimumFontSize),
+  );
   return cacheWrite(
     key,
-    fittedBibleFontSize(text, settings, viewport, 12) < subtleFloor,
+    isLongBibleVerse(
+      text,
+      { ...settings, textFontSize: readableMinimum },
+      viewport,
+    ),
   );
 }
 

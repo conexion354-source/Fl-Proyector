@@ -153,6 +153,17 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
+    version: "10.11.50",
+    title: "Escala de texto y videos de reuniones",
+    publishedAt: "2026-11-02T00:00:00Z",
+    changes: [
+      "Los versículos y canciones mantienen una escala más pareja: se limita el crecimiento de textos cortos y se respeta un mínimo legible.",
+      "La división A/B se recomienda cuando el versículo no entra con el tamaño mínimo configurado.",
+      "Los videos y GIF de una reunión pueden reproducirse en bucle desde el menú de clic derecho.",
+      "Las versiones publicadas ahora incluyen instaladores para Windows y macOS Apple Silicon.",
+    ],
+  },
+  {
     version: "10.11.49",
     title: "Fondos en movimiento más estables",
     publishedAt: "2026-11-01T00:00:00Z",
@@ -1217,6 +1228,13 @@ const mediaUrl = (path: string) =>
 const needsVideoConversion = (extension: string) =>
   videoExtensions.includes(extension) && ![".mp4", ".webm"].includes(extension);
 
+// A GIF can contain an animation but the browser exposes it as an image, so
+// its repeat count cannot be controlled from the meeting operator. Convert
+// meeting GIFs to an ordinary MP4: that gives them the same reliable transport
+// and explicit loop control as videos without changing the Fondos library.
+const needsMeetingMediaConversion = (extension: string) =>
+  needsVideoConversion(extension) || extension === ".gif";
+
 async function transcodeVideoToMp4(source: string, destination: string) {
   if (!ffmpegPath) {
     throw new Error("FFmpeg no está disponible para convertir este video.");
@@ -1277,11 +1295,12 @@ const meetingMediaFromPayload = (payload: Record<string, unknown>) => {
 
 async function importMeetingMediaFile(source: string): Promise<MediaItem> {
   const extension = extname(source).toLowerCase();
-  const filename = needsVideoConversion(extension)
+  const convert = needsMeetingMediaConversion(extension);
+  const filename = convert
     ? `${Date.now()}-${basename(source, extension)}.mp4`
     : `${Date.now()}-${basename(source)}`;
   const destination = join(meetingMediaDir, filename);
-  if (needsVideoConversion(extension)) {
+  if (convert) {
     await transcodeVideoToMp4(source, destination);
   } else {
     await copyFile(source, destination);
@@ -1294,7 +1313,7 @@ async function importMeetingMediaFile(source: string): Promise<MediaItem> {
     url: mediaUrl(destination),
     tags: [],
     favoriteSlot: null,
-    kind: imageExtensions.includes(extension) ? "image" : "video",
+    kind: convert || !imageExtensions.includes(extension) ? "video" : "image",
   };
 }
 
@@ -1306,7 +1325,7 @@ async function migrateMeetingVideosToMp4() {
       if (!embedded?.path) continue;
       const extension = extname(embedded.path).toLowerCase();
       if (
-        !needsVideoConversion(extension) ||
+        !needsMeetingMediaConversion(extension) ||
         embedded.path.toLowerCase().endsWith("-compatible.mp4")
       )
         continue;
