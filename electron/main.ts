@@ -153,14 +153,13 @@ let updateStatus: UpdateStatus = {
 
 const bundledReleaseHistory: ReleaseHistoryEntry[] = [
   {
-    version: "10.11.50",
-    title: "Escala de texto y videos de reuniones",
+    version: "10.11.51",
+    title: "Instalador de macOS corregido",
     publishedAt: "2026-11-02T00:00:00Z",
     changes: [
-      "Los versículos y canciones mantienen una escala más pareja: se limita el crecimiento de textos cortos y se respeta un mínimo legible.",
-      "La división A/B se recomienda cuando el versículo no entra con el tamaño mínimo configurado.",
-      "Los videos y GIF de una reunión pueden reproducirse en bucle desde el menú de clic derecho.",
-      "Las versiones publicadas ahora incluyen instaladores para Windows y macOS Apple Silicon.",
+      "El instalador para macOS Apple Silicon firma la aplicación antes de crear el DMG y el ZIP.",
+      "Se corrige el rechazo de macOS que indicaba que la aplicación estaba dañada.",
+      "Las versiones publicadas incluyen instaladores para Windows y macOS Apple Silicon.",
     ],
   },
   {

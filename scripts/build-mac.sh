@@ -10,4 +10,6 @@ fi
 
 codesign --force --deep --sign - --timestamp=none "$app_path"
 codesign --verify --deep --strict "$app_path"
-pnpm exec electron-builder --mac dmg --prepackaged "$app_path"
+# Empaquetar solamente después de firmar la aplicación.  Esto evita que el
+# DMG distribuido contenga una app sin firma (macOS la muestra como dañada).
+pnpm exec electron-builder --mac dmg zip --prepackaged "$app_path"

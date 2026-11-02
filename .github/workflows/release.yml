@@ -27,7 +27,6 @@ jobs:
               release/latest.yml
           - label: macOS Apple Silicon
             runner: macos-14
-            target: --mac --arm64
             artifact: macos-arm64-release
             files: |
               release/*.dmg
@@ -57,12 +56,18 @@ jobs:
       - name: Compilar la aplicación
         run: pnpm build
 
-      - name: Crear instalador
+      - name: Crear instalador de Windows
+        if: runner.os == 'Windows'
         env:
-          # Sin certificado de Apple el instalador se entrega sin firmar; la
-          # firma/notarización se puede incorporar después mediante secretos.
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: pnpm exec electron-builder ${{ matrix.target }} --publish never
+        run: pnpm exec electron-builder --win --x64 --publish never
+
+      - name: Firmar y empaquetar instalador de macOS
+        if: runner.os == 'macOS'
+        # A falta de un certificado Apple Developer, aplicamos una firma ad-hoc
+        # antes de crear el DMG/ZIP. Así Gatekeeper no interpreta la app como
+        # dañada. La notarización se agregará cuando existan credenciales Apple.
+        run: bash scripts/build-mac.sh
 
       - name: Guardar instaladores para publicar
         if: startsWith(github.ref, 'refs/tags/v')
