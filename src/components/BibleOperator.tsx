@@ -37,6 +37,14 @@ type BibleHistoryEntry = {
 let sessionBibleHistory: BibleHistoryEntry[] = [];
 let sessionBibleHistorySequence = 0;
 
+const historyKey = (entry: Pick<BibleHistoryEntry, "verse" | "slides">) =>
+  [
+    entry.slides[0]?.version ?? "",
+    entry.verse.book,
+    entry.verse.chapter,
+    entry.verse.verse,
+  ].join("|");
+
 function loadBiblePosition(): BibleOperatorPosition {
   try {
     const saved = JSON.parse(
@@ -219,9 +227,13 @@ export function BibleOperator({
   );
   const addToHistory = useCallback((entry: Omit<BibleHistoryEntry, "id">) => {
     setHistory((entries) => {
+      // Un versículo aparece una sola vez: si se vuelve a proyectar, sube al
+      // primer lugar (con la parte A/B que se mostró por última vez) en vez
+      // de repetirse en la lista.
+      const key = historyKey(entry);
       const next = [
         { id: ++sessionBibleHistorySequence, ...entry },
-        ...entries,
+        ...entries.filter((item) => historyKey(item) !== key),
       ].slice(0, 40);
       sessionBibleHistory = next;
       return next;
@@ -482,7 +494,7 @@ export function BibleOperator({
         return;
       }
 
-      const previousSlides = slidesFor(nextVerse, "full");
+      const previousSlides = slidesFor(nextVerse, "automatic");
       setActiveVerse(verseKey(nextVerse));
       setActiveSlides(previousSlides);
       projectSlide(previousSlides, previousSlides.length - 1);
