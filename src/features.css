@@ -500,7 +500,7 @@
   background: color-mix(in srgb, var(--song-section-color) 15%, transparent);
 }
 .song-rich-editor .tiptap > p[data-song-section-label]::before {
-  content: attr(data-song-section-label) "  ·  clic derecho para cambiar";
+  content: attr(data-song-section-label) "  \00B7  clic derecho para cambiar";
   position: absolute;
   top: calc(7px * var(--song-editor-stanza-scale, 1));
   left: calc(12px * var(--song-editor-stanza-scale, 1));

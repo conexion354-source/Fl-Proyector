@@ -1088,6 +1088,104 @@ export function App() {
   );
 }
 
+const overlayColors = ["#ffffff", "#fde047", "#facc15", "#fb923c", "#f87171", "#4ade80", "#38bdf8", "#c084fc"];
+
+/** Muestras de color + color personalizado, en lugar del selector nativo. */
+function SwatchPicker({
+  value,
+  onChange,
+  label,
+}: {
+  value: string;
+  onChange: (color: string) => void;
+  label: string;
+}) {
+  const normalized = value.toLowerCase();
+  const custom = !overlayColors.includes(normalized);
+  return (
+    <div className="dlg-swatches" role="radiogroup" aria-label={label}>
+      {overlayColors.map((color) => (
+        <button
+          type="button"
+          role="radio"
+          aria-checked={normalized === color}
+          aria-label={`${label} ${color}`}
+          title={color.toUpperCase()}
+          className={normalized === color ? "active" : ""}
+          style={{ background: color }}
+          onClick={() => onChange(color)}
+          key={color}
+        />
+      ))}
+      <label className={`dlg-swatch-custom ${custom ? "active" : ""}`} title="Otro color">
+        <input type="color" value={/^#[0-9a-f]{6}$/i.test(value) ? value : "#ffffff"} onChange={(event) => onChange(event.target.value)} aria-label={`${label}: otro color`} />
+        <span style={custom ? { background: value } : undefined} />
+      </label>
+      <code>{value.toUpperCase()}</code>
+    </div>
+  );
+}
+
+function SegmentedChoice<T extends string>({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  onChange: (value: T) => void;
+  label: string;
+}) {
+  return (
+    <div className="dlg-segmented" role="radiogroup" aria-label={label}>
+      {options.map((option) => (
+        <button
+          type="button"
+          role="radio"
+          aria-checked={value === option.value}
+          className={value === option.value ? "active" : ""}
+          onClick={() => onChange(option.value)}
+          key={option.value}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SizeStepper({
+  value,
+  onChange,
+  min,
+  max,
+  label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  min: number;
+  max: number;
+  label: string;
+}) {
+  const step = (delta: number) =>
+    onChange(String(Math.min(max, Math.max(min, (Number(value) || min) + delta))));
+  return (
+    <div className="dlg-stepper">
+      <button type="button" aria-label={`Achicar ${label}`} onClick={() => step(-4)}>−</button>
+      <input type="number" min={min} max={max} value={value} aria-label={label} onChange={(event) => onChange(event.target.value)} />
+      <button type="button" aria-label={`Agrandar ${label}`} onClick={() => step(4)}>+</button>
+      <span>px</span>
+    </div>
+  );
+}
+
+const overlayPositions = [
+  { value: "top" as const, label: "Arriba" },
+  { value: "center" as const, label: "Centro" },
+  { value: "bottom" as const, label: "Abajo" },
+];
+
 function OverlaySettingsDialog({
   kind, timer, clock, onClose, onSave,
 }: {
@@ -1101,94 +1199,52 @@ function OverlaySettingsDialog({
   // Keep number fields as text while editing. Clamping on every keystroke
   // prevents clearing "18" before typing a value such as "400".
   const timerDuration = Math.max(1, Math.round(timer.duration));
-  const [minutesInput, setMinutesInput] = useState(
-    String(Math.floor(timerDuration / 60)),
-  );
-  const [secondsInput, setSecondsInput] = useState(
-    String(timerDuration % 60),
-  );
+  const [minutesInput, setMinutesInput] = useState(String(Math.floor(timerDuration / 60)));
+  const [secondsInput, setSecondsInput] = useState(String(timerDuration % 60));
   const [position, setPosition] = useState(source.position);
   const [fontSizeInput, setFontSizeInput] = useState(String(source.fontSize));
   const [color, setColor] = useState(source.color);
-  const label = kind === "timer" ? "Cronómetro" : "Hora";
-  const save = () => onSave({
-    kind,
-    minutes: Math.max(0, Math.floor(Number(minutesInput) || 0)),
-    seconds: Math.min(
-      59,
-      Math.max(0, Math.floor(Number(secondsInput) || 0)),
-    ),
-    position,
-    fontSize: Math.min(200, Math.max(18, Number(fontSizeInput) || 18)),
-    color,
-  });
+  const label = kind === "timer" ? "cronómetro" : "hora";
+  const fontSize = Math.min(200, Math.max(18, Number(fontSizeInput) || 18));
+  const minutes = Math.max(0, Math.floor(Number(minutesInput) || 0));
+  const seconds = Math.min(59, Math.max(0, Math.floor(Number(secondsInput) || 0)));
+  const save = () => onSave({ kind, minutes, seconds, position, fontSize, color });
+  const sample =
+    kind === "timer"
+      ? `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+      : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   return (
     <Win11SettingsDialog
-      title={`Configurar ${label}`}
+      title={kind === "timer" ? "Configurar cronómetro" : "Configurar hora"}
       icon={kind === "timer" ? <Timer /> : <Clock />}
       onCancel={onClose}
       onSave={save}
     >
       {kind === "timer" && (
-        <label className="win11-settings-field">
-          <span>Minutos</span>
-          <input
-            className="win11-number-box"
-            type="number"
-            min="0"
-            value={minutesInput}
-            onChange={(event) => setMinutesInput(event.target.value)}
-          />
-        </label>
+        <div className="dlg-field win11-settings-full">
+          <span>Duración</span>
+          <div className="dlg-duration">
+            <label><input type="number" min="0" value={minutesInput} onChange={(event) => setMinutesInput(event.target.value)} aria-label="Minutos" /> min</label>
+            <label><input type="number" min="0" max="59" value={secondsInput} onChange={(event) => setSecondsInput(event.target.value)} aria-label="Segundos" /> s</label>
+          </div>
+        </div>
       )}
-      {kind === "timer" && (
-        <label className="win11-settings-field">
-          <span>Segundos</span>
-          <input
-            className="win11-number-box"
-            type="number"
-            min="0"
-            max="59"
-            value={secondsInput}
-            onChange={(event) => setSecondsInput(event.target.value)}
-          />
-        </label>
-      )}
-      <label className="win11-settings-field">
-        <span>Ubicación</span>
-        <select
-          value={position}
-          onChange={(event) => setPosition(event.target.value as "top" | "center" | "bottom")}
-        >
-          <option value="top">Parte superior</option>
-          <option value="center">Centro</option>
-          <option value="bottom">Parte inferior</option>
-        </select>
-      </label>
-      <label className="win11-settings-field">
+      <div className="dlg-field win11-settings-full">
+        <span>Ubicación en la pantalla</span>
+        <SegmentedChoice label="Ubicación" value={position} options={overlayPositions} onChange={setPosition} />
+      </div>
+      <div className="dlg-field">
         <span>Tamaño</span>
-        <input
-          className="win11-number-box"
-          type="number"
-          min="18"
-          max="200"
-          value={fontSizeInput}
-          onChange={(event) => setFontSizeInput(event.target.value)}
-        />
-      </label>
-      <label className="win11-settings-field">
+        <SizeStepper label={`tamaño del ${label}`} value={fontSizeInput} onChange={setFontSizeInput} min={18} max={200} />
+      </div>
+      <div className="dlg-field win11-settings-full">
         <span>Color</span>
-        <span className="win11-settings-color">
-          <input
-            type="color"
-            value={color}
-            aria-label="Elegir color"
-            onChange={(event) => setColor(event.target.value)}
-          />
-          <code>{color.toUpperCase()}</code>
-        </span>
-      </label>
+        <SwatchPicker label="Color" value={color} onChange={setColor} />
+      </div>
+      <div className={`dlg-preview win11-settings-full position-${position}`} aria-hidden="true">
+        <span style={{ color, fontSize: `${Math.max(12, Math.min(40, fontSize * 0.32))}px` }}>{sample}</span>
+      </div>
     </Win11SettingsDialog>
   );
 }
@@ -1213,7 +1269,7 @@ function AlertSettingsDialog({
     <Win11SettingsDialog
       title="Configurar alerta"
       icon={<BellRing />}
-      description="Escribí el aviso que se mostrará sobre el contenido proyectado."
+      description="El aviso aparece sobre lo que se está proyectando. Se guarda en Alertas guardadas para usarlo otra vez."
       onCancel={onClose}
       saveDisabled={!message.trim()}
       onSave={() =>
@@ -1226,72 +1282,51 @@ function AlertSettingsDialog({
         })
       }
     >
-      <label className="win11-settings-field win11-settings-full">
-        <span>Mensaje de la alerta</span>
+      <label className="dlg-field win11-settings-full">
+        <span>Mensaje</span>
         <textarea
+          className="dlg-textarea"
           value={message}
           onChange={(event) => setMessage(event.target.value)}
-          placeholder="Ej. Bebé llorando o auto blanco mal estacionado"
+          placeholder="Ej. Bebé llorando en la sala cuna"
           rows={2}
+          autoFocus
         />
       </label>
-      <label className="win11-settings-field">
-        <span>Ubicación</span>
-        <select
-          value={position}
-          onChange={(event) =>
-            setPosition(event.target.value as typeof position)
-          }
-        >
-          <option value="top">Parte superior</option>
-          <option value="center">Centro</option>
-          <option value="bottom">Parte inferior</option>
-        </select>
-      </label>
-      <label className="win11-settings-field">
+      <div className="dlg-field win11-settings-full">
+        <span>Ubicación en la pantalla</span>
+        <SegmentedChoice label="Ubicación" value={position} options={overlayPositions} onChange={setPosition} />
+      </div>
+      <div className="dlg-field win11-settings-full">
         <span>Movimiento</span>
-        <select
+        <SegmentedChoice
+          label="Movimiento"
           value={animation}
-          onChange={(event) =>
-            setAnimation(event.target.value as typeof animation)
-          }
-        >
-          <option value="none">Sin movimiento</option>
-          <option value="pulse">Pulso suave</option>
-          <option value="scroll">Desplazamiento horizontal</option>
-          <option value="bounce">Rebote suave</option>
-        </select>
-      </label>
-      <label className="win11-settings-field">
-        <span>Tamaño</span>
-        <input
-          className="win11-number-box"
-          type="number"
-          min="18"
-          max="160"
-          value={fontSizeInput}
-          onChange={(event) => setFontSizeInput(event.target.value)}
+          onChange={setAnimation}
+          options={[
+            { value: "none", label: "Fijo" },
+            { value: "pulse", label: "Pulso" },
+            { value: "scroll", label: "Desplazar" },
+            { value: "bounce", label: "Rebote" },
+          ]}
         />
-      </label>
-      <label className="win11-settings-field">
+      </div>
+      <div className="dlg-field">
+        <span>Tamaño</span>
+        <SizeStepper label="tamaño de la alerta" value={fontSizeInput} onChange={setFontSizeInput} min={18} max={160} />
+      </div>
+      <div className="dlg-field win11-settings-full">
         <span>Color del texto</span>
-        <span className="win11-settings-color">
-          <input
-            type="color"
-            value={color}
-            aria-label="Elegir color del texto"
-            onChange={(event) => setColor(event.target.value)}
-          />
-          <code>{color.toUpperCase()}</code>
-        </span>
-      </label>
-      <div className="alert-dialog-preview win11-settings-full">
+        <SwatchPicker label="Color del texto" value={color} onChange={setColor} />
+      </div>
+      <div className={`dlg-preview win11-settings-full position-${position}`} aria-hidden="true">
         <span
           className={`alert-preview-text alert-animation-${animation}`}
-          style={{ color, fontSize: `${Math.min(28, fontSize * 0.45)}px` }}
+          style={{ color, "--dlg-color": color, fontSize: `${Math.max(12, Math.min(30, fontSize * 0.36))}px` } as CSSProperties}
         >
           <span>{message.trim() || "Vista previa de la alerta"}</span>
         </span>
+        <em>Vista previa</em>
       </div>
     </Win11SettingsDialog>
   );

@@ -143,7 +143,7 @@ html .app-shell .on-air {
 }
 html .app-shell .on-air strong { color: var(--fl-text); font-weight: 600; }
 html .app-shell .on-air span { color: var(--fl-tertiary); }
-html .app-shell .on-air span::before { content: "·"; margin-right: 8px; }
+html .app-shell .on-air span::before { content: "\00B7"; margin-right: 8px; }
 html .app-shell .on-air i {
   width: 8px;
   height: 8px;
@@ -1549,3 +1549,113 @@ html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); 
 .w11-hint span { flex: 1; }
 .remote-manual-address { margin: 10px 0 0; color: var(--fl-muted); font-size: 13px; line-height: 1.5; }
 .remote-manual-address b { display: block; margin-top: 4px; color: var(--fl-text); font-family: var(--fl-font-display); font-size: 26px; font-weight: 600; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   Diálogos de alerta, cronómetro y hora (ContentDialog de Windows 11)
+   ========================================================================== */
+#root .app-shell .win11-settings-backdrop { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: rgb(0 0 0 / 0.45) !important; }
+#root .app-shell .win11-settings-dialog {
+  width: min(520px, calc(100vw - 32px)) !important;
+  color: var(--fl-text) !important;
+  border: 1px solid var(--fl-border-strong) !important;
+  border-radius: 8px !important;
+  background: var(--fl-bg) !important;
+  box-shadow: 0 32px 64px #00000047, 0 2px 21px #00000038 !important;
+}
+#root .app-shell .win11-settings-header { min-height: 56px; padding: 0 12px 0 20px; border-bottom: 0 !important; background: transparent !important; }
+#root .app-shell .win11-settings-header h2 { color: var(--fl-text) !important; font-family: var(--fl-font-display); font-size: 20px !important; font-weight: 600 !important; }
+#root .app-shell .win11-settings-icon { color: var(--fl-accent) !important; }
+#root .app-shell .win11-settings-close { color: var(--fl-muted) !important; border: 0 !important; background: transparent !important; }
+#root .app-shell .win11-settings-close:hover { color: var(--fl-text) !important; background: var(--fl-subtle-hover) !important; }
+#root .app-shell .win11-settings-body { padding: 0 20px 20px !important; background: transparent !important; }
+#root .app-shell .win11-settings-description { margin: 0 0 16px !important; color: var(--fl-muted) !important; font-size: 13px !important; line-height: 1.45; }
+#root .app-shell .win11-settings-grid { gap: 16px !important; }
+#root .app-shell .win11-settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px !important;
+  border-top: 1px solid var(--fl-border) !important;
+  background: var(--fl-sidebar) !important;
+}
+#root .app-shell :is(.win11-settings-cancel, .win11-settings-save) {
+  min-width: 120px;
+  height: 32px !important;
+  border-radius: 4px !important;
+  font-size: 14px !important;
+  box-shadow: none !important;
+}
+#root .app-shell .win11-settings-cancel { color: var(--fl-text) !important; border: 1px solid var(--fl-control-stroke) !important; border-bottom-color: var(--fl-control-stroke-bottom) !important; background: var(--fl-control-fill) !important; }
+#root .app-shell .win11-settings-cancel:hover { background: var(--fl-control-hover) !important; }
+#root .app-shell .win11-settings-save { color: var(--fl-on-accent) !important; border: 1px solid transparent !important; background: var(--fl-accent) !important; font-weight: 600 !important; }
+#root .app-shell .win11-settings-save:hover:not(:disabled) { background: var(--fl-accent-hover) !important; }
+#root .app-shell .win11-settings-save:disabled { color: var(--fl-tertiary) !important; background: var(--fl-control-fill) !important; }
+
+.dlg-field { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
+.dlg-field > span { color: var(--fl-text); font-size: 13px; font-weight: 600; }
+#root .app-shell .dlg-textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  padding: 8px 11px !important;
+  color: var(--fl-text) !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-bottom-color: var(--fl-control-stroke-bottom) !important;
+  border-radius: 4px !important;
+  background: var(--fl-control-fill) !important;
+  font-size: 15px !important;
+  line-height: 1.4;
+}
+#root .app-shell .dlg-textarea:focus { outline: 0 !important; border-bottom: 2px solid var(--fl-accent) !important; background: var(--fl-surface) !important; }
+
+.dlg-segmented { display: flex; padding: 2px; border: 1px solid var(--fl-control-stroke); border-radius: 5px; background: var(--fl-control-fill); }
+.dlg-segmented button { flex: 1; height: 30px; padding: 0 10px; color: var(--fl-text); border: 0; border-radius: 3px; background: transparent; font-size: 13px; cursor: pointer; }
+.dlg-segmented button:hover:not(.active) { background: var(--fl-subtle-hover); }
+.dlg-segmented button.active { color: var(--fl-on-accent); background: var(--fl-accent); font-weight: 600; }
+
+.dlg-stepper { display: inline-flex; align-items: center; gap: 4px; }
+.dlg-stepper button { width: 32px; height: 32px; color: var(--fl-text); border: 1px solid var(--fl-control-stroke); border-radius: 4px; background: var(--fl-control-fill); font-size: 16px; cursor: pointer; }
+.dlg-stepper button:hover { background: var(--fl-control-hover); }
+#root .app-shell .dlg-stepper input { width: 64px !important; min-width: 0 !important; height: 32px !important; padding: 0 8px !important; text-align: center; font-variant-numeric: tabular-nums; }
+.dlg-stepper span { margin-left: 2px; color: var(--fl-muted); font-size: 13px; }
+.dlg-duration { display: flex; gap: 12px; }
+.dlg-duration label { display: inline-flex; align-items: center; gap: 6px; color: var(--fl-muted); font-size: 13px; }
+#root .app-shell .dlg-duration input { width: 72px !important; height: 32px !important; padding: 0 8px !important; text-align: center; }
+
+.dlg-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dlg-swatches > button,
+.dlg-swatch-custom {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #80808066;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.dlg-swatches > button.active,
+.dlg-swatch-custom.active { outline: 2px solid var(--fl-accent); outline-offset: 2px; }
+.dlg-swatch-custom { display: inline-block; overflow: hidden; background: conic-gradient(#f87171, #facc15, #4ade80, #38bdf8, #c084fc, #f87171); }
+.dlg-swatch-custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.dlg-swatch-custom span { position: absolute; inset: 6px; border-radius: 50%; pointer-events: none; }
+.dlg-swatches code { margin-left: 4px; color: var(--fl-muted); font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, monospace; font-size: 12px; }
+
+.dlg-preview {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 150px;
+  justify-content: center;
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid var(--fl-border-strong);
+  border-radius: 6px;
+  background: #000;
+}
+.dlg-preview.position-top { align-items: flex-start; }
+.dlg-preview.position-center { align-items: center; }
+.dlg-preview.position-bottom { align-items: flex-end; }
+.dlg-preview > span:not(.alert-preview-text) { font-weight: 800; text-shadow: 0 2px 8px #000; font-variant-numeric: tabular-nums; }
+.dlg-preview em { position: absolute; right: 8px; top: 6px; color: #ffffff80; font-size: 10px; font-style: normal; }
+#root .app-shell .dlg-preview .alert-preview-text > span { color: inherit !important; }
+#root .app-shell .dlg-preview .alert-preview-text { color: var(--dlg-color, #fff) !important; }
