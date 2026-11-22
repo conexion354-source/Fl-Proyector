@@ -43,6 +43,9 @@ import { splitSongStanzas } from "../shared/songSections.js";
 // considers it occluded or unfocused behind the operator window.
 if (process.platform === "win32") {
   app.commandLine.appendSwitch("disable-renderer-backgrounding");
+  // Los videos de la reunión se reproducen con sonido en la ventana del
+  // proyector sin que nadie haga clic en ella.
+  app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
   app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
   app.commandLine.appendSwitch("disable-background-timer-throttling");
 }
@@ -1234,6 +1237,47 @@ const needsVideoConversion = (extension: string) =>
 const needsMeetingMediaConversion = (extension: string) =>
   needsVideoConversion(extension) || extension === ".gif";
 
+/**
+ * Lee los códecs de un archivo con FFmpeg ("ffmpeg -i" sin salida imprime la
+ * información de las pistas). Devuelve null si no se pudo leer.
+ */
+async function probeVideoCodecs(source: string): Promise<{ video: string | null; audio: string | null } | null> {
+  if (!ffmpegPath) return null;
+  const executable = app.isPackaged ? ffmpegPath.replace("app.asar", "app.asar.unpacked") : ffmpegPath;
+  return new Promise((resolve) => {
+    let output = "";
+    const child = spawn(executable, ["-hide_banner", "-i", source]);
+    const timer = setTimeout(() => child.kill(), 15000);
+    child.stderr?.on("data", (chunk) => (output += String(chunk)));
+    child.once("error", () => {
+      clearTimeout(timer);
+      resolve(null);
+    });
+    child.once("close", () => {
+      clearTimeout(timer);
+      const video = /Stream #[^\n]*Video:\s*([a-z0-9_]+)/i.exec(output)?.[1]?.toLowerCase() ?? null;
+      const audio = /Stream #[^\n]*Audio:\s*([a-z0-9_]+)/i.exec(output)?.[1]?.toLowerCase() ?? null;
+      resolve(video || audio ? { video, audio } : null);
+    });
+  });
+}
+
+/**
+ * Un MP4 o WebM puede traer códecs que Chromium no reproduce (H.265/HEVC de
+ * celulares, ProRes, audio AC-3/DTS de películas): se veía negro o sin
+ * sonido. En esos casos también se convierte.
+ */
+async function modernVideoNeedsConversion(source: string) {
+  const codecs = await probeVideoCodecs(source);
+  if (!codecs) return false;
+  const playableVideo = ["h264", "vp8", "vp9", "av1"];
+  const playableAudio = ["aac", "mp3", "opus", "vorbis", "flac"];
+  return (
+    (codecs.video !== null && !playableVideo.includes(codecs.video)) ||
+    (codecs.audio !== null && !playableAudio.includes(codecs.audio))
+  );
+}
+
 async function transcodeVideoToMp4(source: string, destination: string) {
   if (!ffmpegPath) {
     throw new Error("FFmpeg no está disponible para convertir este video.");
@@ -1294,7 +1338,9 @@ const meetingMediaFromPayload = (payload: Record<string, unknown>) => {
 
 async function importMeetingMediaFile(source: string): Promise<MediaItem> {
   const extension = extname(source).toLowerCase();
-  const convert = needsMeetingMediaConversion(extension);
+  const convert =
+    needsMeetingMediaConversion(extension) ||
+    ([".mp4", ".webm"].includes(extension) && (await modernVideoNeedsConversion(source)));
   const filename = convert
     ? `${Date.now()}-${basename(source, extension)}.mp4`
     : `${Date.now()}-${basename(source)}`;
@@ -1585,7 +1631,9 @@ function projectRemoteMultimedia(itemId: number) {
     video: source.kind === "video"
       ? {
           playing: true,
-          loop: false,
+          // Respeta "Reproducir en bucle" del elemento: antes, desde el
+          // teléfono, un video marcado en bucle se reproducía una sola vez.
+          loop: payload.loop === true,
           seekTime: 0,
           currentTime: 0,
           duration: 0,
@@ -1611,7 +1659,10 @@ async function syncMedia() {
 
 async function importMediaFile(source: string) {
   const extension = extname(source).toLowerCase();
-  if (needsVideoConversion(extension)) {
+  if (
+    needsVideoConversion(extension) ||
+    ([".mp4", ".webm"].includes(extension) && (await modernVideoNeedsConversion(source)))
+  ) {
     const destination = join(mediaDir, `${basename(source, extension)}-compatible.mp4`);
     await transcodeVideoToMp4(source, destination);
     return destination;

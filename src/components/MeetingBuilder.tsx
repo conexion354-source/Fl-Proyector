@@ -789,6 +789,8 @@ export function MeetingBuilder({
     );
     if (selected?.id === changed.id) setSelected(changed);
     setContextMenu(null);
+    // Si el video ya está en el aire, el cambio se aplica en el momento.
+    if (isItemOnAir(item)) update({ video: { loop } });
   };
   const backgroundVideoState = (background?: MediaItem) =>
     background?.kind === "video"
@@ -1558,6 +1560,10 @@ export function MeetingBuilder({
               setStanzaContextMenu({ index, x, y })
             }
             onEdit={() => setEditing(true)}
+            loopable={isLoopableMeetingItem(selected)}
+            onToggleLoop={() =>
+              void setMeetingItemLoop(selected, (selected.payload as Record<string, unknown>).loop !== true)
+            }
           />
         ) : (
           <div className="inspector-empty">
@@ -2067,6 +2073,8 @@ function ItemSummary({
   onStanza,
   onStanzaContextMenu,
   onEdit,
+  loopable = false,
+  onToggleLoop,
 }: {
   item: MeetingItem;
   songs: Song[];
@@ -2079,12 +2087,16 @@ function ItemSummary({
   onStanza: (index: number) => void;
   onStanzaContextMenu: (index: number, x: number, y: number) => void;
   onEdit: () => void;
+  loopable?: boolean;
+  onToggleLoop?: () => void;
 }) {
   const payload = item.payload as any;
   const song = songs.find((value) => value.id === Number(payload.songId));
-  const medium = media.find(
-    (value) => value.id === Number(payload.mediaId ?? payload.backgroundId),
-  );
+  // Los videos e imágenes agregados solo a la reunión viajan dentro del
+  // elemento (meetingMedia); antes el panel no los mostraba.
+  const medium =
+    (payload.meetingMedia?.url ? (payload.meetingMedia as MediaItem) : undefined) ??
+    media.find((value) => value.id === Number(payload.mediaId ?? payload.backgroundId));
   const html =
     item.type === "song" ? song?.content : String(payload.html || "");
   const stanzas = song ? splitSongStanzas(song.content) : [];
@@ -2235,6 +2247,17 @@ function ItemSummary({
         <p className="summary-empty">
           Este elemento todavía no tiene contenido.
         </p>
+      )}
+      {loopable && (
+        <label className="summary-loop">
+          <Repeat2 aria-hidden="true" />
+          <span>
+            <b>Reproducir en bucle</b>
+            <small>{payload.loop === true ? "Se repite hasta que lo quites del aire." : "Se reproduce una vez y vuelve el fondo."}</small>
+          </span>
+          <input type="checkbox" role="switch" checked={payload.loop === true} onChange={() => onToggleLoop?.()} aria-label="Reproducir en bucle" />
+          <i aria-hidden="true" />
+        </label>
       )}
       <button className="summary-edit" onClick={onEdit}>
         <Edit3 />

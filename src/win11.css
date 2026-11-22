@@ -1659,3 +1659,19 @@ html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); 
 .dlg-preview em { position: absolute; right: 8px; top: 6px; color: #ffffff80; font-size: 10px; font-style: normal; }
 #root .app-shell .dlg-preview .alert-preview-text > span { color: inherit !important; }
 #root .app-shell .dlg-preview .alert-preview-text { color: var(--dlg-color, #fff) !important; }
+
+/* Interruptor "Reproducir en bucle" en el panel del elemento */
+.summary-loop { display: flex; align-items: center; gap: 12px; margin: 10px 0; padding: 10px 12px; border: 1px solid var(--fl-control-stroke); border-radius: 6px; background: var(--fl-surface); cursor: pointer; }
+.summary-loop > svg { width: 18px; height: 18px; flex: 0 0 18px; color: var(--fl-accent); }
+.summary-loop > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.summary-loop b { color: var(--fl-text); font-size: 13px; font-weight: 600; }
+.summary-loop small { color: var(--fl-muted); font-size: 12px; }
+.summary-loop input { position: absolute; opacity: 0; pointer-events: none; }
+.summary-loop i { position: relative; width: 40px; height: 20px; flex: 0 0 40px; border: 1px solid var(--fl-muted); border-radius: 10px; background: var(--fl-control-fill); }
+.summary-loop i::after { content: ""; position: absolute; left: 3px; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--fl-muted); transform: translateY(-50%); transition: left 140ms ease; }
+.summary-loop input:checked + i { border-color: var(--fl-accent); background: var(--fl-accent); }
+.summary-loop input:checked + i::after { left: 23px; background: var(--fl-on-accent); }
+.summary-loop input:focus-visible + i { outline: 2px solid var(--fl-text); outline-offset: 2px; }
+#root .app-shell .video-transport { display: flex; align-items: center; gap: 6px; }
+#root .app-shell .video-transport .transport-stop { display: grid; width: 32px; min-width: 32px; height: 32px; place-items: center; padding: 0 !important; }
+#root .app-shell .video-transport .transport-stop svg { width: 12px; height: 12px; }

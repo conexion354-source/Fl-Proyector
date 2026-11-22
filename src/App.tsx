@@ -1418,6 +1418,23 @@ function LiveContentControls({
             <Play fill="currentColor" />
           )}
         </button>
+        <button
+          className="transport-stop"
+          title="Detener y volver al inicio"
+          aria-label="Detener y volver al inicio"
+          onClick={() => {
+            setVideoTime(0);
+            update({
+              video: {
+                playing: false,
+                seekTime: 0,
+                commandId: state.video.commandId + 1,
+              },
+            });
+          }}
+        >
+          <Square fill="currentColor" />
+        </button>
         <input
           aria-label="Posición del video"
           type="range"
