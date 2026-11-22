@@ -137,7 +137,7 @@ function StanzaEditDialog({
         >
           <X />
         </button>
-        <span className="eyebrow">EDITAR SÓLO ESTA PARTE</span>
+        <span className="eyebrow">Editar solo esta parte</span>
         <h2 id="stanza-edit-title">{label}</h2>
         <p>
           Enter crea una nueva estrofa al guardar. Shift + Enter agrega una
@@ -625,7 +625,7 @@ export function SongLibrary({
     >
       <aside className="song-categories">
         <div className="pane-title">
-          <b>CATEGORÍAS</b>
+          <b>Categorías</b>
           <button onClick={() => openNewCategory(false)} aria-label="Nueva categoría" title="Nueva categoría">
             <FolderPlus size={16} />
           </button>
@@ -724,7 +724,7 @@ export function SongLibrary({
         <div className="section-title song-editor-title-row">
           <label className="song-editor-title-field">
             <span className="eyebrow">
-              {editing ? "EDITAR CANCIÓN" : "CANCIÓN"}
+              {editing ? "Editar canción" : "Canción"}
             </span>
             <input
               className="title-input"
@@ -737,7 +737,7 @@ export function SongLibrary({
           </label>
           <div className="song-editor-header-actions">
             <label className="song-editor-category-field">
-              <span className="eyebrow">CATEGORÍA</span>
+              <span className="eyebrow">Categoría</span>
               <select
                 aria-label="Categoría de la canción"
                 title="Elegí una categoría o creá una nueva"
@@ -763,7 +763,7 @@ export function SongLibrary({
               </select>
             </label>
             <div className="song-stanza-size-controls" aria-label="Tamaño de las estrofas en el sistema">
-              <span className="eyebrow">ESTROFAS</span>
+              <span className="eyebrow">Estrofas</span>
               <div>
                 <button
                   type="button"
@@ -1083,7 +1083,7 @@ export function SongLibrary({
             >
               <X />
             </button>
-            <span className="eyebrow">RENOMBRAR CANCIÓN</span>
+            <span className="eyebrow">Renombrar canción</span>
             <h2>Editar título</h2>
             <p>El nuevo nombre se verá en la biblioteca y en las reuniones.</p>
             <label>
@@ -1167,7 +1167,7 @@ export function SongLibrary({
             >
               <X />
             </button>
-            <span className="eyebrow">NUEVA CATEGORÍA</span>
+            <span className="eyebrow">Nueva categoría</span>
             <h2>
               {assignNewCategory
                 ? "Crear y asignar categoría"

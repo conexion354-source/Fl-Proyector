@@ -786,7 +786,9 @@ export function App() {
               >
                 <QrCode aria-hidden="true" />
                 {liveAudienceQrOnAir ? "Quitar QR" : "QR en vivo"}
-                <small aria-hidden="true">{liveAudienceStatus.viewers} conectado{liveAudienceStatus.viewers === 1 ? "" : "s"}</small>
+                {liveAudienceStatus.viewers > 0 && (
+                  <small aria-hidden="true">{liveAudienceStatus.viewers}</small>
+                )}
               </button>
               <button
                 aria-label="Limpiar contenido de la proyección"
@@ -1328,7 +1330,7 @@ function LiveContentControls({
     return (
       <section className="live-media-controls presentation-live-controls">
         <div className="live-control-title">
-          <span>CONTROL DE POWERPOINT</span>
+          <span>Control de PowerPoint</span>
           <b>{state.presentation.name}</b>
         </div>
         <div className="live-presentation-status">
@@ -1366,7 +1368,7 @@ function LiveContentControls({
   return (
     <section className="live-media-controls">
       <div className="live-control-title">
-        <span>CONTROL DE VIDEO</span>
+        <span>Control de video</span>
         <b>{state.background.name}</b>
       </div>
       <div className="video-transport">

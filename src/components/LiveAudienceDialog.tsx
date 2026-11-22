@@ -47,7 +47,7 @@ export function LiveAudienceDialog({
           <div className="live-audience-dialog-title">
             <span className="live-audience-dialog-icon"><QrCode /></span>
             <div>
-              <span className="eyebrow">MODO AUDIENCIA</span>
+              <span className="eyebrow">Modo audiencia</span>
               <h2 id="live-audience-title">Lectura en vivo por QR</h2>
             </div>
           </div>

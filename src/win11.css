@@ -1131,3 +1131,369 @@ html[data-theme="light"] #root .app-shell .pro-content-section .announcement-edi
   border-radius: 6px !important;
   background: var(--fl-surface) !important;
 }
+
+/* Pivot (pestañas de una página de ajustes) */
+.w11-pivot { display: flex; gap: 4px; margin-top: 18px; border-bottom: 1px solid var(--fl-border); }
+.w11-pivot button {
+  position: relative;
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  color: var(--fl-muted);
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+}
+.w11-pivot button:hover { color: var(--fl-text); }
+.w11-pivot button.active { color: var(--fl-text); font-weight: 600; }
+.w11-pivot button.active::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 3px; border-radius: 2px; background: var(--fl-accent); }
+
+/* ==========================================================================
+   PASADA NATIVA WINDOWS 11
+   Sin degradados, brillos ni tarjetas grandes: listas, barras de comandos y
+   controles estándar de 32 px con un único color de acento.
+   ========================================================================== */
+
+/* Títulos pequeños: sin mayúsculas ni espaciado de letras */
+#root .app-shell :is(.eyebrow, .pane-title b, .bible-column-heading span, .summary-heading small, .live-control-title span, .field-label) {
+  color: var(--fl-muted) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+/* Sin brillos ni sombras exageradas dentro de la interfaz */
+#root .app-shell :is(button, .settings-card, .bible-toolbar, .bible-verse-column, .bible-slide-column, .background-controls, .media-card, .meeting-list > button, .rundown-list article, .song-list > button) {
+  text-shadow: none !important;
+}
+
+/* ---------- Deslizadores (Slider de Windows 11) ---------- */
+#root .app-shell input[type="range"] {
+  height: 22px;
+  margin: 0;
+  background: transparent !important;
+  border: 0 !important;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+#root .app-shell input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border: 0 !important;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--fl-accent) 0 var(--range-progress, 0%), var(--fl-control-stroke-bottom) var(--range-progress, 0%) 100%) !important;
+}
+#root .app-shell input[type="range"]::-webkit-slider-thumb {
+  width: 20px;
+  height: 20px;
+  margin-top: -8px;
+  border: 5px solid var(--fl-surface) !important;
+  border-radius: 50%;
+  background: var(--fl-accent) !important;
+  box-shadow: 0 0 0 1px var(--fl-control-stroke-bottom) !important;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-width 100ms ease;
+}
+#root .app-shell input[type="range"]:hover::-webkit-slider-thumb { border-width: 4px !important; }
+#root .app-shell input[type="range"]:active::-webkit-slider-thumb { border-width: 6px !important; }
+
+/* ---------- Barra de comandos: agregar elementos a la reunión ---------- */
+#root .app-shell .add-item-row {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 4px !important;
+  margin-bottom: 12px;
+  padding: 4px;
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 6px;
+  background: var(--fl-surface);
+}
+#root .app-shell .add-item-row button {
+  display: inline-flex !important;
+  height: 32px !important;
+  flex: 0 0 auto;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  padding: 0 11px !important;
+  color: var(--fl-text) !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+#root .app-shell .add-item-row button:hover { background: var(--fl-subtle-hover) !important; color: var(--fl-text) !important; }
+#root .app-shell .add-item-row button svg { width: 16px !important; height: 16px !important; margin: 0 !important; color: var(--fl-accent); }
+
+/* ---------- Listas (ListView): reuniones, orden del culto, canciones ---------- */
+#root .app-shell :is(.meeting-list > button:not(.create-meeting), .song-list > button:not(.new-song), .song-categories > button, .rundown-list article) {
+  position: relative;
+  min-height: 0 !important;
+  margin: 0 0 2px !important;
+  color: var(--fl-text) !important;
+  border: 1px solid transparent !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: background 80ms ease;
+}
+#root .app-shell :is(.meeting-list > button:not(.create-meeting), .song-list > button:not(.new-song), .song-categories > button, .rundown-list article):hover {
+  background: var(--fl-subtle-hover) !important;
+}
+#root .app-shell :is(.meeting-list > button.active, .song-list > button.active, .song-categories > button.active, .rundown-list article.selected) {
+  background: var(--fl-subtle-hover) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+#root .app-shell :is(.meeting-list > button.active, .song-list > button.active, .song-categories > button.active, .rundown-list article.selected)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--fl-accent);
+  transform: translateY(-50%);
+}
+#root .app-shell .meeting-list > button:not(.create-meeting) { padding: 8px 10px 8px 12px !important; border-left: 1px solid transparent !important; }
+#root .app-shell .song-list > button:not(.new-song) { padding: 7px 10px 7px 14px !important; border-left: 0 !important; }
+#root .app-shell .song-list > button:not(.new-song)::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--song-color, var(--fl-accent));
+  opacity: 0.85;
+}
+#root .app-shell .song-list > button.active::after { display: none; }
+#root .app-shell .song-categories > button { height: 34px; padding: 0 10px 0 12px !important; font-size: 14px !important; }
+#root .app-shell .song-categories > button span { color: var(--fl-tertiary) !important; font-size: 12px; }
+#root .app-shell .meeting-list strong,
+#root .app-shell .song-list > button strong { font-size: 14px !important; font-weight: 400 !important; }
+#root .app-shell :is(.meeting-list > button.active, .song-list > button.active) strong { font-weight: 600 !important; }
+#root .app-shell .meeting-list span,
+#root .app-shell .song-list > button span { color: var(--fl-muted) !important; font-size: 12px !important; }
+
+/* Orden del culto: fila con franja de color fina y estado "al aire" */
+#root .app-shell .rundown-list { gap: 2px !important; }
+#root .app-shell .rundown-list article {
+  height: 52px !important;
+  padding: 0 10px 0 8px !important;
+  border-color: var(--fl-control-stroke) !important;
+  background: var(--fl-surface) !important;
+}
+#root .app-shell .rundown-list article:hover { background: var(--fl-hover) !important; }
+#root .app-shell .rundown-list article.selected { background: var(--fl-accent-soft) !important; border-color: color-mix(in srgb, var(--fl-accent) 45%, transparent) !important; }
+#root .app-shell .rundown-list article > i { width: 3px !important; height: 24px !important; border-radius: 2px !important; box-shadow: none !important; }
+#root .app-shell .rundown-list article > b { color: var(--fl-tertiary) !important; font-size: 12px !important; font-weight: 400 !important; font-variant-numeric: tabular-nums; }
+#root .app-shell .rundown-list article strong { font-size: 14px !important; font-weight: 400 !important; }
+#root .app-shell .rundown-list article.selected strong { font-weight: 600 !important; }
+#root .app-shell .rundown-list article.on-air-item { border-color: #c42b1c !important; box-shadow: inset 3px 0 0 #e81123 !important; }
+
+/* Etiquetas "Al aire" (InfoBadge) */
+#root .app-shell :is(.rundown-on-air, .summary-on-air, .playing-indicator) {
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  padding: 0 8px !important;
+  color: #fff !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: #c42b1c !important;
+  box-shadow: none !important;
+  font-size: 11px !important;
+  font-style: normal;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  animation: none !important;
+}
+
+/* Panel del elemento seleccionado */
+#root .app-shell .summary-edit {
+  min-height: 32px !important;
+  height: 32px !important;
+  color: var(--fl-on-accent) !important;
+  border: 1px solid transparent !important;
+  border-radius: 4px !important;
+  background: var(--fl-accent) !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+#root .app-shell .summary-edit:hover { background: var(--fl-accent-hover) !important; }
+#root .app-shell .summary-heading h3 { font-size: 16px !important; font-weight: 600 !important; }
+#root .app-shell .summary-heading > span { width: 3px !important; border-radius: 2px !important; box-shadow: none !important; }
+
+/* ---------- Panel en vivo: controles compactos ---------- */
+#root .app-shell .master-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 4px !important; }
+#root .app-shell .master-grid button {
+  min-height: 36px !important;
+  height: 36px !important;
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  padding: 0 12px !important;
+  font-size: 13px !important;
+  text-align: left;
+}
+#root .app-shell .master-grid button svg { width: 16px !important; height: 16px !important; flex: 0 0 16px; }
+#root .app-shell .master-grid button small { margin-left: auto; }
+#root .app-shell .background-controls {
+  margin-top: 12px !important;
+  padding: 4px 0 0 !important;
+  border: 0 !important;
+  border-top: 1px solid var(--fl-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#root .app-shell .background-control { padding: 10px 0 2px; }
+#root .app-shell .control-title span { color: var(--fl-text) !important; font-size: 13px !important; font-weight: 400 !important; }
+#root .app-shell .control-title small { color: var(--fl-tertiary) !important; font-size: 11.5px !important; }
+#root .app-shell .control-title b {
+  min-width: 44px;
+  padding: 2px 6px !important;
+  color: var(--fl-text) !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: var(--fl-control-fill) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  text-align: center;
+}
+#root .app-shell :is(.overlay-controls .overlay-action, .alert-control-row .overlay-action, .speed-options button, .video-transport button, .video-volume button, .live-presentation-buttons button) {
+  height: 32px !important;
+  color: var(--fl-text) !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-bottom-color: var(--fl-control-stroke-bottom) !important;
+  border-radius: 4px !important;
+  background: var(--fl-control-fill) !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+#root .app-shell :is(.overlay-controls .overlay-action, .alert-control-row .overlay-action):hover:not(:disabled) { background: var(--fl-control-hover) !important; }
+#root .app-shell :is(.overlay-controls .overlay-action.active, .alert-control-row .overlay-action.active, .speed-options button.active) {
+  color: var(--fl-on-accent) !important;
+  border-color: transparent !important;
+  background: var(--fl-accent) !important;
+}
+#root .app-shell .overlay-controls .stop-overlay:not(:disabled) { color: var(--fl-danger) !important; }
+#root .app-shell .saved-alerts { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--fl-border); }
+#root .app-shell .saved-alerts-heading b { font-size: 13px !important; font-weight: 600 !important; }
+#root .app-shell .saved-alert-item button { height: 32px; border-radius: 4px !important; }
+#root .app-shell .preview-label { padding: 2px 8px !important; border-radius: 4px !important; box-shadow: none !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; }
+#root .app-shell .preview-frame { border: 1px solid var(--fl-border-strong) !important; border-radius: 6px !important; box-shadow: none !important; }
+#root .app-shell .live-media-controls { padding: 12px 0 !important; border: 0 !important; border-top: 1px solid var(--fl-border) !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }
+
+/* ---------- Canciones: encabezado del editor que no se rompe ---------- */
+#root .app-shell .song-editor { container: songeditor / inline-size; }
+@container songeditor (max-width: 680px) {
+  #root .app-shell .song-editor-title-row { flex-direction: column !important; align-items: stretch !important; gap: 12px; }
+  #root .app-shell .song-editor-header-actions { justify-content: space-between; flex-wrap: wrap; }
+  #root .app-shell .song-editor-category-field { flex: 1; }
+  #root .app-shell .song-editor-category-field select { width: 100% !important; }
+}
+#root .app-shell .song-editor .title-input { font-family: var(--fl-font-display) !important; font-size: 24px !important; font-weight: 600 !important; }
+#root .app-shell .song-stanza-size-controls button { border-color: var(--fl-control-stroke) !important; background: var(--fl-control-fill) !important; color: var(--fl-text) !important; }
+#root .app-shell .pane-title { padding: 4px 10px 8px 12px; }
+#root .app-shell .pane-title button { width: 28px; height: 28px; border: 0 !important; border-radius: 4px !important; background: transparent !important; }
+#root .app-shell .pane-title button:hover { background: var(--fl-subtle-hover) !important; }
+
+/* Botones de peligro estándar */
+#root .app-shell :is(.danger, button.danger) {
+  min-height: 32px;
+  color: var(--fl-danger) !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-radius: 4px !important;
+  background: var(--fl-control-fill) !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+#root .app-shell :is(.danger, button.danger):hover { background: var(--fl-danger-soft) !important; }
+
+/* Cuadros de diálogo: esquinas y sombras de Windows 11 */
+#root .app-shell :is(.meeting-dialog, .song-create-dialog, .item-edit-dialog, .library-picker, .bible-picker, .overlay-settings-dialog, .confirm-delete-dialog, .version-history-dialog) {
+  border-radius: 8px !important;
+  box-shadow: 0 32px 64px #00000047, 0 2px 21px #00000038 !important;
+}
+#root .app-shell .modal-backdrop { backdrop-filter: none !important; background: rgb(0 0 0 / 0.45) !important; }
+#root .app-shell .rundown-list article.selected::before { display: none; }
+#root .app-shell .song-categories > button { display: flex !important; align-items: center; justify-content: space-between; gap: 8px; text-align: left; }
+#root .app-shell .master-grid button small {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  color: #fff !important;
+  border-radius: 9px;
+  background: #c42b1c;
+  font-size: 11px !important;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* Biblia: versículos como filas de lista, no como tarjetas */
+#root .app-shell .verse-list { gap: 0 !important; padding: 4px !important; }
+#root .app-shell :is(.verse-entry, .bible-slide-list > button) {
+  position: relative;
+  min-height: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--fl-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#root .app-shell :is(.verse-entry, .bible-slide-list > button):hover { background: var(--fl-subtle-hover) !important; border-radius: 4px !important; }
+#root .app-shell :is(.verse-entry.selected, .bible-slide-list > button.selected) {
+  border-radius: 4px !important;
+  border-bottom-color: transparent !important;
+  background: var(--fl-accent-soft) !important;
+  box-shadow: none !important;
+}
+#root .app-shell :is(.verse-entry.selected, .bible-slide-list > button.selected)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  z-index: 1;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--fl-accent);
+  transform: translateY(-50%);
+}
+#root .app-shell .verse-entry.focused:not(.selected) { box-shadow: inset 0 0 0 1px var(--fl-accent) !important; border-radius: 4px !important; }
+#root .app-shell .verse-full { padding: 10px 12px !important; }
+#root .app-shell .bible-slide-list { gap: 0 !important; padding: 4px !important; }
+#root .app-shell .bible-slide-list > button { padding: 10px 12px !important; }
+#root .app-shell .verse-split-actions { border-left: 1px solid var(--fl-border) !important; }
+#root .app-shell .verse-split-actions button {
+  min-width: 36px !important;
+  color: var(--fl-text) !important;
+  border: 0 !important;
+  border-left: 1px solid var(--fl-border) !important;
+  background: transparent !important;
+  font-size: 13px !important;
+}
+#root .app-shell .verse-split-actions button:hover { background: var(--fl-subtle-hover) !important; }
+#root .app-shell .verse-split-actions button.selected { color: var(--fl-on-accent) !important; background: var(--fl-accent) !important; }
+#root .app-shell .bible-column-heading strong { padding: 0 7px; color: var(--fl-muted) !important; border-radius: 9px; background: var(--fl-control-fill) !important; font-size: 12px; font-weight: 400; }
+#root .app-shell :is(.bible-toolbar, .bible-verse-column, .bible-slide-column) { box-shadow: none !important; }
+#root .app-shell .bible-history-clear { height: 28px; padding: 0 8px !important; color: var(--fl-text) !important; border: 0 !important; border-radius: 4px !important; background: transparent !important; font-size: 13px !important; }
+#root .app-shell .bible-history-clear:hover:not(:disabled) { background: var(--fl-subtle-hover) !important; }
+#root .app-shell .bible-history-clear:disabled { color: var(--fl-tertiary) !important; opacity: 1 !important; }
+#root .app-shell :is(.bible-slide-empty, .win11-empty-state) svg { color: var(--fl-tertiary) !important; }

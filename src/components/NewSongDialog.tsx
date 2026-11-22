@@ -80,7 +80,7 @@ export function NewSongDialog({ onClose, onManual, onImport }: Props) {
 
         {mode === "choose" && (
           <>
-            <span className="eyebrow">NUEVO CANTO</span>
+            <span className="eyebrow">Nueva canción</span>
             <h2 id="new-song-dialog-title">¿Cómo querés crearlo?</h2>
             <p>Elegí cómo cargar la letra.</p>
             <div className="new-song-mode-grid">
@@ -116,7 +116,7 @@ export function NewSongDialog({ onClose, onManual, onImport }: Props) {
             <button type="button" className="song-dialog-back" onClick={() => setMode("choose")}>
               <ArrowLeft /> Volver
             </button>
-            <span className="eyebrow">CREACIÓN MANUAL</span>
+            <span className="eyebrow">Creación manual</span>
             <h2 id="new-song-dialog-title">Crear canción</h2>
             <p>Ingresá el título y luego escribí o pegá la letra en el editor.</p>
             <label>
@@ -140,7 +140,7 @@ export function NewSongDialog({ onClose, onManual, onImport }: Props) {
             <button type="button" className="song-dialog-back" onClick={() => setMode("choose")}>
               <ArrowLeft /> Volver
             </button>
-            <span className="eyebrow">BÚSQUEDA EN INTERNET</span>
+            <span className="eyebrow">Búsqueda en internet</span>
             <h2 id="new-song-dialog-title">Buscar letra</h2>
             <p>Indicá el título y, si lo conocés, el artista para mejorar los resultados.</p>
             <form

@@ -660,7 +660,7 @@ export function BibleOperator({
         <section className="bible-verse-column">
           <div className="bible-column-heading">
             <div>
-              <span>VERSÍCULOS</span>
+              <span>Versículos</span>
               <strong>{displayedVerses.length}</strong>
             </div>
             <small>
@@ -727,7 +727,7 @@ export function BibleOperator({
         <section className="bible-slide-column">
           <div className="bible-column-heading">
             <div>
-              <span>HISTORIAL DE PROYECCIÓN</span>
+              <span>Historial</span>
               <strong>{history.length || "—"}</strong>
             </div>
             <button
@@ -792,7 +792,7 @@ export function BibleOperator({
           <section className="bible-split-dialog" role="dialog" aria-modal="true" aria-label="Editar división del versículo">
             <header>
               <div>
-                <span>DIVISIÓN A/B</span>
+                <span>División A/B</span>
                 <h3>{splitEditor.verse.book} {splitEditor.verse.chapter}:{splitEditor.verse.verse}</h3>
               </div>
               <button type="button" onClick={() => setSplitEditor(null)} aria-label="Cerrar"><X /></button>

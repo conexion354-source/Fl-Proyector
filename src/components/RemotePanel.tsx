@@ -70,7 +70,7 @@ export function RemotePanel({
     <section className="remote-panel-page">
       <div className="section-title">
         <div>
-          <span className="eyebrow">CONTROL REMOTO</span>
+          <span className="eyebrow">Control remoto</span>
           <h2>Conectá un teléfono</h2>
         </div>
       </div>
@@ -129,7 +129,7 @@ export function RemotePanel({
       <section className={`remote-full-control ${fullControlEnabled ? "enabled" : ""}`}>
         <div className="remote-full-control-icon"><Music2 /></div>
         <div>
-          <span className="eyebrow">PERMISO TEMPORAL</span>
+          <span className="eyebrow">Permiso temporal</span>
           <h3>App · Control total</h3>
           <p>
             Habilita en el teléfono las canciones del orden del culto, sus
@@ -154,7 +154,7 @@ export function RemotePanel({
 
       <section className="collaborator-section">
         <header className="collaborator-heading">
-          <div><span className="eyebrow">ACCESO DE EQUIPO</span><h3>Colaborador</h3></div>
+          <div><span className="eyebrow">Acceso de equipo</span><h3>Colaborador</h3></div>
         </header>
         <div className="collaborator-card">
           <p>Permite editar canciones y preparar reuniones desde otra computadora de la misma red. No permite controlar el proyector.</p>

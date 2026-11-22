@@ -95,13 +95,18 @@ const sections: Array<{
   icon: ReactNode;
 }> = [
   { id: "pantalla", label: "Pantallas", description: "Proyector, resolución y salidas adicionales", icon: <MonitorCog /> },
-  { id: "texto", label: "Texto en pantalla", description: "Tamaño y reparto del texto, igual para Biblia y canciones", icon: <Type /> },
+  { id: "texto", label: "Texto en pantalla", description: "Letra, tamaño y diseño de la Biblia y las canciones", icon: <Type /> },
   { id: "iglesia", label: "Iglesia y logo", description: "Nombre, dirección y logo que se proyecta", icon: <Building2 /> },
-  { id: "biblias", label: "Biblias", description: "Versiones instaladas y diseño de los versículos", icon: <BookOpen /> },
-  { id: "canciones", label: "Canciones", description: "Diseño global de las letras proyectadas", icon: <Music2 /> },
   { id: "tema", label: "Apariencia", description: "Tema claro u oscuro de la aplicación", icon: <Palette /> },
   { id: "atajos", label: "Atajos de teclado", description: "Teclas rápidas para operar en vivo", icon: <Keyboard /> },
   { id: "version", label: "Actualizaciones", description: "Versión instalada y novedades", icon: <BadgeInfo /> },
+];
+
+/** Pestañas de "Texto en pantalla": lo común y lo propio de cada tipo. */
+const textTabs: Array<{ id: Section; label: string }> = [
+  { id: "texto", label: "General" },
+  { id: "biblias", label: "Biblia" },
+  { id: "canciones", label: "Canciones" },
 ];
 
 const referenceDesigns: Array<{
@@ -121,6 +126,9 @@ const referenceDesigns: Array<{
 
 /** Parámetros de tamaño y reparto compartidos por Biblia y canciones. */
 type TextLayout = {
+  fontFamily: string;
+  textColor: string;
+  uppercase: boolean;
   size: number;
   growPercent: number;
   shrinkPercent: number;
@@ -131,6 +139,9 @@ type TextLayout = {
 };
 
 const initialLayout: TextLayout = {
+  fontFamily: initialBibleDisplaySettings.textFontFamily,
+  textColor: initialBibleDisplaySettings.textColor,
+  uppercase: initialBibleDisplaySettings.uppercase,
   size: initialBibleDisplaySettings.textFontSize,
   growPercent: initialBibleDisplaySettings.growPercent,
   shrinkPercent: initialBibleDisplaySettings.shrinkPercent,
@@ -143,6 +154,9 @@ const initialLayout: TextLayout = {
 function withBibleLayout(value: BibleDisplaySettings, layout: TextLayout): BibleDisplaySettings {
   return {
     ...value,
+    textFontFamily: layout.fontFamily,
+    textColor: layout.textColor,
+    uppercase: layout.uppercase,
     textFontSize: layout.size,
     growPercent: layout.growPercent,
     shrinkPercent: layout.shrinkPercent,
@@ -156,6 +170,9 @@ function withBibleLayout(value: BibleDisplaySettings, layout: TextLayout): Bible
 function withSongLayout(value: SongDisplaySettings, layout: TextLayout): SongDisplaySettings {
   return {
     ...value,
+    fontFamily: layout.fontFamily,
+    textColor: layout.textColor,
+    uppercase: layout.uppercase,
     fontSize: layout.size,
     growPercent: layout.growPercent,
     shrinkPercent: layout.shrinkPercent,
@@ -680,6 +697,9 @@ export function SettingsPanel({
       setBible(normalized);
       setSavedBible(normalized);
       const fromBible: Partial<TextLayout> = {
+        fontFamily: normalized.textFontFamily,
+        textColor: normalized.textColor,
+        uppercase: normalized.uppercase,
         size: normalized.textFontSize,
         growPercent: normalized.growPercent,
         shrinkPercent: normalized.shrinkPercent,
@@ -908,7 +928,14 @@ export function SettingsPanel({
         bibleStyle: nextBible,
         songStyle: nextSong,
         ...(state.text.kind === "biblia" || state.text.kind === "canto"
-          ? { text: { ...state.text, fontSize: layout.size } }
+          ? {
+              text: {
+                ...state.text,
+                fontSize: layout.size,
+                fontFamily: layout.fontFamily,
+                color: layout.textColor,
+              },
+            }
           : {}),
       });
       setSavedBible(nextBible);
@@ -922,7 +949,7 @@ export function SettingsPanel({
   const calculateIdealSize = () => {
     const ideal = idealSizeFor(
       [typicalVerse],
-      { fontFamily: bible.textFontFamily, uppercase: bible.uppercase },
+      { fontFamily: layout.fontFamily, uppercase: layout.uppercase },
       bibleTextBox(layoutBible, state.outputViewport),
     );
     setLayout((value) => ({ ...value, size: Math.max(24, Math.min(200, ideal)) }));
@@ -1131,7 +1158,8 @@ export function SettingsPanel({
     }
   };
 
-  const current = sections.find((item) => item.id === section)!;
+  const navSection: Section = section === "biblias" || section === "canciones" ? "texto" : section;
+  const current = sections.find((item) => item.id === navSection)!;
   const savable = section in dirty;
 
   /* ------------------------------------------------------------------------ */
@@ -1141,19 +1169,24 @@ export function SettingsPanel({
       <aside className="w11-settings-nav" aria-label="Secciones de ajustes">
         <h2>Ajustes</h2>
         <nav>
-          {sections.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              className={section === item.id ? "active" : ""}
-              aria-current={section === item.id ? "page" : undefined}
-              onClick={() => setSection(item.id)}
-            >
-              {item.id === "tema" ? (theme === "dark" ? <Moon /> : <Sun />) : item.icon}
-              <span>{item.label}</span>
-              {dirty[item.id] && <i className="w11-dirty-dot" title="Cambios sin guardar" />}
-            </button>
-          ))}
+          {sections.map((item) => {
+            const active = navSection === item.id;
+            const itemDirty =
+              item.id === "texto" ? textTabs.some((tab) => dirty[tab.id]) : dirty[item.id];
+            return (
+              <button
+                type="button"
+                key={item.id}
+                className={active ? "active" : ""}
+                aria-current={active ? "page" : undefined}
+                onClick={() => setSection(item.id)}
+              >
+                {item.id === "tema" ? (theme === "dark" ? <Moon /> : <Sun />) : item.icon}
+                <span>{item.label}</span>
+                {itemDirty && <i className="w11-dirty-dot" title="Cambios sin guardar" />}
+              </button>
+            );
+          })}
         </nav>
       </aside>
 
@@ -1163,6 +1196,22 @@ export function SettingsPanel({
             <span className="w11-breadcrumb">Ajustes</span>
             <h1>{current.label}</h1>
             <p>{current.description}</p>
+            {navSection === "texto" && (
+              <nav className="w11-pivot" aria-label="Partes de Texto en pantalla">
+                {textTabs.map((tab) => (
+                  <button
+                    type="button"
+                    key={tab.id}
+                    className={section === tab.id ? "active" : ""}
+                    aria-current={section === tab.id ? "page" : undefined}
+                    onClick={() => setSection(tab.id)}
+                  >
+                    {tab.label}
+                    {dirty[tab.id] && <i className="w11-dirty-dot" title="Cambios sin guardar" />}
+                  </button>
+                ))}
+              </nav>
+            )}
           </header>
 
           {/* ============================ PANTALLAS ============================ */}
@@ -1356,10 +1405,31 @@ export function SettingsPanel({
           {/* ======================== TEXTO EN PANTALLA ======================== */}
           {section === "texto" && (
             <>
-              <p className="w11-infobar">
-                Estos valores se usan igual para la Biblia y para las canciones. El texto se agranda o se achica solo
-                dentro del rango que elijas, así un texto corto no queda gigante al lado de uno largo.
-              </p>
+
+              <SettingsGroup title="Letra">
+                <SettingRow title="Tipo de letra">
+                  <FontSelect
+                    label="Tipo de letra"
+                    value={layout.fontFamily}
+                    onChange={(fontFamily) => setLayout((value) => ({ ...value, fontFamily }))}
+                  />
+                </SettingRow>
+                <SettingRow title="Color">
+                  <ColorPicker
+                    label="Color del texto"
+                    value={layout.textColor}
+                    colors={textColors}
+                    onChange={(textColor) => setLayout((value) => ({ ...value, textColor }))}
+                  />
+                </SettingRow>
+                <SettingRow title="Todo en mayúsculas" description="Solo cambia lo que se proyecta.">
+                  <Toggle
+                    label="Todo en mayúsculas"
+                    checked={layout.uppercase}
+                    onChange={(uppercase) => setLayout((value) => ({ ...value, uppercase }))}
+                  />
+                </SettingRow>
+              </SettingsGroup>
 
               <SettingsGroup title="Tamaño">
                 <SettingRow
@@ -1768,29 +1838,7 @@ export function SettingsPanel({
                 </SettingRow>
               </SettingsGroup>
 
-              <SettingsGroup title="Texto del versículo">
-                <SettingRow title="Tipo de letra">
-                  <FontSelect
-                    label="Tipo de letra del versículo"
-                    value={bible.textFontFamily}
-                    onChange={(textFontFamily) => setBible((v) => ({ ...v, textFontFamily }))}
-                  />
-                </SettingRow>
-                <SettingRow title="Color">
-                  <ColorPicker
-                    label="Color del versículo"
-                    value={bible.textColor}
-                    colors={textColors}
-                    onChange={(textColor) => setBible((v) => ({ ...v, textColor }))}
-                  />
-                </SettingRow>
-                <SettingRow title="Todo en mayúsculas" description="Solo cambia lo que se proyecta.">
-                  <Toggle
-                    label="Versículo en mayúsculas"
-                    checked={bible.uppercase}
-                    onChange={(uppercase) => setBible((value) => ({ ...value, uppercase }))}
-                  />
-                </SettingRow>
+              <SettingsGroup title="Lectura sobre fondos">
                 <SettingExpander
                   title="Sombra del texto"
                   description="Mejora la lectura sobre imágenes y videos."
@@ -1828,31 +1876,6 @@ export function SettingsPanel({
           {/* ============================ CANCIONES ============================ */}
           {section === "canciones" && (
             <>
-              <SettingsGroup title="Texto">
-                <SettingRow title="Tipo de letra">
-                  <FontSelect
-                    label="Tipo de letra de las canciones"
-                    value={songStyle.fontFamily}
-                    onChange={(fontFamily) => setSongStyle((value) => ({ ...value, fontFamily }))}
-                  />
-                </SettingRow>
-                <SettingRow title="Color">
-                  <ColorPicker
-                    label="Color del texto"
-                    value={songStyle.textColor}
-                    colors={textColors}
-                    onChange={(textColor) => setSongStyle((value) => ({ ...value, textColor }))}
-                  />
-                </SettingRow>
-                <SettingRow title="Todo en mayúsculas" description="Solo cambia lo que se proyecta.">
-                  <Toggle
-                    label="Letra en mayúsculas"
-                    checked={songStyle.uppercase}
-                    onChange={(uppercase) => setSongStyle((value) => ({ ...value, uppercase }))}
-                  />
-                </SettingRow>
-              </SettingsGroup>
-
               <SettingsGroup title="Ubicación y fondo">
                 <SettingRow title="Posición">
                   <Select

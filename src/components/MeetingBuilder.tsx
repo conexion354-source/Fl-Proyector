@@ -1514,7 +1514,7 @@ export function MeetingBuilder({
                   <strong>{item.title}</strong>
                   <span>{itemLabels[item.type]}</span>
                 </div>
-                {itemOnAir && <em className="rundown-on-air">AL AIRE</em>}
+                {itemOnAir && <em className="rundown-on-air">Al aire</em>}
               </article>
             );
           })}
@@ -1799,7 +1799,7 @@ export function MeetingBuilder({
             >
               <X />
             </button>
-            <span className="eyebrow">RENOMBRAR REUNIÓN</span>
+            <span className="eyebrow">Renombrar reunión</span>
             <h2>Editar nombre</h2>
             <p>Este cambio se verá en la lista de reuniones guardadas.</p>
             <label>
@@ -1913,7 +1913,7 @@ export function MeetingBuilder({
             >
               <X />
             </button>
-            <span className="eyebrow">FONDO DEL ÍTEM</span>
+            <span className="eyebrow">Fondo del elemento</span>
             <h2>{backgroundTarget.title}</h2>
             <p>
               Elegí un fondo exclusivo para este ítem, o dejalo sin asignar para
@@ -1940,7 +1940,7 @@ export function MeetingBuilder({
         <div className="modal-backdrop preview-only-backdrop" onMouseDown={() => { setPreviewDraft(null); void window.flProyector.clearPreviewState(); }}>
           <div className="preview-only-dialog" role="dialog" aria-modal="true" aria-label="Vista previa sin proyectar" onMouseDown={(event) => event.stopPropagation()}>
             <header>
-              <span className="eyebrow">VISTA PREVIA</span>
+              <span className="eyebrow">Vista previa</span>
               <button type="button" className="dialog-close" aria-label="Cerrar" onClick={() => { setPreviewDraft(null); void window.flProyector.clearPreviewState(); }}><X /></button>
             </header>
             <p>Así se vería en la pantalla. Todavía no se envió al proyector.</p>
@@ -2027,7 +2027,7 @@ function MeetingStanzaEditDialog({
         >
           <X />
         </button>
-        <span className="eyebrow">EDITAR SÓLO ESTA PARTE</span>
+        <span className="eyebrow">Editar solo esta parte</span>
         <h2 id="meeting-stanza-edit-title">{label}</h2>
         <p>
           Enter crea una nueva estrofa al guardar. Shift + Enter agrega una
@@ -2108,7 +2108,7 @@ function ItemSummary({
           <small>{itemLabels[item.type]}</small>
           <h3>{item.title}</h3>
         </div>
-        {isOnAir && <strong className="summary-on-air">AL AIRE</strong>}
+        {isOnAir && <strong className="summary-on-air">Al aire</strong>}
       </div>
       {song ? (
         <>
@@ -2272,7 +2272,7 @@ function PresentationSummary({
         <i className={active ? "live" : ""} />
         <div>
           <strong>
-            {active ? "PRESENTACIÓN AL AIRE" : "LISTA PARA PRESENTAR"}
+            {active ? "Presentación al aire" : "Lista para presentar"}
           </strong>
           <span>
             {count
@@ -2323,7 +2323,7 @@ function LibraryPicker({
         <button type="button" className="dialog-close" aria-label="Cerrar" onClick={onClose}>
           <X />
         </button>
-        <span className="eyebrow">AGREGAR A LA REUNIÓN</span>
+        <span className="eyebrow">Agregar a la reunión</span>
         <h2>
           {type === "song"
             ? "Seleccionar canción"
@@ -2469,7 +2469,7 @@ function BiblePicker({
         <button type="button" className="dialog-close" aria-label="Cerrar" onClick={onClose}>
           <X />
         </button>
-        <span className="eyebrow">AGREGAR CITA A LA REUNIÓN</span>
+        <span className="eyebrow">Agregar cita a la reunión</span>
         <h2>Seleccionar pasaje bíblico</h2>
         <div className="bible-picker-controls">
           <label>
@@ -2633,7 +2633,7 @@ function ItemEditor({
           <>
             <div className="item-editor-heading">
               <span className="eyebrow">
-                EDITAR {itemLabels[item.type].toUpperCase()}
+                Editar {itemLabels[item.type].toLowerCase()}
               </span>
             </div>
             {item.type !== "song" && (
