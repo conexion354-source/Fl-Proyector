@@ -895,3 +895,239 @@ html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); 
 .w11-sample-grid strong { font-size: 13px; font-weight: 600; }
 .w11-sample-grid small { color: var(--fl-muted); font-size: 12px; }
 @container w11 (max-width: 500px) { .w11-sample-grid { grid-template-columns: 1fr; } .w11-size-band { grid-template-columns: 1fr 1fr 1fr; } .w11-size-band i { grid-column: 1 / -1; grid-row: 2; } }
+
+/* ==========================================================================
+   Editor de anuncios (y textos bíblicos de la reunión)
+   ========================================================================== */
+#root .app-shell .item-edit-dialog.visual-dialog {
+  width: min(1240px, calc(100vw - 48px)) !important;
+  max-width: none !important;
+  height: min(860px, calc(100vh - 48px)) !important;
+  max-height: none !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid var(--fl-border-strong) !important;
+  border-radius: 8px !important;
+  background: var(--fl-bg) !important;
+  box-shadow: 0 32px 64px #00000066, 0 2px 21px #00000038 !important;
+}
+#root .app-shell .item-edit-dialog.visual-dialog > .dialog-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 6;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: var(--fl-muted) !important;
+  border: 0 !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+}
+#root .app-shell .item-edit-dialog.visual-dialog > .dialog-close:hover { color: var(--fl-text) !important; background: var(--fl-subtle-hover) !important; }
+#root .app-shell .pro-editor {
+  display: grid !important;
+  height: 100% !important;
+  max-height: none !important;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 42%) !important;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+#root .app-shell .pro-editor > .item-editor-controls {
+  min-height: 0;
+  max-height: none !important;
+  overflow-y: auto;
+  padding: 0 28px 24px !important;
+}
+.pro-editor-header {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 -28px 8px;
+  padding: 22px 28px 14px;
+  border-bottom: 1px solid var(--fl-border);
+  background: var(--fl-bg);
+}
+.pro-editor-kicker { display: inline-flex; align-items: center; gap: 8px; color: var(--fl-muted); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; }
+.pro-editor-kicker svg { width: 16px; height: 16px; color: var(--fl-accent); }
+#root .app-shell .pro-editor-title {
+  width: 100%;
+  height: 40px;
+  margin-left: -9px;
+  padding: 0 8px !important;
+  color: var(--fl-text) !important;
+  border: 1px solid transparent !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  font-family: var(--fl-font-display) !important;
+  font-size: 24px !important;
+  font-weight: 600 !important;
+}
+#root .app-shell .pro-editor-title:hover { background: var(--fl-control-fill) !important; border-color: var(--fl-control-stroke) !important; }
+#root .app-shell .pro-editor-title:focus { outline: 0 !important; background: var(--fl-surface) !important; border-color: var(--fl-control-stroke) !important; border-bottom: 2px solid var(--fl-accent) !important; }
+.pro-editor-header > small { color: var(--fl-tertiary); font-size: 12px; }
+
+.pro-section { display: flex; flex-direction: column; gap: 10px; padding: 18px 0; border-bottom: 1px solid var(--fl-border); }
+.pro-section:last-child { border-bottom: 0; }
+.pro-section h3,
+#root .app-shell .pro-section-title { margin: 0; color: var(--fl-text) !important; font-size: 14px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; }
+.pro-section-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 24px; align-items: start; }
+.pro-section-row > div { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
+@container (max-width: 640px) { .pro-section-row { grid-template-columns: 1fr; } }
+
+/* Contenido */
+.pro-content-section .announcement-rich { display: flex; flex-direction: column; gap: 10px; }
+#root .app-shell .pro-content-section .announcement-editor {
+  min-height: 150px;
+  padding: 14px 16px !important;
+  color: var(--fl-text) !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-bottom-color: var(--fl-control-stroke-bottom) !important;
+  border-radius: 6px !important;
+  background: #111 !important;
+  font-size: 22px;
+  line-height: 1.35;
+}
+html[data-theme="light"] #root .app-shell .pro-content-section .announcement-editor { background: #1f1f1f !important; color: #fff !important; }
+#root .app-shell .pro-content-section .announcement-editor:focus-within { border-bottom: 2px solid var(--fl-accent) !important; }
+.pro-content-section .announcement-rich > small,
+.pro-content-section .announcement-page-note { color: var(--fl-tertiary) !important; font-size: 12px !important; line-height: 1.45; }
+
+/* Tarjetas de elección (ubicación y estilo) */
+#root .app-shell .pro-choice-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)) !important; gap: 8px !important; margin: 0 !important; }
+#root .app-shell .pro-choice-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+@container (max-width: 640px) { #root .app-shell .pro-choice-grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+#root .app-shell .pro-choice-grid button {
+  position: relative;
+  display: flex !important;
+  min-width: 0;
+  height: auto !important;
+  min-height: 0 !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  padding: 10px !important;
+  color: var(--fl-text) !important;
+  text-align: left !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-radius: 6px !important;
+  background: var(--fl-surface) !important;
+  box-shadow: var(--fl-card-shadow) !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  cursor: pointer;
+}
+#root .app-shell .pro-choice-grid button:hover { background: var(--fl-hover) !important; }
+#root .app-shell .pro-choice-grid button.active { border-color: var(--fl-accent) !important; background: var(--fl-accent-soft) !important; box-shadow: inset 0 0 0 1px var(--fl-accent) !important; }
+#root .app-shell .pro-choice-grid button > i { width: 100% !important; height: 46px !important; margin: 0 !important; border-radius: 4px !important; }
+#root .app-shell .pro-choice-grid button > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 13px !important; font-weight: 600 !important; line-height: 1.25; }
+#root .app-shell .pro-choice-grid button > span strong { font-size: 13px; font-weight: 600; }
+#root .app-shell .pro-choice-grid button > span small { color: var(--fl-muted); font-size: 11.5px; font-weight: 400; }
+#root .app-shell .pro-choice-grid button > em {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 6px;
+  color: var(--fl-muted);
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 8px;
+  background: var(--fl-bg);
+  font-size: 10px;
+  font-style: normal;
+}
+
+/* Colores */
+.pro-color-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 4px; }
+.pro-color-row > span { color: var(--fl-muted); font-size: 13px; }
+#root .app-shell .pro-color-row .preset-palette { display: block !important; margin: 0 !important; padding: 0 !important; border: 0 !important; }
+#root .app-shell .pro-color-row .preset-palette > div { display: flex !important; flex-wrap: wrap; gap: 6px !important; }
+#root .app-shell .pro-color-row .preset-palette button { width: 26px !important; height: 26px !important; min-width: 0 !important; padding: 0 !important; border: 1px solid #80808055 !important; border-radius: 50% !important; cursor: pointer; }
+#root .app-shell .pro-color-row .preset-palette button.active { outline: 2px solid var(--fl-accent) !important; outline-offset: 2px; }
+.pro-custom-color { display: inline-flex; align-items: center; gap: 6px; color: var(--fl-text); font-size: 13px; cursor: pointer; }
+.pro-custom-color input { width: 26px; height: 26px; padding: 0; border: 1px solid var(--fl-control-stroke); border-radius: 50%; background: none; cursor: pointer; overflow: hidden; }
+
+/* Botones segmentados */
+.pro-segmented { display: inline-flex; flex-wrap: nowrap; align-self: flex-start; padding: 2px; border: 1px solid var(--fl-control-stroke); border-radius: 5px; background: var(--fl-control-fill); }
+.pro-segmented.wrap { flex-wrap: wrap; }
+.pro-segmented button { display: inline-grid; min-width: 36px; height: 30px; place-items: center; padding: 0 11px; color: var(--fl-text); border: 0; border-radius: 3px; background: transparent; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.pro-segmented button svg { width: 16px; height: 16px; }
+.pro-segmented button:hover:not(.active) { background: var(--fl-subtle-hover); }
+.pro-segmented button.active { color: var(--fl-on-accent); background: var(--fl-accent); font-weight: 600; }
+#root .app-shell .pro-number { width: 96px; height: 34px; padding: 0 10px !important; }
+
+/* Vista previa */
+#root .app-shell .pro-editor > .announcement-preview {
+  position: relative !important;
+  top: auto !important;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  align-self: stretch !important;
+  margin: 0 !important;
+  padding: 58px 24px 24px !important;
+  border: 0 !important;
+  border-left: 1px solid var(--fl-border) !important;
+  border-radius: 0 !important;
+  background: var(--fl-sidebar) !important;
+}
+#root .app-shell .pro-editor .preview-heading { margin-bottom: 12px; color: var(--fl-text) !important; font-size: 13px !important; font-weight: 600 !important; letter-spacing: 0 !important; }
+#root .app-shell .pro-editor .preview-heading small { color: var(--fl-tertiary) !important; font-size: 12px !important; font-weight: 400 !important; }
+#root .app-shell .pro-editor .designer-preview { border: 1px solid var(--fl-border-strong) !important; border-radius: 6px !important; box-shadow: 0 8px 24px #00000059 !important; }
+#root .app-shell .pro-editor .announcement-preview > p { margin-top: 12px !important; color: var(--fl-muted) !important; font-size: 12px !important; }
+#root .app-shell .pro-editor .preview-editor-button { border-radius: 5px !important; }
+
+/* Barra inferior */
+.pro-editor-footer {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--fl-border);
+  background: var(--fl-sidebar);
+}
+.pro-editor-footer-note { margin-right: auto; color: var(--fl-tertiary); font-size: 12px; }
+.pro-button {
+  display: inline-flex;
+  min-width: 110px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  color: var(--fl-text);
+  border: 1px solid var(--fl-control-stroke);
+  border-bottom-color: var(--fl-control-stroke-bottom);
+  border-radius: 4px;
+  background: var(--fl-control-fill);
+  font-size: 14px;
+  cursor: pointer;
+}
+.pro-button:hover { background: var(--fl-control-hover); }
+.pro-button svg { width: 16px; height: 16px; }
+.pro-button.accent { color: var(--fl-on-accent); border-color: transparent; border-bottom-color: #00000033; background: var(--fl-accent); font-weight: 600; }
+.pro-button.accent:hover { background: var(--fl-accent-hover); }
+.pro-button.danger { min-width: 0; color: var(--fl-danger); border-color: transparent; background: transparent; }
+.pro-button.danger:hover { background: var(--fl-danger-soft); }
+.pro-editor-footer .pro-button.danger + .pro-editor-footer-note { margin-left: 4px; }
+#root .app-shell .item-edit-dialog.visual-dialog { container-type: inline-size; }
+@container (max-width: 860px) {
+  #root .app-shell .pro-editor { grid-template-columns: 1fr !important; grid-template-rows: auto minmax(0, 1fr) auto; }
+  #root .app-shell .pro-editor > .announcement-preview { grid-row: 1; padding: 52px 20px 12px !important; border-left: 0 !important; border-bottom: 1px solid var(--fl-border) !important; }
+  #root .app-shell .pro-editor > .announcement-preview .designer-preview { max-height: 200px; }
+}
+#root .app-shell .pro-editor .announcement-toolbar {
+  height: auto;
+  min-height: 44px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-radius: 6px !important;
+  background: var(--fl-surface) !important;
+}
