@@ -96,7 +96,17 @@ export function RemotePanel({
               <p className="remote-webapp-note">
                 Abrila en el navegador y elegí <b>Instalar app</b> o <b>Agregar a pantalla de inicio</b>.
                 Después detectará el sistema de la red Wi-Fi actual y cargará sus reuniones; no necesita Internet.
-                Si una red bloquea la detección, escaneá este QR nuevamente.
+              </p>
+              <p className="remote-manual-address">
+                Si el teléfono no encuentra la PC solo, escribí esta dirección en la app
+                (Android: «Escanear código QR» o escribila y tocá «Conectar al proyector»; iPhone: el cuadro «Conectar» de la app):
+                <b>{(() => {
+                  try {
+                    return new URL(url).hostname;
+                  } catch {
+                    return url;
+                  }
+                })()}</b>
               </p>
               {window.flProyector.platform === "win32" && (
                 <div className={`remote-firewall ${firewallResult ?? ""}`}>

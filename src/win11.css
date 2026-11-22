@@ -1547,3 +1547,5 @@ html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); 
 #root .app-shell .pro-content-section .announcement-editor .tiptap { font-size: 20px !important; line-height: 1.4 !important; }
 .w11-hint { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding: 10px 12px 10px 16px; color: var(--fl-muted); border: 1px solid var(--fl-control-stroke); border-radius: 6px; background: var(--fl-surface-alt); font-size: 13px; }
 .w11-hint span { flex: 1; }
+.remote-manual-address { margin: 10px 0 0; color: var(--fl-muted); font-size: 13px; line-height: 1.5; }
+.remote-manual-address b { display: block; margin-top: 4px; color: var(--fl-text); font-family: var(--fl-font-display); font-size: 26px; font-weight: 600; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
