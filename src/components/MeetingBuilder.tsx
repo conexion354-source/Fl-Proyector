@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Color from "@tiptap/extension-color";
@@ -160,12 +160,32 @@ function announcementPages(payload: Record<string, unknown>) {
 
 function announcementListTitle(pages: string[]) {
   const holder = document.createElement("div");
-  holder.innerHTML = pages.join(" ");
+  // Cada renglón (p, br, div, h…) se separa con un espacio: antes
+  // "Bienvenidos" + "Enseguida comenzamos" quedaba "BienvenidosEnseguida".
+  holder.innerHTML = pages
+    .join(" ")
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/(p|div|h[1-6]|li|blockquote)>/gi, "</$1> ");
   const text = (holder.textContent || "").replace(/\s+/g, " ").trim();
   if (!text) return "Nuevo anuncio";
   if (text.length <= 58) return text;
   const shortened = text.slice(0, 58).replace(/\s+\S*$/, "").trim();
   return `${shortened || text.slice(0, 55).trim()}…`;
+}
+
+/** Título para mostrar: los anuncios con título automático se recalculan. */
+function displayItemTitle(item: MeetingItem) {
+  if (item.type !== "announcement") return item.title;
+  const pages = announcementPages(item.payload as Record<string, unknown>);
+  if (announcementHasAutomaticTitle(item)) return announcementListTitle(pages);
+  // Títulos automáticos guardados antes, con los renglones pegados.
+  const holder = document.createElement("div");
+  holder.innerHTML = pages.join(" ");
+  const glued = (holder.textContent || "").replace(/\s+/g, " ").trim();
+  const title = item.title.replace(/…$/, "").trim();
+  if (title && glued.startsWith(title) && !announcementListTitle(pages).startsWith(title))
+    return announcementListTitle(pages);
+  return item.title;
 }
 
 function announcementHasAutomaticTitle(item: MeetingItem) {
@@ -1603,7 +1623,7 @@ export function MeetingBuilder({
                 <b>{index + 1}</b>
                 <Icon />
                 <div>
-                  <strong>{item.title}</strong>
+                  <strong>{displayItemTitle(item)}</strong>
                   <span>{itemLabels[item.type]}</span>
                 </div>
                 {itemOnAir && <em className="rundown-on-air">Al aire</em>}
@@ -2199,6 +2219,12 @@ function ItemSummary({
 }) {
   const payload = item.payload as any;
   const song = songs.find((value) => value.id === Number(payload.songId));
+  // La estrofa activa siempre queda a la vista al avanzar con el teclado.
+  const rowsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const row = rowsRef.current?.querySelector<HTMLElement>(".stanza-row.is-active");
+    row?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [activeStanza, item.id]);
   // Los videos e imágenes agregados solo a la reunión viajan dentro del
   // elemento (meetingMedia); antes el panel no los mostraba.
   const medium =
@@ -2225,7 +2251,7 @@ function ItemSummary({
         <span style={{ background: item.color }} />
         <div>
           <small>{itemLabels[item.type]}</small>
-          <h3>{item.title}</h3>
+          <h3>{displayItemTitle(item)}</h3>
         </div>
         {isOnAir && <strong className="summary-on-air">Al aire</strong>}
       </div>
@@ -2278,27 +2304,28 @@ function ItemSummary({
             </button>
           </div>
           <div
-            className={`stanza-list ${stanzaCardScale <= 0.66 ? "is-compact" : ""} ${stanzaCardScale <= 0.52 ? "is-ultra-compact" : ""}`}
+            ref={rowsRef}
+            className="stanza-rows"
             style={{ "--stanza-card-scale": stanzaCardScale } as CSSProperties}
           >
-            {(stanzas.length ? stanzas : [song.content]).map(
-              (stanza, index) => (
-                <button
-                  className={activeStanza === index ? "active" : ""}
-                  data-section-type={sectionTypes[index] || "verse"}
-                  onClick={() => onStanza(index)}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onStanzaContextMenu(index, event.clientX, event.clientY);
-                  }}
-                  key={index}
-                >
-                  <b>{songSectionLabel(sectionTypes, index).toLocaleUpperCase("es-AR")}</b>
-                  <div dangerouslySetInnerHTML={{ __html: stanza }} />
-                </button>
-              ),
-            )}
+            {(stanzas.length ? stanzas : [song.content]).map((stanza, index) => (
+              <StanzaRow
+                key={index}
+                index={index}
+                label={songSectionLabel(sectionTypes, index)}
+                sectionType={sectionTypes[index] || "verse"}
+                html={stanza}
+                active={activeStanza === index}
+                live={isOnAir && activeStanza === index}
+                next={isOnAir && activeStanza + 1 === index}
+                onClick={() => onStanza(index)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onStanzaContextMenu(index, event.clientX, event.clientY);
+                }}
+              />
+            ))}
           </div>
         </>
       ) : item.type === "bible" && scriptureSections.length ? (
@@ -2321,16 +2348,19 @@ function ItemSummary({
               <ChevronDown />
             </button>
           </div>
-          <div className="stanza-list bible-section-list">
+          <div ref={rowsRef} className="stanza-rows bible-section-list">
             {scriptureSections.map((section, index) => (
-              <button
-                className={activeStanza === index ? "active" : ""}
-                onClick={() => onStanza(index)}
+              <StanzaRow
                 key={index}
-              >
-                <b>{section.label}</b>
-                <div dangerouslySetInnerHTML={{ __html: section.html }} />
-              </button>
+                index={index}
+                label={section.label}
+                sectionType="scripture"
+                html={section.html}
+                active={activeStanza === index}
+                live={isOnAir && activeStanza === index}
+                next={isOnAir && activeStanza + 1 === index}
+                onClick={() => onStanza(index)}
+              />
             ))}
           </div>
         </>
@@ -3711,5 +3741,57 @@ function CaptureSourcePicker({
         </footer>
       </section>
     </div>
+  );
+}
+
+/** Fila de estrofa o pasaje: número, etiqueta, estado y texto. */
+function StanzaRow({
+  index,
+  label,
+  sectionType,
+  html,
+  active,
+  live,
+  next,
+  onClick,
+  onContextMenu,
+}: {
+  index: number;
+  label: string;
+  sectionType: string;
+  html: string;
+  active: boolean;
+  live: boolean;
+  next: boolean;
+  onClick: () => void;
+  onContextMenu?: (event: ReactMouseEvent) => void;
+}) {
+  const tag = label
+    ? label.charAt(0).toLocaleUpperCase("es-AR") + label.slice(1).toLocaleLowerCase("es-AR")
+    : "";
+  return (
+    <button
+      type="button"
+      className={`stanza-row ${active ? "is-active" : ""} ${live ? "is-live" : ""} ${next ? "is-next" : ""}`}
+      data-section-type={sectionType}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      aria-current={live ? "true" : undefined}
+    >
+      <span className="stanza-num">{index + 1}</span>
+      <span className="stanza-body">
+        <span className="stanza-head">
+          <span className="stanza-tag">{tag}</span>
+          {live ? (
+            <em className="stanza-state is-live">Al aire</em>
+          ) : next ? (
+            <em className="stanza-state is-next">Siguiente</em>
+          ) : active ? (
+            <em className="stanza-state">Seleccionada</em>
+          ) : null}
+        </span>
+        <div className="stanza-text" dangerouslySetInnerHTML={{ __html: html }} />
+      </span>
+    </button>
   );
 }

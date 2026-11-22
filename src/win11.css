@@ -1780,3 +1780,36 @@ html[data-theme="light"] select optgroup { color: #1b1b1b; background-color: #ff
 html select option:disabled { color: #8a8a8a; }
 html[data-theme="dark"] select option:checked { color: #ffffff; background-color: #3d3d3d; }
 html[data-theme="light"] select option:checked { color: #1b1b1b; background-color: #e5e5e5; }
+
+/* Lista de estrofas y pasajes (lista compacta): número, etiqueta, estado.
+   El rojo marca solo lo que está al aire; el azul, lo que sigue. */
+#root .stanza-rows { --stanza-card-scale: 1; display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 4px; overflow-y: auto; padding: 2px 4px 8px 0; }
+#root .stanza-row { position: relative; display: flex; width: 100%; align-items: flex-start; gap: 10px; margin: 0; padding: calc(8px * var(--stanza-card-scale)) 12px calc(8px * var(--stanza-card-scale)) 10px; color: var(--fl-text); border: 1px solid var(--fl-border); border-radius: 6px; background: var(--fl-surface); box-shadow: none; text-align: left; cursor: pointer; transition: background 100ms ease, border-color 100ms ease; }
+#root .stanza-row:hover { border-color: var(--fl-control-stroke); background: var(--fl-subtle-hover); }
+#root .stanza-row::before { content: ""; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 3px; border-radius: 6px 0 0 6px; background: transparent; }
+#root .stanza-row.is-active { border-color: var(--fl-accent); }
+#root .stanza-row.is-active::before { background: var(--fl-accent); }
+#root .stanza-row.is-live { border-color: #c42b1c; background: color-mix(in srgb, #c42b1c 10%, var(--fl-surface)); }
+#root .stanza-row.is-live::before { background: #e81123; }
+#root .stanza-row.is-next::before { background: var(--fl-accent); }
+#root .stanza-num { flex: 0 0 18px; padding-top: 1px; color: var(--fl-muted); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+#root .stanza-row.is-live .stanza-num { color: #e81123; font-weight: 600; }
+#root .stanza-body { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+#root .stanza-head { display: flex; min-height: 18px; align-items: center; gap: 8px; }
+#root .stanza-tag { display: inline-flex; height: 18px; align-items: center; padding: 0 6px; color: var(--fl-muted); border-radius: 4px; background: var(--fl-control-fill); font-size: 11px; font-weight: 600; letter-spacing: 0; white-space: nowrap; }
+#root .stanza-row[data-section-type="chorus"] .stanza-tag { color: #6d28d9; background: rgba(124, 58, 237, 0.12); }
+#root .stanza-row[data-section-type="prechorus"] .stanza-tag,
+#root .stanza-row[data-section-type="bridge"] .stanza-tag { color: #92400e; background: rgba(217, 119, 6, 0.14); }
+html[data-theme="dark"] #root .stanza-row[data-section-type="chorus"] .stanza-tag { color: #c4b5fd; background: rgba(167, 139, 250, 0.16); }
+html[data-theme="dark"] #root .stanza-row[data-section-type="prechorus"] .stanza-tag,
+html[data-theme="dark"] #root .stanza-row[data-section-type="bridge"] .stanza-tag { color: #fcd34d; background: rgba(251, 191, 36, 0.14); }
+#root .stanza-state { color: var(--fl-muted); font-size: 11px; font-style: normal; white-space: nowrap; }
+#root .stanza-state.is-live { height: 18px; padding: 0 7px; color: #fff; border-radius: 9px; background: #c42b1c; font-weight: 600; line-height: 18px; }
+#root .stanza-state.is-next { color: var(--fl-accent-text, var(--fl-accent)); font-weight: 600; }
+#root .stanza-text { color: var(--fl-text); font-size: clamp(11px, calc(13px * var(--stanza-card-scale)), 18px); line-height: 1.4; }
+#root .stanza-text :is(p, div) { margin: 0; color: inherit !important; font-size: inherit !important; }
+#root .stanza-text * { color: inherit !important; background: transparent !important; }
+#root .stanza-row:focus { outline: none; box-shadow: none; }
+#root .stanza-row:focus-visible { outline: 2px solid var(--fl-accent); outline-offset: 1px; }
+#root .stanza-toolbar > span { white-space: nowrap; }
+#root .stanza-toolbar > small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
