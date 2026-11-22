@@ -1,24 +1,73 @@
 import type { BibleDisplaySettings } from "./types.js";
+import {
+  REFERENCE_RESERVE,
+  idealSizeFor,
+  largestFit,
+  maxLinesAt,
+  measureText,
+  planText,
+  sizeBand,
+  textArea,
+  wrapLines,
+  type ProjectionDimensions,
+  type TextBox,
+  type TextPlan,
+  type TextSizeRules,
+} from "./textFit.js";
 
-export type ProjectionDimensions = { width: number; height: number };
+export type { ProjectionDimensions } from "./textFit.js";
 
-// Bible navigation calls these helpers repeatedly while an operator moves with
-// the arrows. Cache the pure layout decisions so a long chapter never causes
-// dozens of canvas measurements on the renderer (especially noticeable on
-// lower-powered Windows PCs).
-const layoutCache = new Map<string, boolean | string[]>();
-const MAX_LAYOUT_CACHE_ENTRIES = 480;
+/*
+ * Reglas de Biblia sobre el motor compartido (shared/textFit.ts). Todas las
+ * funciones usan la misma geometría que el proyector, así el operador, el
+ * teléfono, la vista previa y la salida real toman la misma decisión.
+ */
 
-const cacheKey = (
+// La navegación con flechas consulta estas decisiones muchas veces seguidas.
+const planCache = new Map<string, TextPlan>();
+const MAX_PLAN_CACHE_ENTRIES = 480;
+
+export function bibleSizeRules(settings: BibleDisplaySettings): TextSizeRules {
+  return {
+    size: settings.textFontSize,
+    growPercent: settings.growPercent ?? 15,
+    shrinkPercent: settings.shrinkPercent ?? 20,
+  };
+}
+
+export function bibleTextBox(
+  settings: BibleDisplaySettings,
+  viewport?: ProjectionDimensions,
+): TextBox {
+  return {
+    viewport,
+    horizontalMargin: settings.horizontalMargin,
+    verticalMargin: settings.verticalMargin,
+    reservedHeight:
+      settings.showReference || settings.showVersion
+        ? settings.referenceFontSize * REFERENCE_RESERVE
+        : 0,
+  };
+}
+
+const bibleFont = (settings: BibleDisplaySettings) => ({
+  fontFamily: settings.textFontFamily,
+  uppercase: settings.uppercase,
+});
+
+function cachedPlan(
   text: string,
   settings: BibleDisplaySettings,
   viewport: ProjectionDimensions | undefined,
-) =>
-  [
+  allowSplit: boolean,
+  forcedSplitAt?: number,
+) {
+  const key = [
     text,
     settings.textFontFamily,
     settings.textFontSize,
-    settings.minimumFontSize,
+    settings.growPercent,
+    settings.shrinkPercent,
     settings.referenceFontSize,
     settings.horizontalMargin,
     settings.verticalMargin,
@@ -27,24 +76,44 @@ const cacheKey = (
     settings.showVersion,
     viewport?.width ?? 1920,
     viewport?.height ?? 1080,
+    allowSplit,
+    forcedSplitAt ?? "",
   ].join("|");
-
-const cacheRead = <T extends boolean | string[]>(key: string): T | undefined => {
-  const value = layoutCache.get(key) as T | undefined;
-  if (value !== undefined) {
-    // A tiny LRU: recently used verses remain cheap during arrow navigation.
-    layoutCache.delete(key);
-    layoutCache.set(key, value);
+  const cached = planCache.get(key);
+  if (cached) {
+    planCache.delete(key);
+    planCache.set(key, cached);
+    return cached;
   }
-  return value;
-};
+  const plan = planText(
+    text,
+    bibleFont(settings),
+    bibleTextBox(settings, viewport),
+    bibleSizeRules(settings),
+    allowSplit,
+    forcedSplitAt,
+  );
+  planCache.set(key, plan);
+  if (planCache.size > MAX_PLAN_CACHE_ENTRIES)
+    planCache.delete(planCache.keys().next().value!);
+  return plan;
+}
 
-const cacheWrite = <T extends boolean | string[]>(key: string, value: T) => {
-  layoutCache.set(key, value);
-  if (layoutCache.size > MAX_LAYOUT_CACHE_ENTRIES)
-    layoutCache.delete(layoutCache.keys().next().value!);
-  return value;
-};
+/** Plan completo de un pasaje: partes y tamaño común. */
+export function planBiblePassage(
+  text: string,
+  settings: BibleDisplaySettings,
+  viewport?: ProjectionDimensions,
+  options: { allowSplit?: boolean; splitAtWord?: number } = {},
+) {
+  return cachedPlan(
+    text.trim(),
+    settings,
+    viewport,
+    options.allowSplit ?? settings.longVerseMode !== "auto-fit",
+    options.splitAtWord,
+  );
+}
 
 export function bibleSplitOverrideKey(
   version: string,
@@ -57,263 +126,92 @@ export function bibleSplitOverrideKey(
     .toLocaleLowerCase("es-AR")}|${chapter}|${verse}`;
 }
 
-const fontWidthScale = (fontFamily: string) => {
-  const family = fontFamily.toLocaleLowerCase("en-US");
-  if (family.includes("bebas")) return 0.68;
-  if (family.includes("courier")) return 1.12;
-  if (family.includes("verdana")) return 1.06;
-  if (family.includes("trebuchet")) return 0.98;
-  if (family.includes("raleway")) return 0.94;
-  return 1;
-};
-
-const glyphWidth = (
-  character: string,
-  fontSize: number,
-  fontFamily: string,
-) => {
-  const scale = fontWidthScale(fontFamily);
-  if (/\s/.test(character)) return fontSize * 0.32 * scale;
-  if (/[ilI1|.,:;'!]/.test(character)) return fontSize * 0.29 * scale;
-  if (/[mwMW@#%&]/.test(character)) return fontSize * 0.86 * scale;
-  if (/[A-ZÁÉÍÓÚÑ]/.test(character)) return fontSize * 0.64 * scale;
-  if (/[0-9]/.test(character)) return fontSize * 0.56 * scale;
-  return fontSize * 0.52 * scale;
-};
-
-let measureContext: CanvasRenderingContext2D | null | undefined;
-
-const measuredWidth = (
-  text: string,
+export function bibleTextCapacity(
   settings: BibleDisplaySettings,
-) => {
-  if (typeof document !== "undefined") {
-    if (measureContext === undefined)
-      measureContext = document.createElement("canvas").getContext("2d");
-    if (measureContext) {
-      measureContext.font = `700 ${settings.textFontSize}px ${settings.textFontFamily}`;
-      return measureContext.measureText(text).width;
-    }
-  }
-  return Array.from(text).reduce(
-    (width, character) =>
-      width + glyphWidth(character, settings.textFontSize, settings.textFontFamily),
-    0,
-  ) * 1.04;
-};
+  viewport: ProjectionDimensions = { width: 1920, height: 1080 },
+) {
+  const box = bibleTextBox(settings, viewport);
+  const { lineWidth } = textArea(box, settings.textFontSize);
+  return {
+    charactersPerLine: Math.max(10, Math.floor(lineWidth / (settings.textFontSize * 0.53))),
+    lineWidth,
+    lines: maxLinesAt(box, settings.textFontSize),
+  };
+}
 
-/**
- * Wraps exactly as the projector is expected to wrap: one word at a time,
- * using the configured font size and the real usable screen width. Keeping
- * the resulting lines lets splitting happen only when the text would exceed
- * the real usable height of the output.
- */
+/** Cortes de línea al tamaño configurado, como los haría el proyector. */
 export function bibleTextLines(
   text: string,
   settings: BibleDisplaySettings,
   viewport: ProjectionDimensions = { width: 1920, height: 1080 },
 ) {
   const { lineWidth } = bibleTextCapacity(settings, viewport);
-  const source = settings.uppercase ? text.toLocaleUpperCase("es-AR") : text;
-  const words = source.trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return [];
-  const lines: string[][] = [[]];
-  let usedWidth = 0;
-  const spaceWidth = measuredWidth(" ", settings);
-  for (let index = 0; index < words.length; index += 1) {
-    const currentWordWidth = measuredWidth(words[index], settings);
-    const nextWidth = usedWidth + (lines.at(-1)!.length ? spaceWidth : 0) + currentWordWidth;
-    if (lines.at(-1)!.length && nextWidth > lineWidth) {
-      lines.push([words[index]]);
-      usedWidth = currentWordWidth;
-    } else {
-      lines.at(-1)!.push(words[index]);
-      usedWidth = nextWidth;
-    }
-  }
-  // Return word ranges from the original spelling; uppercase only affects the
-  // width calculation and remains a projection preference.
-  let consumed = 0;
-  const originalWords = text.trim().split(/\s+/).filter(Boolean);
-  return lines.map((line) => {
-    const originalLine = originalWords.slice(consumed, consumed + line.length);
-    consumed += line.length;
-    return originalLine.join(" ");
-  });
+  return wrapLines(text, bibleFont(settings), settings.textFontSize, lineWidth);
 }
 
-export function bibleTextCapacity(
-  settings: BibleDisplaySettings,
-  viewport: ProjectionDimensions = { width: 1920, height: 1080 },
-) {
-  const width = Math.max(320, viewport.width || 1920);
-  const height = Math.max(240, viewport.height || 1080);
-  const usableWidth = width * (1 - (settings.horizontalMargin * 2) / 100);
-  const usableHeight = height * (1 - (settings.verticalMargin * 2) / 100);
-  const averageGlyphWidth = Math.max(
-    5,
-    settings.textFontSize * 0.53 * fontWidthScale(settings.textFontFamily),
-  );
-  const charactersPerLine = Math.max(
-    10,
-    Math.floor(usableWidth / averageGlyphWidth),
-  );
-  const referenceReserve =
-    settings.showReference || settings.showVersion
-      ? settings.referenceFontSize * 1.7 + settings.textFontSize * 0.45
-      : 0;
-  const linesByHeight = Math.max(
-    1,
-    Math.floor(
-      Math.max(settings.textFontSize, usableHeight - referenceReserve) /
-        (settings.textFontSize * 1.16),
-    ),
-  );
-  return {
-    charactersPerLine,
-    lineWidth: Math.max(120, usableWidth * 0.98),
-    lines: linesByHeight,
-  };
-}
-
-/**
- * Estimates the wrapping used by the real projection area without ever
- * splitting a word. A verse is long only when the configured type size would
- * physically exceed the available screen height.
- */
+/** ¿El pasaje supera la pantalla al tamaño normal? */
 export function isLongBibleVerse(
   text: string,
   settings: BibleDisplaySettings,
   viewport?: ProjectionDimensions,
 ) {
-  const trimmed = text.trim();
-  if (!trimmed) return false;
-  const { lines: maximumLines } = bibleTextCapacity(settings, viewport);
-  return bibleTextLines(trimmed, settings, viewport).length > maximumLines;
+  if (!text.trim()) return false;
+  return bibleTextLines(text, settings, viewport).length > bibleTextCapacity(settings, viewport).lines;
 }
 
-/**
- * Returns the largest size that can keep a passage on one screen. This uses
- * the same word wrapping and reference reserve as the A/B decision, so the
- * operator, phone and settings guidance all agree.
- */
+/** Mayor tamaño que mantiene el pasaje completo en una pantalla. */
 export function fittedBibleFontSize(
   text: string,
   settings: BibleDisplaySettings,
   viewport?: ProjectionDimensions,
   minimum = 12,
 ) {
-  const ceiling = Math.max(minimum, settings.textFontSize);
-  let low = Math.max(8, Math.min(minimum, ceiling));
-  let high = ceiling;
-  let best = low;
-  for (let step = 0; step < 12; step += 1) {
-    const middle = (low + high) / 2;
-    const candidate = { ...settings, textFontSize: middle };
-    if (!isLongBibleVerse(text, candidate, viewport)) {
-      best = middle;
-      low = middle;
-    } else high = middle;
-  }
-  return Math.min(ceiling, best);
+  return largestFit(
+    measureText(text, bibleFont(settings)),
+    bibleTextBox(settings, viewport),
+    Math.max(8, minimum),
+    Math.max(minimum, settings.textFontSize),
+  );
 }
 
 /**
- * A/B begins only when a verse cannot fit at the operator's configured
- * readable minimum. Above that threshold the renderer simply makes the small,
- * gradual adjustment needed to keep the verse complete on one slide.
+ * Hay que dividir cuando el pasaje no entra ni siquiera achicado al máximo
+ * permitido (tamaño normal − % de achique).
  */
 export function shouldSplitBibleVerse(
   text: string,
   settings: BibleDisplaySettings,
   viewport?: ProjectionDimensions,
 ) {
-  const key = `split?/${cacheKey(text, settings, viewport)}`;
-  const cached = cacheRead<boolean>(key);
-  if (cached !== undefined) return cached;
-  if (!isLongBibleVerse(text, settings, viewport)) return cacheWrite(key, false);
-  const readableMinimum = Math.min(
-    settings.textFontSize,
-    Math.max(18, settings.minimumFontSize),
-  );
-  return cacheWrite(
-    key,
-    isLongBibleVerse(
-      text,
-      { ...settings, textFontSize: readableMinimum },
-      viewport,
-    ),
-  );
+  if (!text.trim()) return false;
+  return cachedPlan(text.trim(), settings, viewport, true).needsSplit;
 }
 
-const recommendationSample =
-  "Porque de tal manera amó Dios al mundo, que ha dado a su Hijo unigénito, para que todo aquel que en él cree no se pierda, mas tenga vida eterna.";
-
+/** Tamaño que aprovecha toda el área con un versículo de largo típico. */
 export function recommendedBibleFontSize(
   settings: BibleDisplaySettings,
   viewport?: ProjectionDimensions,
 ) {
-  const testSettings = { ...settings, textFontSize: 200 };
   return Math.max(
     24,
-    Math.floor(
-      fittedBibleFontSize(recommendationSample, testSettings, viewport, 24),
-    ),
+    idealSizeFor([typicalVerse], bibleFont(settings), bibleTextBox(settings, viewport)),
   );
 }
 
+/** Divide en A y B con el mejor corte posible (o devuelve el texto entero). */
 export function splitBibleVerse(
   text: string,
   settings: BibleDisplaySettings,
   viewport?: ProjectionDimensions,
 ) {
-  if (!shouldSplitBibleVerse(text, settings, viewport)) return [text];
-  const key = `split/${cacheKey(text, settings, viewport)}`;
-  const cached = cacheRead<string[]>(key);
-  if (cached) return cached;
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length < 2) return [text];
-  const maximumLines = bibleTextCapacity(settings, viewport).lines;
-  let bestIndex = Math.ceil(words.length / 2);
-  let bestScore = Number.POSITIVE_INFINITY;
-  for (let index = 1; index < words.length; index += 1) {
-    const ratio = index / words.length;
-    if (ratio < 0.24 || ratio > 0.76) continue;
-    const left = words.slice(0, index).join(" ");
-    const right = words.slice(index).join(" ");
-    const leftLines = bibleTextLines(left, settings, viewport).length;
-    const rightLines = bibleTextLines(right, settings, viewport).length;
-    const overflow =
-      Math.max(0, leftLines - maximumLines) +
-      Math.max(0, rightLines - maximumLines);
-    const previousWord = words[index - 1];
-    const nextWords = words.slice(index, index + 3).join(" ").toLocaleLowerCase("es-AR");
-    // Prefer the end of a complete thought first, then a natural pause or a
-    // new clause. Balance remains important, but never at the expense of a
-    // visibly awkward split in the middle of a phrase.
-    const punctuation = /[.!?][”"')\]]?$/.test(previousWord)
-      ? -7
-      : /[;:][”"')\]]?$/.test(previousWord)
-        ? -5
-        : /,[”"')\]]?$/.test(previousWord)
-          ? -3
-          : /^(pero|porque|aunque|mientras|cuando|entonces|sin embargo|por tanto|para que|y |e )/.test(nextWords)
-            ? -2
-            : 3;
-    const score =
-      overflow * 100 +
-      Math.abs(leftLines - rightLines) * 6 +
-      Math.abs(0.5 - ratio) * 18 +
-      punctuation;
-    if (score < bestScore) {
-      bestScore = score;
-      bestIndex = index;
-    }
-  }
-  // It is always exactly A/B. If a particularly long half still needs help,
-  // the renderer performs the final small safety reduction without clipping.
-  return cacheWrite(key, [
-    words.slice(0, bestIndex).join(" "),
-    words.slice(bestIndex).join(" "),
-  ].filter(Boolean));
+  const plan = cachedPlan(text.trim(), settings, viewport, true);
+  return plan.needsSplit ? plan.parts : [text];
 }
+
+export function bibleSizeBand(settings: BibleDisplaySettings) {
+  return sizeBand(bibleSizeRules(settings));
+}
+
+/** Juan 3:16: largo representativo de un versículo para calcular el tamaño ideal. */
+export const typicalVerse =
+  "Porque de tal manera amó Dios al mundo, que ha dado a su Hijo unigénito, para que todo aquel que en él cree no se pierda, mas tenga vida eterna.";

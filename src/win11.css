@@ -857,3 +857,41 @@ html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); 
 }
 .song-editor > .song-home { padding: 8px 4px 4px; }
 .song-home-actions .secondary { min-width: 0; }
+
+/* Texto en pantalla: rango de tamaño y ejemplos */
+.w11-infobar:not(.error) { margin: 0 0 22px; border-color: color-mix(in srgb, var(--fl-accent) 35%, transparent); background: var(--fl-accent-soft); line-height: 1.5; }
+.w11-size-band {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 6px;
+  background: var(--fl-surface-alt);
+}
+.w11-size-band span { display: flex; flex-direction: column; gap: 1px; }
+.w11-size-band small { color: var(--fl-muted); font-size: 11px; }
+.w11-size-band strong { color: var(--fl-text); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.w11-size-band i { position: relative; height: 6px; border-radius: 3px; background: var(--fl-control-fill); }
+.w11-size-band b { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: color-mix(in srgb, var(--fl-accent) 55%, transparent); }
+.w11-size-band em { position: absolute; top: -5px; width: 3px; height: 16px; border-radius: 2px; background: var(--fl-accent); transform: translateX(-50%); }
+.w11-sample-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.w11-sample-grid button {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  color: var(--fl-text);
+  text-align: left;
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 6px;
+  background: var(--fl-surface);
+  cursor: pointer;
+}
+.w11-sample-grid button:hover { background: var(--fl-hover); }
+.w11-sample-grid button.active { border-color: var(--fl-accent); box-shadow: inset 0 0 0 1px var(--fl-accent); }
+.w11-sample-grid strong { font-size: 13px; font-weight: 600; }
+.w11-sample-grid small { color: var(--fl-muted); font-size: 12px; }
+@container w11 (max-width: 500px) { .w11-sample-grid { grid-template-columns: 1fr; } .w11-size-band { grid-template-columns: 1fr 1fr 1fr; } .w11-size-band i { grid-column: 1 / -1; grid-row: 2; } }

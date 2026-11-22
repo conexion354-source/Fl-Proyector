@@ -14,6 +14,8 @@ import {
   Palette,
   RefreshCw,
   Save,
+  Sparkles,
+  Type,
   Sun,
   Trash2,
   Upload,
@@ -36,6 +38,8 @@ import {
   type UpdateStatus,
 } from "../../shared/types";
 import { buildBibleSlides } from "../bibleDisplay";
+import { bibleSizeBand, bibleTextBox, planBiblePassage, typicalVerse } from "../../shared/bibleLayout";
+import { idealSizeFor } from "../../shared/textFit";
 import { projectionFonts } from "../fonts";
 import { notifySaveError, notifySaved } from "./SaveNotification";
 import {
@@ -76,6 +80,7 @@ const defaultSongPanelColor = "#1f2937";
 
 type Section =
   | "pantalla"
+  | "texto"
   | "iglesia"
   | "biblias"
   | "canciones"
@@ -90,6 +95,7 @@ const sections: Array<{
   icon: ReactNode;
 }> = [
   { id: "pantalla", label: "Pantallas", description: "Proyector, resolución y salidas adicionales", icon: <MonitorCog /> },
+  { id: "texto", label: "Texto en pantalla", description: "Tamaño y reparto del texto, igual para Biblia y canciones", icon: <Type /> },
   { id: "iglesia", label: "Iglesia y logo", description: "Nombre, dirección y logo que se proyecta", icon: <Building2 /> },
   { id: "biblias", label: "Biblias", description: "Versiones instaladas y diseño de los versículos", icon: <BookOpen /> },
   { id: "canciones", label: "Canciones", description: "Diseño global de las letras proyectadas", icon: <Music2 /> },
@@ -112,6 +118,69 @@ const referenceDesigns: Array<{
   { value: "lower-third", label: "Lower third", detail: "Franja profesional" },
   { value: "broadcast", label: "TV en vivo", detail: "Doble acento" },
 ];
+
+/** Parámetros de tamaño y reparto compartidos por Biblia y canciones. */
+type TextLayout = {
+  size: number;
+  growPercent: number;
+  shrinkPercent: number;
+  horizontalMargin: number;
+  verticalMargin: number;
+  longVerseMode: "split-halves" | "auto-fit";
+  stableSongSize: boolean;
+};
+
+const initialLayout: TextLayout = {
+  size: initialBibleDisplaySettings.textFontSize,
+  growPercent: initialBibleDisplaySettings.growPercent,
+  shrinkPercent: initialBibleDisplaySettings.shrinkPercent,
+  horizontalMargin: initialBibleDisplaySettings.horizontalMargin,
+  verticalMargin: initialBibleDisplaySettings.verticalMargin,
+  longVerseMode: "split-halves",
+  stableSongSize: true,
+};
+
+function withBibleLayout(value: BibleDisplaySettings, layout: TextLayout): BibleDisplaySettings {
+  return {
+    ...value,
+    textFontSize: layout.size,
+    growPercent: layout.growPercent,
+    shrinkPercent: layout.shrinkPercent,
+    minimumFontSize: Math.max(12, Math.round(layout.size * (1 - layout.shrinkPercent / 100))),
+    horizontalMargin: layout.horizontalMargin,
+    verticalMargin: layout.verticalMargin,
+    longVerseMode: layout.longVerseMode,
+  };
+}
+
+function withSongLayout(value: SongDisplaySettings, layout: TextLayout): SongDisplaySettings {
+  return {
+    ...value,
+    fontSize: layout.size,
+    growPercent: layout.growPercent,
+    shrinkPercent: layout.shrinkPercent,
+    minimumFontSize: Math.max(12, Math.round(layout.size * (1 - layout.shrinkPercent / 100))),
+    horizontalMargin: layout.horizontalMargin,
+    verticalMargin: layout.verticalMargin,
+    stableFontSize: layout.stableSongSize,
+  };
+}
+
+/** Ejemplos para ver cómo se comporta el texto con distintos largos. */
+const bibleSamples = {
+  corto: { text: "Jesús lloró.", reference: "Juan 11:35" },
+  normal: { text: typicalVerse, reference: "Juan 3:16" },
+  largo: {
+    text: "Entonces fueron llamados los escribanos del rey en el mes tercero, que es Siván, a los veintitrés días de ese mes; y se escribió conforme a todo lo que mandó Mardoqueo, a los judíos, y a los sátrapas, los capitanes y los príncipes de las provincias que había desde la India hasta Etiopía, ciento veintisiete provincias; a cada provincia según su escritura, y a cada pueblo conforme a su lengua, a los judíos también conforme a su escritura y lengua.",
+    reference: "Ejemplo largo",
+  },
+} as const;
+const songSamples = {
+  corto: "<p>Te alabaré<br>con todo el corazón</p>",
+  normal: "<p>Cantaré de tu bondad cada mañana<br>porque tu amor me sostiene al caminar<br>en la noche más oscura tu luz brilla<br>y en tus brazos siempre puedo descansar</p>",
+  largo: "<p>Cantaré de tu bondad cada mañana<br>porque tu amor me sostiene al caminar<br>en la noche más oscura tu luz brilla<br>y en tus brazos siempre puedo descansar<br>no hay montaña que me impida seguirte<br>no hay tormenta que me aparte de tu voz<br>levantaré mis manos en tu presencia<br>porque grande y fiel eres tú, mi Dios</p>",
+} as const;
+type SampleLength = keyof typeof songSamples;
 
 const fallbackBiblePreview = {
   text: "Porque de tal manera amó Dios al mundo, que ha dado a su Hijo unigénito, para que todo aquel que en él cree no se pierda, sino que tenga vida eterna.",
@@ -581,6 +650,10 @@ export function SettingsPanel({
   const [shortcuts, setShortcuts] = useState<Record<ShortcutAction, string>>(() => loadShortcuts());
   const [savedShortcuts, setSavedShortcuts] = useState<Record<ShortcutAction, string>>(() => loadShortcuts());
   const [shortcutError, setShortcutError] = useState("");
+  const [layout, setLayout] = useState<TextLayout>(initialLayout);
+  const [savedLayout, setSavedLayout] = useState<TextLayout>(initialLayout);
+  const [layoutPreview, setLayoutPreview] = useState<"biblia" | "canto">("biblia");
+  const [sampleLength, setSampleLength] = useState<SampleLength>("normal");
   const [saving, setSaving] = useState(false);
 
   const [versions, setVersions] = useState<BibleVersion[]>([]);
@@ -606,11 +679,24 @@ export function SettingsPanel({
       const normalized = { ...initialBibleDisplaySettings, ...value };
       setBible(normalized);
       setSavedBible(normalized);
+      const fromBible: Partial<TextLayout> = {
+        size: normalized.textFontSize,
+        growPercent: normalized.growPercent,
+        shrinkPercent: normalized.shrinkPercent,
+        horizontalMargin: normalized.horizontalMargin,
+        verticalMargin: normalized.verticalMargin,
+        longVerseMode: normalized.longVerseMode === "auto-fit" ? "auto-fit" : "split-halves",
+      };
+      setLayout((current) => ({ ...current, ...fromBible }));
+      setSavedLayout((current) => ({ ...current, ...fromBible }));
     });
     window.flProyector.getSongDisplaySettings().then((value) => {
       const normalized = { ...initialSongDisplaySettings, ...value, autoFit: true };
       setSongStyle(normalized);
       setSavedSongStyle(normalized);
+      const stableSongSize = normalized.stableFontSize !== false;
+      setLayout((current) => ({ ...current, stableSongSize }));
+      setSavedLayout((current) => ({ ...current, stableSongSize }));
     });
     reloadVersions();
     window.flProyector.getUpdateStatus().then(setUpdateStatus);
@@ -628,6 +714,7 @@ export function SettingsPanel({
 
   const dirty: Partial<Record<Section, boolean>> = {
     pantalla: !same(settings, savedSettings),
+    texto: !same(layout, savedLayout),
     iglesia: !same(church, savedChurch),
     biblias: !same(bible, savedBible),
     canciones: !same(songStyle, savedSongStyle),
@@ -809,6 +896,42 @@ export function SettingsPanel({
     }, "El diseño de canciones fue guardado.");
   };
 
+  /* ---------------- Texto en pantalla ---------------- */
+
+  const saveLayout = () =>
+    runSave(async () => {
+      const nextBible = withBibleLayout(savedBible, layout);
+      const nextSong = withSongLayout(savedSongStyle, layout);
+      await window.flProyector.saveBibleDisplaySettings(nextBible);
+      await window.flProyector.saveSongDisplaySettings(nextSong);
+      update({
+        bibleStyle: nextBible,
+        songStyle: nextSong,
+        ...(state.text.kind === "biblia" || state.text.kind === "canto"
+          ? { text: { ...state.text, fontSize: layout.size } }
+          : {}),
+      });
+      setSavedBible(nextBible);
+      setSavedSongStyle(nextSong);
+      setBible((value) => withBibleLayout(value, layout));
+      setSongStyle((value) => withSongLayout(value, layout));
+      setSavedLayout(layout);
+    }, "El tamaño del texto se guardó para Biblia y canciones.");
+  const layoutBible = withBibleLayout(bible, layout);
+  const layoutBand = bibleSizeBand(layoutBible);
+  const calculateIdealSize = () => {
+    const ideal = idealSizeFor(
+      [typicalVerse],
+      { fontFamily: bible.textFontFamily, uppercase: bible.uppercase },
+      bibleTextBox(layoutBible, state.outputViewport),
+    );
+    setLayout((value) => ({ ...value, size: Math.max(24, Math.min(200, ideal)) }));
+  };
+  const samplePlans = (Object.keys(bibleSamples) as SampleLength[]).map((length) => ({
+    length,
+    plan: planBiblePassage(bibleSamples[length].text, layoutBible, state.outputViewport),
+  }));
+
   /* ---------------- Atajos ---------------- */
 
   const saveShortcuts = () =>
@@ -824,6 +947,7 @@ export function SettingsPanel({
   const saveCurrent = async () => {
     const save = {
       pantalla: saveDisplay,
+      texto: saveLayout,
       iglesia: saveChurch,
       biblias: saveBible,
       canciones: saveSongStyle,
@@ -839,6 +963,7 @@ export function SettingsPanel({
   };
   const discardCurrent = () => {
     if (section === "pantalla") setSettings(savedSettings);
+    if (section === "texto") setLayout(savedLayout);
     if (section === "iglesia") setChurch(savedChurch);
     if (section === "biblias") setBible(savedBible);
     if (section === "canciones") setSongStyle(savedSongStyle);
@@ -916,13 +1041,39 @@ export function SettingsPanel({
     text: { ...state.text, visible: false },
     presentation: { ...state.presentation, visible: false },
   };
+  const layoutSample = bibleSamples[sampleLength];
+  const layoutBibleSlide = buildBibleSlides(
+    layoutSample.text,
+    layoutSample.reference,
+    "RVR1960",
+    layoutBible,
+    state.outputViewport,
+  )[0];
+  const layoutPreviewState: ProjectionState =
+    layoutPreview === "biblia"
+      ? {
+          ...previewState,
+          bibleStyle: layoutBible,
+          text: {
+            ...previewState.text,
+            html: layoutBibleSlide.html,
+            fontSize: layout.size,
+            sourceBibleText: null,
+          },
+        }
+      : {
+          ...songPreviewState,
+          songStyle: withSongLayout(songStyle, layout),
+          text: { ...songPreviewState.text, html: songSamples[sampleLength], fontSize: layout.size },
+        };
   useEffect(() => {
-    if (section === "canciones") onPreviewChange(songPreviewState);
+    if (section === "texto") onPreviewChange(layoutPreviewState);
+    else if (section === "canciones") onPreviewChange(songPreviewState);
     else if (section === "biblias") onPreviewChange(previewState);
     else if (section === "iglesia") onPreviewChange(logoPreviewState);
     else onPreviewChange(null);
     return () => onPreviewChange(null);
-  }, [section, songStyle, bible, church, state, onPreviewChange]);
+  }, [section, songStyle, bible, church, state, onPreviewChange, layout, layoutPreview, sampleLength]);
   useEffect(() => {
     onDisplayPreviewChange(section === "pantalla" ? settings : null);
     return () => onDisplayPreviewChange(null);
@@ -1202,6 +1353,186 @@ export function SettingsPanel({
             </>
           )}
 
+          {/* ======================== TEXTO EN PANTALLA ======================== */}
+          {section === "texto" && (
+            <>
+              <p className="w11-infobar">
+                Estos valores se usan igual para la Biblia y para las canciones. El texto se agranda o se achica solo
+                dentro del rango que elijas, así un texto corto no queda gigante al lado de uno largo.
+              </p>
+
+              <SettingsGroup title="Tamaño">
+                <SettingRow
+                  icon={<Type />}
+                  title="Tamaño normal"
+                  description="El tamaño de lectura habitual. «Calcular» elige el que aprovecha toda el área con un versículo de largo típico."
+                >
+                  <button type="button" className="w11-button" onClick={calculateIdealSize}>
+                    <Sparkles aria-hidden="true" /> Calcular
+                  </button>
+                  <NumberBox
+                    label="Tamaño normal"
+                    value={layout.size}
+                    min={24}
+                    max={200}
+                    suffix="px"
+                    onChange={(size) => setLayout((value) => ({ ...value, size }))}
+                  />
+                </SettingRow>
+                <SettingRow title="Agrandar textos cortos hasta" description="Cuánto más grande puede verse un texto que sobra espacio.">
+                  <Select
+                    label="Agrandar textos cortos hasta"
+                    value={String(layout.growPercent) as "0"}
+                    onChange={(growPercent) => setLayout((value) => ({ ...value, growPercent: Number(growPercent) }))}
+                    options={[0, 10, 15, 25, 40].map((percent) => ({
+                      value: String(percent) as "0",
+                      label: percent === 0 ? "No agrandar" : `${percent} % más`,
+                    }))}
+                  />
+                </SettingRow>
+                <SettingRow
+                  title="Achicar textos largos hasta"
+                  description="Si un texto necesita achicarse más que esto, se divide en partes en lugar de quedar chico."
+                >
+                  <Select
+                    label="Achicar textos largos hasta"
+                    value={String(layout.shrinkPercent) as "0"}
+                    onChange={(shrinkPercent) => setLayout((value) => ({ ...value, shrinkPercent: Number(shrinkPercent) }))}
+                    options={[10, 15, 20, 30, 40].map((percent) => ({
+                      value: String(percent) as "0",
+                      label: `${percent} % menos`,
+                    }))}
+                  />
+                </SettingRow>
+                <div className="w11-size-band" aria-label="Rango de tamaño resultante">
+                  <span>
+                    <small>Mínimo</small>
+                    <strong>{Math.round(layoutBand.floor)} px</strong>
+                  </span>
+                  <i aria-hidden="true">
+                    <b
+                      style={{
+                        left: `${(layoutBand.floor / layoutBand.ceiling) * 100}%`,
+                        width: `${100 - (layoutBand.floor / layoutBand.ceiling) * 100}%`,
+                      }}
+                    />
+                    <em style={{ left: `${(layoutBand.normal / layoutBand.ceiling) * 100}%` }} />
+                  </i>
+                  <span>
+                    <small>Normal</small>
+                    <strong>{Math.round(layoutBand.normal)} px</strong>
+                  </span>
+                  <span>
+                    <small>Máximo</small>
+                    <strong>{Math.round(layoutBand.ceiling)} px</strong>
+                  </span>
+                </div>
+              </SettingsGroup>
+
+              <SettingsGroup title="Área de la pantalla">
+                <SettingRow title="Margen lateral" description="Espacio libre a izquierda y derecha. Menos margen = más texto por línea.">
+                  <NumberBox
+                    label="Margen lateral"
+                    value={layout.horizontalMargin}
+                    min={2}
+                    max={25}
+                    suffix="%"
+                    onChange={(horizontalMargin) => setLayout((value) => ({ ...value, horizontalMargin }))}
+                  />
+                </SettingRow>
+                <SettingRow title="Margen vertical" description="Espacio libre arriba y abajo. La cita bíblica queda fuera de esta zona.">
+                  <NumberBox
+                    label="Margen vertical"
+                    value={layout.verticalMargin}
+                    min={2}
+                    max={25}
+                    suffix="%"
+                    onChange={(verticalMargin) => setLayout((value) => ({ ...value, verticalMargin }))}
+                  />
+                </SettingRow>
+              </SettingsGroup>
+
+              <SettingsGroup title="Textos largos">
+                <SettingRow
+                  icon={<BookOpen />}
+                  title="Versículos que no entran"
+                  description="Dividir busca el mejor corte (punto, punto y coma, coma o «porque», «pero»…) y deja las dos partes del mismo tamaño."
+                >
+                  <Select
+                    label="Versículos que no entran"
+                    value={layout.longVerseMode}
+                    onChange={(longVerseMode) => setLayout((value) => ({ ...value, longVerseMode }))}
+                    options={[
+                      { value: "split-halves", label: "Dividir en A y B" },
+                      { value: "auto-fit", label: "Achicar hasta que entre" },
+                    ]}
+                  />
+                </SettingRow>
+                <SettingRow
+                  icon={<Music2 />}
+                  title="Mismo tamaño en toda la canción"
+                  description="Todas las estrofas usan un solo tamaño. Si una es mucho más larga, solo esa se achica."
+                >
+                  <Toggle
+                    label="Mismo tamaño en toda la canción"
+                    checked={layout.stableSongSize}
+                    onChange={(stableSongSize) => setLayout((value) => ({ ...value, stableSongSize }))}
+                  />
+                </SettingRow>
+              </SettingsGroup>
+
+              <SettingsGroup
+                title="Probar con ejemplos"
+                action={
+                  <div className="w11-segmented" role="radiogroup" aria-label="Tipo de texto de prueba">
+                    {(
+                      [
+                        ["biblia", "Biblia"],
+                        ["canto", "Canción"],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={layoutPreview === value}
+                        className={layoutPreview === value ? "active" : ""}
+                        key={value}
+                        onClick={() => setLayoutPreview(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                }
+              >
+                <div className="w11-sample-grid" role="radiogroup" aria-label="Largo del ejemplo">
+                  {samplePlans.map(({ length, plan }) => (
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={sampleLength === length}
+                      className={sampleLength === length ? "active" : ""}
+                      key={length}
+                      onClick={() => setSampleLength(length)}
+                    >
+                      <strong>{length === "corto" ? "Texto corto" : length === "normal" ? "Texto normal" : "Texto largo"}</strong>
+                      {layoutPreview === "biblia" ? (
+                        <small>
+                          {plan.parts.length > 1 ? "Se divide en A y B" : "Una pantalla"} · {Math.round(plan.fontSize)} px
+                        </small>
+                      ) : (
+                        <small>Mirá la vista previa</small>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <p className="w11-group-note">
+                  La vista previa de la derecha muestra el ejemplo elegido con la pantalla real del proyector.
+                </p>
+              </SettingsGroup>
+            </>
+          )}
+
           {/* ============================ IGLESIA ============================ */}
           {section === "iglesia" && (
             <>
@@ -1445,22 +1776,6 @@ export function SettingsPanel({
                     onChange={(textFontFamily) => setBible((v) => ({ ...v, textFontFamily }))}
                   />
                 </SettingRow>
-                <SettingRow title="Tamaño preferido" description="Se reduce solo si el versículo no entra en pantalla.">
-                  <NumberBox
-                    label="Tamaño del versículo"
-                    value={bible.textFontSize}
-                    min={24}
-                    max={200}
-                    suffix="px"
-                    onChange={(textFontSize) =>
-                      setBible((value) => ({
-                        ...value,
-                        textFontSize,
-                        minimumFontSize: Math.min(value.minimumFontSize, textFontSize),
-                      }))
-                    }
-                  />
-                </SettingRow>
                 <SettingRow title="Color">
                   <ColorPicker
                     label="Color del versículo"
@@ -1507,54 +1822,6 @@ export function SettingsPanel({
                 </SettingExpander>
               </SettingsGroup>
 
-              <SettingsGroup title="Distribución en pantalla">
-                <SettingRow title="Margen lateral" description="Espacio libre a izquierda y derecha.">
-                  <NumberBox
-                    label="Margen lateral"
-                    value={bible.horizontalMargin}
-                    min={2}
-                    max={25}
-                    suffix="%"
-                    onChange={(horizontalMargin) => setBible((v) => ({ ...v, horizontalMargin }))}
-                  />
-                </SettingRow>
-                <SettingRow title="Margen vertical" description="Espacio libre arriba y abajo. La cita queda fuera de esta zona.">
-                  <NumberBox
-                    label="Margen vertical"
-                    value={bible.verticalMargin}
-                    min={2}
-                    max={25}
-                    suffix="%"
-                    onChange={(verticalMargin) => setBible((v) => ({ ...v, verticalMargin }))}
-                  />
-                </SettingRow>
-                <SettingRow
-                  title="Versículos largos"
-                  description="Si el texto no entra con el tamaño mínimo, se divide una sola vez en A y B sin cortar palabras."
-                >
-                  <Select
-                    label="Versículos largos"
-                    value={bible.longVerseMode === "split" ? "split-halves" : bible.longVerseMode}
-                    onChange={(longVerseMode) => setBible((value) => ({ ...value, longVerseMode }))}
-                    options={[
-                      { value: "split-halves", label: "Dividir en A y B si no entra" },
-                      { value: "auto-fit", label: "Siempre en una sola pantalla" },
-                    ]}
-                  />
-                </SettingRow>
-                {bible.longVerseMode !== "auto-fit" && (
-                  <SettingRow title="Tamaño mínimo legible" description="Por debajo de este tamaño, el versículo se divide.">
-                    <NumberBox
-                      label="Tamaño mínimo legible"
-                      value={Math.min(bible.minimumFontSize, bible.textFontSize)}
-                      min={18}
-                      max={Math.max(18, bible.textFontSize)}
-                      suffix="px"
-                      onChange={(minimumFontSize) => setBible((value) => ({ ...value, minimumFontSize }))}
-                    />
-                  </SettingRow>
-                )}
-              </SettingsGroup>
             </>
           )}
 
@@ -1567,26 +1834,6 @@ export function SettingsPanel({
                     label="Tipo de letra de las canciones"
                     value={songStyle.fontFamily}
                     onChange={(fontFamily) => setSongStyle((value) => ({ ...value, fontFamily }))}
-                  />
-                </SettingRow>
-                <SettingRow title="Tamaño de la letra" description="Se reduce solo si una estrofa no entra.">
-                  <NumberBox
-                    label="Tamaño de la letra"
-                    value={songStyle.fontSize}
-                    min={24}
-                    max={200}
-                    suffix="px"
-                    onChange={(fontSize) => setSongStyle((value) => ({ ...value, fontSize }))}
-                  />
-                </SettingRow>
-                <SettingRow
-                  title="Mismo tamaño en toda la canción"
-                  description="Evita que la letra cambie de tamaño entre estrofas."
-                >
-                  <Toggle
-                    label="Mismo tamaño en toda la canción"
-                    checked={songStyle.stableFontSize !== false}
-                    onChange={(stableFontSize) => setSongStyle((value) => ({ ...value, stableFontSize }))}
                   />
                 </SettingRow>
                 <SettingRow title="Color">
@@ -1676,26 +1923,6 @@ export function SettingsPanel({
                     />
                   </SettingRow>
                 )}
-                <SettingRow title="Margen lateral" description="Área segura donde puede aparecer la letra.">
-                  <NumberBox
-                    label="Margen lateral"
-                    value={songStyle.horizontalMargin ?? 8}
-                    min={2}
-                    max={25}
-                    suffix="%"
-                    onChange={(horizontalMargin) => setSongStyle((value) => ({ ...value, horizontalMargin }))}
-                  />
-                </SettingRow>
-                <SettingRow title="Margen vertical">
-                  <NumberBox
-                    label="Margen vertical"
-                    value={songStyle.verticalMargin ?? 10}
-                    min={2}
-                    max={25}
-                    suffix="%"
-                    onChange={(verticalMargin) => setSongStyle((value) => ({ ...value, verticalMargin }))}
-                  />
-                </SettingRow>
               </SettingsGroup>
 
               <SettingsGroup title="Título de la canción">
