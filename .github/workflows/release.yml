@@ -26,7 +26,7 @@ jobs:
               release/*.blockmap
               release/latest.yml
           - label: macOS Apple Silicon
-            runner: macos-14
+            runner: macos-15
             artifact: macos-arm64-release
             files: |
               release/*.dmg
