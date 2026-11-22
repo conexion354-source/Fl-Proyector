@@ -196,6 +196,14 @@ export function BibleOperator({
   // visible so the operator retains surrounding context.
   const displayedVerses = verses;
   const versionCode = versions.find((value) => value.id === versionId)?.code || "";
+  // Cada actualización de la proyección trae un objeto de estado nuevo. Si las
+  // diapositivas dependieran de esa identidad, el operador volvía a enviar el
+  // versículo sin resaltar un instante después de resaltarlo. Solo se recalcula
+  // cuando cambia de verdad el diseño bíblico o la pantalla.
+  const bibleStyleKey = JSON.stringify(state.bibleStyle);
+  const viewportKey = `${state.outputViewport.width}x${state.outputViewport.height}`;
+  const bibleStyle = useMemo(() => state.bibleStyle, [bibleStyleKey]);
+  const outputViewport = useMemo(() => state.outputViewport, [viewportKey]);
   const slidesFor = useCallback((verse: BibleVerse, mode: "automatic" | "full" | "split" = "automatic") => {
     const splitAtWord = splitOverrides[
       bibleSplitOverrideKey(versionCode, verse.book, verse.chapter, verse.verse)
@@ -204,26 +212,26 @@ export function BibleOperator({
       verse.text,
       `${verse.book} ${verse.chapter}:${verse.verse}`,
       versionCode,
-      state.bibleStyle,
-      state.outputViewport,
+      bibleStyle,
+      outputViewport,
       { mode, splitAtWord },
     );
-  }, [splitOverrides, state.bibleStyle, state.outputViewport, versionCode]);
+  }, [splitOverrides, bibleStyle, outputViewport, versionCode]);
   // The complete verse is always the main action. A/B appears only as an
   // optional, deliberate choice when the configured projection needs it.
   const verseChoices = useMemo(
     () =>
       displayedVerses.map((verse) => {
         const recommendedSplit =
-          state.bibleStyle.longVerseMode !== "auto-fit" &&
-          shouldSplitBibleVerse(verse.text, state.bibleStyle, state.outputViewport);
+          bibleStyle.longVerseMode !== "auto-fit" &&
+          shouldSplitBibleVerse(verse.text, bibleStyle, outputViewport);
         return {
           verse,
           fullSlide: slidesFor(verse, "full")[0],
           splitSlides: recommendedSplit ? slidesFor(verse, "split") : [],
         };
       }),
-    [displayedVerses, slidesFor, state.bibleStyle, state.outputViewport],
+    [displayedVerses, slidesFor, bibleStyle, outputViewport],
   );
   const addToHistory = useCallback((entry: Omit<BibleHistoryEntry, "id">) => {
     setHistory((entries) => {
@@ -387,14 +395,18 @@ export function BibleOperator({
       return;
     }
     if (!selected.verse) return;
-    const slides = slidesFor(selected.verse, "full").map((slide) => ({
+    // Respeta la división automática en A/B y proyecta la parte que contiene
+    // la frase elegida.
+    const plainSlides = slidesFor(selected.verse, "automatic");
+    const target = Math.max(0, plainSlides.findIndex((slide) => slide.contentHtml.includes(escapedText)));
+    const slides = plainSlides.map((slide) => ({
       ...slide,
       html: slide.html.replace(escapedText, markedText),
       contentHtml: slide.contentHtml.replace(escapedText, markedText),
     }));
     setActiveVerse(verseKey(selected.verse));
     setActiveSlides(slides);
-    projectSlide(slides, 0);
+    projectSlide(slides, target);
     window.getSelection()?.removeAllRanges();
     setHighlightSelection(null);
   };

@@ -1,3 +1,4 @@
+import { networkInterfaces } from "node:os";
 import express from "express";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
@@ -31,6 +32,18 @@ const remoteClientVersion = "10.11.52";
 // This hostname is answered only inside the current Wi-Fi/LAN through mDNS.
 // It deliberately does not require an Internet connection or a fixed IP.
 const remoteLanHostname = "fl-proyector.local";
+
+/** Direcciones IPv4 privadas de esta PC (sin autoconfiguración 169.254). */
+function lanIpv4Addresses() {
+  return Object.values(networkInterfaces())
+    .flat()
+    .filter(
+      (item): item is NonNullable<typeof item> =>
+        Boolean(item) && item!.family === "IPv4" && !item!.internal && !item!.address.startsWith("169.254."),
+    )
+    .map((item) => item.address)
+    .filter((address) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(address));
+}
 const remoteLanOrigin = `http://${remoteLanHostname}:3001`;
 
 type LiveAudiencePayload =
@@ -266,6 +279,9 @@ export function startRemoteServer(
         hostname: remoteLanHostname,
         origin: remoteLanOrigin,
         remoteVersion: remoteClientVersion,
+        // Direcciones reales de la PC: el control remoto las recuerda para
+        // reconectarse aunque la red bloquee fl-proyector.local (mDNS).
+        addresses: lanIpv4Addresses(),
       }),
   );
   app.get("/api/remote/app-version", (_req, res) =>
@@ -958,6 +974,13 @@ const remoteHtml = String.raw`<!doctype html>
   var lanOrigin="http://fl-proyector.local:3001",legacyCandidateOrigins=candidateOrigins;
   candidateOrigins=function(){var candidates=[lanOrigin],legacy=legacyCandidateOrigins();legacy.forEach(function(origin){if(candidates.indexOf(origin)<0)candidates.push(origin);});return candidates;};
   if(location.origin!==lanOrigin)setTimeout(function(){discover(lanOrigin).then(function(origin){if(origin){localStorage.setItem("fl-remote-server",origin);location.replace(origin);}});},350);
+  // Remember the PC's real IP addresses. If fl-proyector.local stops
+  // resolving (mDNS blocked by the network or a firewall), the phone can
+  // still find the PC by its last address or by scanning those subnets.
+  function rememberServerAddresses(){fetch("/api/discovery?_="+Date.now(),{cache:"no-store"}).then(function(response){return response.ok?response.json():null;}).then(function(data){if(data&&data.addresses&&data.addresses.length)localStorage.setItem("fl-remote-ips",JSON.stringify(data.addresses.slice(0,6)));}).catch(function(){});}
+  rememberServerAddresses();
+  var addressCandidateOrigins=candidateOrigins;
+  candidateOrigins=function(){var candidates=addressCandidateOrigins(),stored=[];try{stored=JSON.parse(localStorage.getItem("fl-remote-ips")||"[]");}catch(error){stored=[];}if(!Array.isArray(stored))stored=[];var prefixes=[];stored.forEach(function(ip){var origin="http://"+ip+":3001";if(candidates.indexOf(origin)<0)candidates.splice(1,0,origin);var parts=String(ip).split(".");if(parts.length===4){var prefix=parts.slice(0,3).join(".");if(prefixes.indexOf(prefix)<0)prefixes.push(prefix);}});prefixes.forEach(function(prefix){for(var last=1;last<255;last++){var origin="http://"+prefix+"."+last+":3001";if(candidates.indexOf(origin)<0)candidates.push(origin);}});return candidates;};
   document.getElementById("clear-live").onclick=function(){command("/api/remote/clear").then(function(){selectedVerse=-1;renderVerses();notify("Versículo quitado del aire");});};
   })();
 </script></body></html>`;

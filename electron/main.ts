@@ -1377,47 +1377,20 @@ function localNetworkAddresses() {
 
 function enableWindowsRemoteAccess() {
   if (process.platform !== "win32") return Promise.resolve(true);
+  // Una sola ventana de permiso de Windows (antes eran dos) y sin reglas
+  // duplicadas: se borran y se vuelven a crear. Mismas reglas que instala el
+  // instalador (build/installer.nsh).
+  const remoteIps = "localsubnet,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16";
+  const script = [
+    'netsh advfirewall firewall delete rule name="FL Proyector - Control remoto"',
+    'netsh advfirewall firewall delete rule name="FL Proyector - Descubrimiento local"',
+    `netsh advfirewall firewall add rule name="FL Proyector - Control remoto" dir=in action=allow protocol=TCP localport=3001 remoteip=${remoteIps} profile=any enable=yes`,
+    `netsh advfirewall firewall add rule name="FL Proyector - Descubrimiento local" dir=in action=allow protocol=UDP localport=5353 remoteip=${remoteIps} profile=any enable=yes`,
+  ].join(" & ");
   return new Promise<boolean>((resolve) => {
-    const remoteRuleArguments = [
-      "advfirewall",
-      "firewall",
-      "add",
-      "rule",
-      "name=FL Proyector - Control remoto",
-      "dir=in",
-      "action=allow",
-      "protocol=TCP",
-      "localport=3001",
-      "remoteip=localsubnet",
-      "profile=any",
-      "enable=yes",
-    ];
-    const discoveryRuleArguments = [
-      "advfirewall",
-      "firewall",
-      "add",
-      "rule",
-      "name=FL Proyector - Descubrimiento local",
-      "dir=in",
-      "action=allow",
-      "protocol=UDP",
-      "localport=5353",
-      "remoteip=localsubnet",
-      "profile=any",
-      "enable=yes",
-    ];
-    const escapeArguments = (argumentsList: string[]) =>
-      argumentsList
-        .map((value) => `'${value.replace(/'/g, "''")}'`)
-        .join(",");
-    const escapedRemoteArguments = escapeArguments(remoteRuleArguments);
-    const escapedDiscoveryArguments = escapeArguments(discoveryRuleArguments);
-    const command = [
-      `$remote = Start-Process -FilePath 'netsh.exe' -ArgumentList @(${escapedRemoteArguments}) -Verb RunAs -Wait -PassThru`,
-      "if ($remote.ExitCode -ne 0) { exit $remote.ExitCode }",
-      `$discovery = Start-Process -FilePath 'netsh.exe' -ArgumentList @(${escapedDiscoveryArguments}) -Verb RunAs -Wait -PassThru`,
-      "exit $discovery.ExitCode",
-    ].join("; ");
+    const command =
+      `$p = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', '${script.replace(/'/g, "''")}') -Verb RunAs -Wait -PassThru -WindowStyle Hidden; ` +
+      "exit $p.ExitCode";
     const child = spawn(
       "powershell.exe",
       ["-NoProfile", "-NonInteractive", "-Command", command],
