@@ -327,7 +327,7 @@ export function MediaLibrary({ state, update }: Props) {
                   }}
                 />
               )}
-              <div className="playing-indicator">AL AIRE</div>
+              <div className="playing-indicator">Al aire</div>
             </div>
             <div className="media-meta">
               <div>
@@ -393,7 +393,7 @@ export function MediaLibrary({ state, update }: Props) {
           >
             <div className="media-tags-header">
               <div>
-                <span className="eyebrow">AGREGAR FONDOS</span>
+                <span className="eyebrow">Agregar fondos</span>
                 <h2 id="media-source-title">Elegí el origen</h2>
               </div>
               <button
@@ -565,7 +565,7 @@ export function MediaLibrary({ state, update }: Props) {
           >
             <div className="media-tags-header">
               <div>
-                <span className="eyebrow">ORGANIZAR FONDO</span>
+                <span className="eyebrow">Organizar fondo</span>
                 <h2 id="media-tags-title">Editar fondo</h2>
               </div>
               <button

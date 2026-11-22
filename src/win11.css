@@ -1,0 +1,1499 @@
+/* ==========================================================================
+   FL Proyector · Capa de diseño Windows 11 (Fluent 2)
+   Se carga al final: afina los colores, la tipografía y los controles de toda
+   la interfaz de operación. La salida al proyector (fuera de .app-shell) no
+   se modifica.
+   ========================================================================== */
+
+/* ---------- Colores del sistema --------------------------------------- */
+:root,
+html[data-theme="light"] {
+  --fl-sidebar: #f3f3f3;          /* Mica */
+  --fl-bg: #f9f9f9;               /* capa de contenido */
+  --fl-surface: #ffffff;          /* tarjetas */
+  --fl-surface-alt: #fdfdfd;      /* controles */
+  --fl-border: #e5e5e5;
+  --fl-border-strong: #d1d1d1;
+  --fl-text: #1b1b1b;
+  --fl-muted: #5f5f5f;
+  --fl-tertiary: #8a8a8a;
+  --fl-accent: #005fb8;
+  --fl-accent-hover: #196ebf;
+  --fl-accent-pressed: #3283c9;
+  --fl-accent-soft: #e6f0fa;
+  --fl-accent-text: #003e92;
+  --fl-on-accent: #ffffff;
+  --fl-hover: #f0f0f0;
+  --fl-pressed: #ebebeb;
+  --fl-control-fill: #ffffffb3;
+  --fl-control-hover: #f9f9f980;
+  --fl-control-stroke: #0000000f;
+  --fl-control-stroke-bottom: #00000029;
+  --fl-subtle-hover: #0000000a;
+  --fl-subtle-pressed: #00000006;
+  --fl-card-shadow: 0 1px 2px #0000000a;
+  --fl-flyout-shadow: 0 8px 16px #00000024, 0 0 0 1px #0000000f;
+  --fl-success: #0f7b0f;
+  --fl-caution: #9d5d00;
+  --fl-danger: #c42b1c;
+  --fl-danger-soft: #fde7e9;
+  --fl-shadow: var(--fl-card-shadow);
+  --fl-font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
+  --fl-font-display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif;
+}
+html[data-theme="dark"] {
+  --fl-sidebar: #202020;
+  --fl-bg: #282828;
+  --fl-surface: #2f2f2f;
+  --fl-surface-alt: #2c2c2c;
+  --fl-border: #3a3a3a;
+  --fl-border-strong: #4b4b4b;
+  --fl-text: #ffffff;
+  --fl-muted: #c9c9c9;
+  --fl-tertiary: #9a9a9a;
+  --fl-accent: #60cdff;
+  --fl-accent-hover: #5ab9e5;
+  --fl-accent-pressed: #52a6cc;
+  --fl-accent-soft: #1f3a47;
+  --fl-accent-text: #99ebff;
+  --fl-on-accent: #000000;
+  --fl-hover: #353535;
+  --fl-pressed: #2b2b2b;
+  --fl-control-fill: #ffffff0f;
+  --fl-control-hover: #ffffff15;
+  --fl-control-stroke: #ffffff12;
+  --fl-control-stroke-bottom: #ffffff24;
+  --fl-subtle-hover: #ffffff0f;
+  --fl-subtle-pressed: #ffffff0a;
+  --fl-card-shadow: 0 1px 2px #00000040;
+  --fl-flyout-shadow: 0 8px 16px #00000066, 0 0 0 1px #ffffff14;
+  --fl-success: #6ccb5f;
+  --fl-caution: #fce100;
+  --fl-danger: #ff99a4;
+  --fl-danger-soft: #442726;
+}
+
+/* ---------- Tipografía ------------------------------------------------ */
+html .app-shell,
+html .app-shell :is(button, input, select, textarea) {
+  font-family: var(--fl-font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+html .app-shell { font-size: 14px; }
+html .app-shell .section-title h2,
+html .app-shell .w11-page-header h1 {
+  font-family: var(--fl-font-display);
+  letter-spacing: -0.01em;
+}
+
+/* ---------- Botones -------------------------------------------------- */
+html .app-shell :is(.primary, .save-settings, .import-button, .create-meeting, .new-song, .project-button:not(.active)) {
+  min-height: 32px;
+  color: var(--fl-on-accent) !important;
+  border: 1px solid transparent !important;
+  border-radius: 4px !important;
+  background: var(--fl-accent) !important;
+  box-shadow: inset 0 -1px 0 #00000033 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  transition: background 120ms ease;
+}
+html .app-shell :is(.primary, .save-settings, .import-button, .create-meeting, .new-song, .project-button:not(.active)):hover:not(:disabled) {
+  background: var(--fl-accent-hover) !important;
+}
+html .app-shell :is(.primary, .save-settings, .import-button, .create-meeting, .new-song, .project-button:not(.active)):active:not(:disabled) {
+  background: var(--fl-accent-pressed) !important;
+  box-shadow: none !important;
+}
+html .app-shell :is(.primary, .save-settings, .import-button, .create-meeting, .new-song) :is(svg) { color: inherit !important; }
+html .app-shell .secondary {
+  min-height: 32px;
+  color: var(--fl-text) !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-bottom-color: var(--fl-control-stroke-bottom) !important;
+  border-radius: 4px !important;
+  background: var(--fl-control-fill) !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+html .app-shell .secondary:hover:not(:disabled) { background: var(--fl-control-hover) !important; }
+html .app-shell :is(button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--fl-text) !important;
+  outline-offset: 1px !important;
+}
+html .app-shell button:disabled { cursor: default; }
+
+/* ---------- Barra superior e indicador de salida --------------------- */
+html .app-shell .topbar {
+  background: var(--fl-sidebar) !important;
+  border-bottom: 0 !important;
+  backdrop-filter: none;
+}
+html .app-shell .brand strong { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
+html .app-shell .on-air {
+  height: 30px;
+  gap: 8px;
+  padding: 0 12px 0 10px;
+  color: var(--fl-muted);
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-radius: 15px;
+  background: var(--fl-control-fill) !important;
+  font-size: 12px;
+}
+html .app-shell .on-air strong { color: var(--fl-text); font-weight: 600; }
+html .app-shell .on-air span { color: var(--fl-tertiary); }
+html .app-shell .on-air span::before { content: "·"; margin-right: 8px; }
+html .app-shell .on-air i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fl-tertiary);
+  animation: none;
+}
+html .app-shell .on-air.on-air-live {
+  border-color: #e81123 !important;
+  background: color-mix(in srgb, #e81123 16%, transparent) !important;
+}
+html .app-shell .on-air.on-air-live strong { color: #ff6b75; text-transform: uppercase; letter-spacing: 0.04em; }
+html[data-theme="light"] .app-shell .on-air.on-air-live strong { color: #c50f1f; }
+html .app-shell .on-air.on-air-live i { background: #e81123; box-shadow: 0 0 0 3px #e8112333 !important; animation: w11-pulse 1.6s ease-in-out infinite; }
+html .app-shell .on-air.on-air-frozen { border-color: #f7630c !important; background: color-mix(in srgb, #f7630c 16%, transparent) !important; }
+html .app-shell .on-air.on-air-frozen i { background: #f7630c; }
+html .app-shell .on-air.on-air-black { border-color: var(--fl-border-strong) !important; background: #000 !important; }
+html .app-shell .on-air.on-air-black strong { color: #fff; }
+@keyframes w11-pulse { 50% { opacity: 0.45; } }
+@media (max-width: 900px) { html .app-shell .on-air span { display: none; } }
+
+/* ---------- Navegación lateral (NavigationView) ---------------------- */
+html .app-shell .sidebar {
+  background: var(--fl-sidebar) !important;
+  border-right: 0 !important;
+  padding: 4px 6px 8px;
+}
+html .app-shell .sidebar nav button,
+html .app-shell .sidebar-bottom button {
+  height: 36px;
+  margin: 1px 0;
+  padding: 0 12px;
+  gap: 14px;
+  color: var(--fl-text) !important;
+  border: 0 !important;
+  border-radius: 5px;
+  background: transparent !important;
+  font-size: 14px;
+  font-weight: 400;
+}
+html .app-shell .sidebar nav button:hover,
+html .app-shell .sidebar-bottom button:hover { background: var(--fl-subtle-hover) !important; }
+html .app-shell .sidebar nav button.active { background: var(--fl-subtle-hover) !important; font-weight: 600; }
+html .app-shell .sidebar nav button svg,
+html .app-shell .sidebar-bottom button svg { width: 18px; height: 18px; color: var(--fl-text) !important; stroke-width: 1.6; }
+html .app-shell .sidebar nav button.active svg { color: var(--fl-accent) !important; }
+html .app-shell .sidebar button.active::before {
+  top: 50% !important;
+  bottom: auto !important;
+  height: 16px;
+  transform: translateY(-50%);
+  width: 3px !important;
+  border-radius: 2px !important;
+  background: var(--fl-accent) !important;
+}
+
+/* ---------- Capa de contenido redondeada (como en Windows 11) -------- */
+html .app-shell .workspace { background: var(--fl-sidebar) !important; }
+html .app-shell .content {
+  border-top: 1px solid var(--fl-border);
+  border-left: 1px solid var(--fl-border);
+  border-top-left-radius: 8px;
+  background: var(--fl-bg) !important;
+}
+html .app-shell .column-resizer { background: transparent !important; }
+html .app-shell .workspace > .column-resizer { background: var(--fl-bg) !important; border-top: 1px solid var(--fl-border); }
+
+/* ---------- Panel de vista en vivo ----------------------------------- */
+html .app-shell .live-panel {
+  background: var(--fl-bg) !important;
+  border-top: 1px solid var(--fl-border) !important;
+  border-left: 1px solid var(--fl-border) !important;
+}
+html .app-shell .live-panel { container: live / inline-size; }
+html .app-shell .panel-heading { align-items: center; flex-wrap: nowrap; gap: 8px; }
+html .app-shell .panel-heading > div:first-child { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--fl-text); font-size: 13px; font-weight: 600; white-space: nowrap; }
+html .app-shell .panel-heading > span { margin-left: auto; color: var(--fl-tertiary); font-size: 11px; white-space: nowrap; }
+html .app-shell .preview-mode-switch button { white-space: nowrap; }
+@container live (max-width: 400px) { html .app-shell .panel-heading > span { display: none; } html .app-shell .preview-panel-actions { margin-left: auto; } }
+html .app-shell .live-panel-collapse {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  padding: 0;
+  color: var(--fl-muted);
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+html .app-shell .live-panel-collapse:hover { color: var(--fl-text); background: var(--fl-subtle-hover); }
+html .app-shell .live-panel-collapse svg { width: 16px; height: 16px; }
+
+html .app-shell .live-panel.live-panel-rail {
+  width: 52px !important;
+  min-width: 52px !important;
+  flex: 0 0 52px !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px !important;
+  overflow: hidden;
+}
+.live-panel-rail .rail-expand,
+.live-panel-rail .rail-actions button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  padding: 0;
+  color: var(--fl-text);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+}
+.live-panel-rail .rail-expand:hover,
+.live-panel-rail .rail-actions button:hover { background: var(--fl-subtle-hover); }
+.live-panel-rail svg { width: 18px; height: 18px; }
+.live-panel-rail .rail-status i {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--fl-tertiary);
+}
+.live-panel-rail .rail-status.on-air-live i { background: #e81123; animation: w11-pulse 1.6s ease-in-out infinite; }
+.live-panel-rail .rail-status.on-air-frozen i { background: #f7630c; }
+.live-panel-rail .rail-status.on-air-black i { background: #000; outline: 1px solid var(--fl-border-strong); }
+.live-panel-rail .rail-label {
+  color: var(--fl-muted);
+  font-size: 12px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+}
+.live-panel-rail .rail-actions { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
+.live-panel-rail .rail-actions button.active.red { color: #ff6b75; border-color: #e81123; background: color-mix(in srgb, #e81123 16%, transparent); }
+.live-panel-rail .rail-actions button.active.amber { color: #f7630c; border-color: #f7630c; }
+.live-panel-rail .rail-actions button.active.blue { color: var(--fl-accent); border-color: var(--fl-accent); }
+
+/* Controles maestros: iconos y textos más legibles */
+html .app-shell .master-grid button {
+  min-height: 52px;
+  height: auto !important;
+  padding: 7px 4px !important;
+  gap: 3px;
+  color: var(--fl-text) !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-bottom-color: var(--fl-control-stroke-bottom) !important;
+  border-radius: 5px !important;
+  background: var(--fl-control-fill) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1.2;
+}
+html .app-shell .master-grid button:hover { background: var(--fl-control-hover) !important; }
+html .app-shell .master-grid button svg { width: 18px; height: 18px; }
+html .app-shell .master-grid button small { color: var(--fl-tertiary); font-size: 10.5px; }
+html .app-shell .master-grid button.active.red { color: #ff6b75 !important; border-color: #e81123 !important; background: color-mix(in srgb, #e81123 16%, var(--fl-surface)) !important; }
+html[data-theme="light"] .app-shell .master-grid button.active.red { color: #c50f1f !important; }
+html .app-shell .master-grid button.active.blue { color: var(--fl-accent-text) !important; border-color: var(--fl-accent) !important; background: var(--fl-accent-soft) !important; }
+html .app-shell .master-grid button.active.amber { color: #f7630c !important; border-color: #f7630c !important; background: color-mix(in srgb, #f7630c 14%, var(--fl-surface)) !important; }
+html .app-shell .master-controls .eyebrow { color: var(--fl-text); font-size: 13px; font-weight: 600; }
+html .app-shell .preview-mode-switch button.active { color: var(--fl-on-accent) !important; background: var(--fl-accent) !important; }
+
+/* ---------- Biblia: barra y columnas que se adaptan al espacio ------- */
+html .app-shell .bible-page { container: bible / inline-size; }
+html .app-shell .bible-toolbar {
+  display: grid !important;
+  grid-template-columns: minmax(170px, 1.3fr) minmax(130px, 1fr) minmax(84px, 0.55fr) minmax(110px, 0.7fr) minmax(220px, 2fr) !important;
+  gap: 10px 12px !important;
+  padding: 12px 14px !important;
+  border-radius: 8px !important;
+}
+html .app-shell .bible-toolbar label,
+html .app-shell .bible-toolbar .bible-book-field {
+  min-width: 0;
+  color: var(--fl-muted) !important;
+  font-family: var(--fl-font) !important;
+  font-size: 12px !important;
+}
+html .app-shell .bible-toolbar :is(select, .bible-book-trigger, .bible-search) {
+  height: 34px !important;
+  min-height: 34px !important;
+  min-width: 0;
+  width: 100%;
+}
+html .app-shell .bible-toolbar :is(select, .bible-book-trigger, .bible-search input) {
+  font-family: var(--fl-font) !important;
+  font-size: 13px !important;
+  text-overflow: ellipsis;
+}
+html .app-shell .bible-toolbar .bible-search { align-self: end; }
+#root .app-shell :is(.search, .song-search, .bible-search, .picker-search) > input { height: 100% !important; min-height: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; outline: 0 !important; box-shadow: none !important; }
+#root .app-shell :is(.search, .song-search, .bible-search, .picker-search):focus-within { border-bottom: 2px solid var(--fl-accent) !important; }
+html .app-shell .bible-slide-column .bible-column-heading { flex-wrap: wrap; gap: 6px; }
+html .app-shell .bible-slide-column .bible-column-heading > * { flex: 0 0 auto; }
+html .app-shell .bible-history-clear { white-space: nowrap; }
+@container bible (max-width: 1000px) {
+  html .app-shell .bible-toolbar {
+    grid-template-columns: minmax(150px, 1.3fr) minmax(120px, 1fr) minmax(80px, 0.6fr) minmax(100px, 0.7fr) !important;
+  }
+  html .app-shell .bible-toolbar .bible-search { grid-column: 1 / -1; }
+}
+@container bible (max-width: 560px) {
+  html .app-shell .bible-toolbar { grid-template-columns: 1fr 1fr !important; }
+}
+html .app-shell .bible-workspace {
+  grid-template-columns: minmax(0, 1fr) clamp(220px, 28%, 320px) !important;
+}
+@container bible (max-width: 760px) {
+  html .app-shell .bible-workspace {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) minmax(150px, 30%);
+  }
+}
+html .app-shell .bible-column-heading span { color: var(--fl-muted); font-size: 12px; letter-spacing: 0.02em; }
+html .app-shell .verse-list b { color: var(--fl-accent-text) !important; font-size: 13px; font-weight: 700; }
+html .app-shell .verse-list span { font-size: 14px; line-height: 1.5; }
+html .app-shell .verse-full { grid-template-columns: 96px minmax(0, 1fr) !important; gap: 10px !important; }
+@container bible (max-width: 640px) {
+  html .app-shell .verse-full { grid-template-columns: minmax(0, 1fr) !important; gap: 4px !important; }
+}
+
+/* ---------- Canciones: pantalla de inicio de la biblioteca ----------- */
+.song-home {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 24px;
+  overflow: auto;
+  padding: 28px 28px 24px;
+}
+.song-home header .eyebrow { color: var(--fl-muted); font-size: 12px; }
+.song-home h2 { margin: 2px 0 4px; color: var(--fl-text); font-family: var(--fl-font-display); font-size: 28px; font-weight: 600; }
+.song-home header p { margin: 0; color: var(--fl-muted); font-size: 13px; }
+.song-home-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.song-home-actions button { display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; cursor: pointer; }
+.song-home-actions svg { width: 16px; height: 16px; }
+.song-home h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: var(--fl-text); font-size: 14px; font-weight: 600; }
+.song-home h3 svg { width: 16px; height: 16px; color: var(--fl-muted); }
+.song-home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.song-home-grid button {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 68px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 12px 10px 16px;
+  color: var(--fl-text);
+  text-align: left;
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 7px;
+  background: var(--fl-surface);
+  box-shadow: var(--fl-card-shadow);
+  cursor: pointer;
+}
+.song-home-grid button:hover { background: var(--fl-hover); }
+.song-home-grid i { position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 2px 2px 0; background: var(--song-color); }
+.song-home-grid strong { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.song-home-grid span { overflow: hidden; color: var(--fl-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.song-home-tip { margin: auto 0 0; color: var(--fl-tertiary); font-size: 12px; }
+
+/* ==========================================================================
+   AJUSTES · réplica del panel de Configuración de Windows 11
+   ========================================================================== */
+html .app-shell .w11-settings {
+  display: grid;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: 216px minmax(0, 1fr);
+  color: var(--fl-text);
+  background: var(--fl-bg) !important;
+}
+html .app-shell .w11-settings-nav {
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 10px 16px;
+  border-right: 1px solid var(--fl-border);
+  background: transparent;
+}
+html .app-shell .w11-settings-nav h2 {
+  margin: 0 0 14px;
+  padding: 0 12px;
+  color: var(--fl-text);
+  font-family: var(--fl-font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+html .app-shell .w11-settings-nav nav { display: flex; flex-direction: column; gap: 2px; }
+html .app-shell .w11-settings-nav button {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 38px;
+  align-items: center;
+  gap: 14px;
+  padding: 0 12px;
+  color: var(--fl-text) !important;
+  text-align: left;
+  border: 0 !important;
+  border-radius: 5px;
+  background: transparent !important;
+  font-size: 14px;
+  cursor: pointer;
+}
+html .app-shell .w11-settings-nav button:hover { background: var(--fl-subtle-hover) !important; }
+html .app-shell .w11-settings-nav button.active { background: var(--fl-subtle-hover) !important; font-weight: 600; }
+html .app-shell .w11-settings-nav button.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--fl-accent);
+  transform: translateY(-50%);
+}
+html .app-shell .w11-settings-nav button svg { width: 18px; height: 18px; flex: 0 0 18px; color: var(--fl-text); stroke-width: 1.6; }
+html .app-shell .w11-settings-nav button.active svg { color: var(--fl-accent); }
+html .app-shell .w11-settings-nav button span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w11-dirty-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--fl-accent); }
+
+html .app-shell .w11-settings-body { display: flex; min-width: 0; min-height: 0; flex-direction: column; }
+html .app-shell .w11-settings-scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 24px clamp(16px, 4cqi, 40px) 32px;
+  container: w11 / inline-size;
+}
+html .app-shell .w11-settings-scroll > * { max-width: 1000px; margin-inline: auto; }
+.w11-page-header { margin-bottom: 22px; }
+.w11-breadcrumb { color: var(--fl-muted); font-size: 13px; }
+html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); font-size: 28px; font-weight: 600; line-height: 1.25; }
+.w11-page-header p { margin: 0; color: var(--fl-muted); font-size: 13px; }
+
+/* Grupos y filas */
+.w11-group { margin-bottom: 26px; }
+.w11-group-header { display: flex; min-height: 32px; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.w11-group-header h3 { margin: 0; color: var(--fl-text); font-size: 14px; font-weight: 600; }
+.w11-group-items { display: flex; flex-direction: column; gap: 3px; }
+.w11-group-note { margin: 6px 2px 0; color: var(--fl-muted); font-size: 12px; line-height: 1.45; }
+.w11-group-note.top { margin: 0 2px 6px; }
+
+.w11-row {
+  position: relative;
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  color: var(--fl-text);
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 6px;
+  background: var(--fl-surface);
+  box-shadow: var(--fl-card-shadow);
+}
+.w11-row.disabled .w11-row-copy,
+.w11-row.disabled .w11-row-icon { opacity: 0.45; }
+.w11-row-icon { display: grid; width: 22px; flex: 0 0 22px; place-items: center; color: var(--fl-text); }
+.w11-row-icon svg { width: 20px; height: 20px; stroke-width: 1.5; }
+.w11-row-copy { display: flex; min-width: 0; flex: 1 1 auto; flex-direction: column; gap: 2px; }
+.w11-row-copy strong { color: var(--fl-text); font-size: 14px; font-weight: 400; line-height: 1.35; }
+.w11-row-copy small { color: var(--fl-muted); font-size: 12px; line-height: 1.4; }
+.w11-row-control { display: flex; min-width: 0; flex: 0 0 auto; align-items: center; justify-content: flex-end; gap: 8px; }
+@container w11 (max-width: 500px) {
+  .w11-row { flex-wrap: wrap; }
+  .w11-row-control { width: 100%; justify-content: flex-start; padding-left: 38px; }
+}
+
+/* Expander (fila desplegable) */
+.w11-expander { border-radius: 6px; }
+.w11-expander-head { padding-right: 48px; }
+.w11-expander-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+.w11-expander-hit:hover { background: var(--fl-subtle-hover); }
+.w11-expander-head > :not(.w11-expander-hit) { position: relative; z-index: 1; }
+.w11-expander-head .w11-row-copy,
+.w11-expander-head .w11-row-icon { pointer-events: none; }
+.w11-expander-chevron {
+  position: absolute !important;
+  right: 16px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  color: var(--fl-muted);
+  transform: translateY(-50%);
+  transition: transform 160ms ease;
+  pointer-events: none;
+}
+.w11-expander.open .w11-expander-chevron { transform: translateY(-50%) rotate(180deg); }
+.w11-expander.open .w11-expander-head { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.w11-expander.disabled .w11-expander-hit { cursor: default; }
+.w11-expander.disabled .w11-expander-hit:hover { background: transparent; }
+.w11-expander-body {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--fl-control-stroke);
+  border-top: 0;
+  border-radius: 0 0 6px 6px;
+  background: var(--fl-surface-alt);
+  overflow: visible;
+  animation: w11-expand 160ms ease-out;
+}
+.w11-expander-body > .w11-row {
+  min-height: 52px;
+  padding-left: 54px;
+  border: 0;
+  border-top: 1px solid var(--fl-control-stroke);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+@keyframes w11-expand { from { opacity: 0; transform: translateY(-4px); } }
+
+/* Interruptor (ToggleSwitch) */
+.w11-toggle { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; }
+.w11-toggle-state { min-width: 74px; color: var(--fl-text); font-size: 14px; text-align: right; }
+.w11-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.w11-toggle i {
+  position: relative;
+  width: 40px;
+  height: 20px;
+  flex: 0 0 40px;
+  border: 1px solid var(--fl-muted);
+  border-radius: 10px;
+  background: var(--fl-control-fill);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.w11-toggle i::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--fl-muted);
+  transform: translateY(-50%);
+  transition: left 140ms cubic-bezier(.2,.8,.3,1), width 120ms ease, height 120ms ease, background 120ms ease;
+}
+.w11-toggle:hover i::after { width: 14px; height: 14px; left: 2px; }
+.w11-toggle input:checked + i { border-color: var(--fl-accent); background: var(--fl-accent); }
+.w11-toggle input:checked + i::after { left: 23px; background: var(--fl-on-accent); }
+.w11-toggle:hover input:checked + i::after { left: 22px; }
+.w11-toggle input:focus-visible + i { outline: 2px solid var(--fl-text); outline-offset: 2px; }
+.w11-toggle:has(input:disabled) { cursor: default; opacity: 0.45; }
+@container w11 (max-width: 500px) { .w11-toggle-state { min-width: 0; text-align: left; } }
+
+/* Campos: select, texto, números */
+#root .app-shell .w11-settings :is(.w11-select, .w11-text, .w11-number input, .w11-keycap) {
+  height: 32px;
+  min-height: 32px;
+  color: var(--fl-text) !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-bottom-color: var(--fl-control-stroke-bottom) !important;
+  border-radius: 4px !important;
+  background: var(--fl-control-fill) !important;
+  box-shadow: none !important;
+  font-size: 14px !important;
+  transition: background 100ms ease;
+}
+#root .app-shell .w11-settings :is(.w11-select, .w11-text, .w11-number input, .w11-keycap):hover:not(:disabled) { background: var(--fl-control-hover) !important; }
+#root .app-shell .w11-settings :is(.w11-text, .w11-number input, .w11-keycap):focus {
+  outline: 0 !important;
+  border-bottom: 2px solid var(--fl-accent) !important;
+  background: var(--fl-surface) !important;
+}
+#root .app-shell .w11-settings .w11-select:focus { outline: 0 !important; border-color: var(--fl-accent) !important; }
+#root .app-shell .w11-settings :is(.w11-select, .w11-text, .w11-number input):disabled { opacity: 0.45; }
+#root .app-shell .w11-settings select.w11-select {
+  width: 240px;
+  max-width: 100%;
+  padding: 0 34px 0 11px !important;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+#root .app-shell .w11-settings :is(.w11-select, .w11-text).wide { width: 320px; }
+#root .app-shell .w11-settings .w11-text { padding: 0 11px !important; }
+.w11-number { position: relative; display: inline-flex; align-items: center; }
+#root .app-shell .w11-settings .w11-number input { width: 104px; padding: 0 34px 0 11px !important; font-variant-numeric: tabular-nums; }
+.w11-number em { position: absolute; right: 11px; color: var(--fl-muted); font-size: 13px; font-style: normal; pointer-events: none; }
+#root .app-shell .w11-settings .w11-keycap {
+  width: 104px;
+  padding: 0 10px !important;
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, monospace !important;
+  font-size: 13px !important;
+  font-weight: 600;
+  text-align: center;
+  caret-color: transparent;
+  cursor: pointer;
+}
+@container w11 (max-width: 500px) {
+  #root .app-shell .w11-settings :is(.w11-select, .w11-text, .w11-select.wide, .w11-text.wide) { width: 100%; }
+}
+
+/* Botones dentro de ajustes */
+.w11-button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  color: var(--fl-text);
+  border: 1px solid var(--fl-control-stroke);
+  border-bottom-color: var(--fl-control-stroke-bottom);
+  border-radius: 4px;
+  background: var(--fl-control-fill);
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+.w11-button:hover:not(:disabled) { background: var(--fl-control-hover); }
+.w11-button:active:not(:disabled) { color: var(--fl-muted); }
+.w11-button:disabled { opacity: 0.45; }
+.w11-button svg { width: 16px; height: 16px; }
+.w11-button.accent { color: var(--fl-on-accent); border-color: transparent; border-bottom-color: #00000033; background: var(--fl-accent); font-weight: 600; }
+.w11-button.accent:hover:not(:disabled) { background: var(--fl-accent-hover); }
+.w11-button.accent:active:not(:disabled) { color: var(--fl-on-accent); background: var(--fl-accent-pressed); }
+.w11-button.accent:disabled { color: var(--fl-tertiary); background: var(--fl-control-fill); border-color: var(--fl-control-stroke); opacity: 1; }
+.w11-button.subtle { border-color: transparent; background: transparent; }
+.w11-button.subtle:hover:not(:disabled) { background: var(--fl-subtle-hover); }
+
+/* Etiqueta y botones segmentados */
+.w11-tag { padding: 3px 9px; color: var(--fl-muted); border: 1px solid var(--fl-control-stroke); border-radius: 12px; background: var(--fl-control-fill); font-size: 12px; white-space: nowrap; }
+.w11-segmented { display: inline-flex; padding: 2px; border: 1px solid var(--fl-control-stroke); border-radius: 5px; background: var(--fl-control-fill); }
+.w11-segmented button { min-width: 78px; height: 28px; padding: 0 12px; color: var(--fl-text); border: 0; border-radius: 3px; background: transparent; font-size: 13px; cursor: pointer; }
+.w11-segmented button:hover:not(.active) { background: var(--fl-subtle-hover); }
+.w11-segmented button.active { color: var(--fl-on-accent); background: var(--fl-accent); font-weight: 600; }
+
+/* Selector de color */
+.w11-color { position: relative; }
+.w11-color-trigger {
+  display: inline-flex;
+  height: 32px;
+  min-width: 150px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px 0 6px;
+  color: var(--fl-text);
+  border: 1px solid var(--fl-control-stroke);
+  border-bottom-color: var(--fl-control-stroke-bottom);
+  border-radius: 4px;
+  background: var(--fl-control-fill);
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, monospace;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.w11-color-trigger:hover { background: var(--fl-control-hover); }
+.w11-color-trigger i { width: 22px; height: 22px; flex: 0 0 22px; border: 1px solid #80808066; border-radius: 4px; }
+.w11-color-trigger i.transparent { background: repeating-conic-gradient(#9a9a9a 0 25%, #e6e6e6 0 50%) 0 0 / 10px 10px; }
+.w11-color-trigger span { flex: 1; text-align: left; }
+.w11-color-trigger svg { width: 14px; height: 14px; color: var(--fl-muted); }
+.w11-color-flyout {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 60;
+  width: 252px;
+  padding: 14px;
+  color: var(--fl-text);
+  border-radius: 8px;
+  background: var(--fl-surface);
+  box-shadow: var(--fl-flyout-shadow);
+  animation: w11-expand 140ms ease-out;
+}
+.w11-color-flyout > strong { display: block; margin-bottom: 10px; font-size: 13px; font-weight: 600; }
+.w11-color-swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.w11-color-swatches button { aspect-ratio: 1; padding: 0; border: 1px solid #80808055; border-radius: 4px; cursor: pointer; }
+.w11-color-swatches button:hover { transform: scale(1.06); }
+.w11-color-swatches button.active { outline: 2px solid var(--fl-accent); outline-offset: 2px; }
+.w11-color-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--fl-border); }
+.w11-color-footer label { display: inline-flex; align-items: center; gap: 8px; color: var(--fl-text); font-size: 13px; cursor: pointer; }
+.w11-color-footer input[type="color"] { width: 28px; height: 28px; padding: 0; border: 1px solid var(--fl-control-stroke); border-radius: 4px; background: none; cursor: pointer; }
+
+/* Logo */
+.w11-logo-row { align-items: center; }
+.w11-logo-preview {
+  display: grid;
+  width: 128px;
+  height: 72px;
+  flex: 0 0 128px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 6px;
+}
+.w11-logo-preview img { max-width: 70%; max-height: 70%; object-fit: contain; }
+.w11-logo-preview.fullscreen img { max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: cover; }
+.w11-logo-preview span { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #ffffff99; font-size: 11px; }
+.w11-logo-preview svg { width: 20px; height: 20px; }
+
+/* Galería de zócalos bíblicos */
+.w11-design-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; padding: 14px 16px 16px 54px; border-top: 1px solid var(--fl-control-stroke); }
+.w11-design-grid button {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px;
+  color: var(--fl-text);
+  text-align: left;
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 6px;
+  background: var(--fl-control-fill);
+  cursor: pointer;
+}
+.w11-design-grid button:hover { background: var(--fl-control-hover); }
+.w11-design-grid button.active { border-color: var(--fl-accent); box-shadow: inset 0 0 0 1px var(--fl-accent); }
+.w11-design-grid .reference-design-sample { display: grid; width: 100%; min-height: 54px; margin-bottom: 4px; place-items: center; border-radius: 4px; background: #111; font-style: normal; }
+.w11-design-grid strong { font-size: 13px; font-weight: 600; }
+.w11-design-grid small { color: var(--fl-muted); font-size: 12px; }
+
+/* Tarjetas de tema */
+.w11-theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.w11-theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  color: var(--fl-text);
+  text-align: left;
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 8px;
+  background: var(--fl-surface);
+  box-shadow: var(--fl-card-shadow);
+  cursor: pointer;
+}
+.w11-theme-card:hover { background: var(--fl-hover); }
+.w11-theme-card.active { border-color: var(--fl-accent); box-shadow: inset 0 0 0 1px var(--fl-accent); }
+.w11-theme-sample { position: relative; display: block; height: 104px; border-bottom: 1px solid var(--fl-control-stroke); }
+.w11-theme-card.dark .w11-theme-sample { background: #202020; }
+.w11-theme-card.light .w11-theme-sample { background: #f3f3f3; }
+.w11-theme-sample i { position: absolute; left: 14px; top: 14px; bottom: 14px; width: 30%; border-radius: 5px; }
+.w11-theme-sample b { position: absolute; left: calc(30% + 24px); right: 14px; height: 18px; border-radius: 4px; }
+.w11-theme-sample b:first-of-type { top: 22px; }
+.w11-theme-sample b:last-of-type { top: 50px; right: 40%; }
+.w11-theme-card.dark i, .w11-theme-card.dark b { background: #2f2f2f; }
+.w11-theme-card.light i, .w11-theme-card.light b { background: #fff; box-shadow: 0 0 0 1px #0000000f; }
+.w11-theme-card.dark b:first-of-type { background: #60cdff; }
+.w11-theme-card.light b:first-of-type { background: #005fb8; }
+.w11-theme-copy { display: grid; grid-template-columns: 18px 1fr; gap: 2px 10px; align-items: center; padding: 12px 14px 14px; }
+.w11-theme-copy svg { width: 18px; height: 18px; grid-row: span 2; }
+.w11-theme-copy strong { font-size: 14px; font-weight: 600; }
+.w11-theme-copy small { color: var(--fl-muted); font-size: 12px; }
+
+/* Actualizaciones */
+.w11-update-hero { min-height: 84px; }
+.w11-update-icon { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; color: var(--fl-on-accent); border-radius: 50%; background: var(--fl-accent); }
+.w11-update-icon svg { width: 22px; height: 22px; }
+.w11-update-hero .w11-row-copy strong { font-size: 18px; font-weight: 600; }
+.w11-update-hero.current .w11-update-icon { background: var(--fl-success); color: #fff; }
+.w11-update-hero.error .w11-update-icon { background: var(--fl-danger); color: #fff; }
+.w11-progress { height: 4px; margin: 4px 2px 0; overflow: hidden; border-radius: 2px; background: var(--fl-control-fill); }
+.w11-progress i { display: block; height: 100%; border-radius: 2px; background: var(--fl-accent); transition: width 200ms ease; }
+
+/* Barra de información y barra de guardado */
+.w11-infobar { margin: 6px 0 0; padding: 12px 16px; color: var(--fl-text); border: 1px solid var(--fl-control-stroke); border-radius: 6px; font-size: 13px; }
+.w11-infobar.error { border-color: color-mix(in srgb, var(--fl-danger) 40%, transparent); background: var(--fl-danger-soft); }
+.w11-savebar {
+  display: flex;
+  min-height: 60px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px clamp(16px, 3vw, 40px);
+  border-top: 1px solid var(--fl-border);
+  background: var(--fl-sidebar);
+}
+.w11-savebar > span { display: inline-flex; align-items: center; gap: 8px; margin-right: auto; color: var(--fl-muted); font-size: 13px; }
+.w11-savebar.dirty > span { color: var(--fl-text); }
+.w11-savebar > span i { width: 8px; height: 8px; border-radius: 50%; background: var(--fl-accent); }
+.w11-savebar .w11-button { min-width: 112px; }
+
+/* Ajustes en ventanas angostas */
+@media (max-width: 900px) {
+  html .app-shell .w11-settings { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  html .app-shell .w11-settings-nav { padding: 10px; border-right: 0; border-bottom: 1px solid var(--fl-border); }
+  html .app-shell .w11-settings-nav h2 { display: none; }
+  html .app-shell .w11-settings-nav nav { flex-direction: row; overflow-x: auto; }
+  html .app-shell .w11-settings-nav button { width: auto; flex: 0 0 auto; }
+}
+.song-editor > .song-home { padding: 8px 4px 4px; }
+.song-home-actions .secondary { min-width: 0; }
+
+/* Texto en pantalla: rango de tamaño y ejemplos */
+.w11-infobar:not(.error) { margin: 0 0 22px; border-color: color-mix(in srgb, var(--fl-accent) 35%, transparent); background: var(--fl-accent-soft); line-height: 1.5; }
+.w11-size-band {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 6px;
+  background: var(--fl-surface-alt);
+}
+.w11-size-band span { display: flex; flex-direction: column; gap: 1px; }
+.w11-size-band small { color: var(--fl-muted); font-size: 11px; }
+.w11-size-band strong { color: var(--fl-text); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.w11-size-band i { position: relative; height: 6px; border-radius: 3px; background: var(--fl-control-fill); }
+.w11-size-band b { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: color-mix(in srgb, var(--fl-accent) 55%, transparent); }
+.w11-size-band em { position: absolute; top: -5px; width: 3px; height: 16px; border-radius: 2px; background: var(--fl-accent); transform: translateX(-50%); }
+.w11-sample-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.w11-sample-grid button {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  color: var(--fl-text);
+  text-align: left;
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 6px;
+  background: var(--fl-surface);
+  cursor: pointer;
+}
+.w11-sample-grid button:hover { background: var(--fl-hover); }
+.w11-sample-grid button.active { border-color: var(--fl-accent); box-shadow: inset 0 0 0 1px var(--fl-accent); }
+.w11-sample-grid strong { font-size: 13px; font-weight: 600; }
+.w11-sample-grid small { color: var(--fl-muted); font-size: 12px; }
+@container w11 (max-width: 500px) { .w11-sample-grid { grid-template-columns: 1fr; } .w11-size-band { grid-template-columns: 1fr 1fr 1fr; } .w11-size-band i { grid-column: 1 / -1; grid-row: 2; } }
+
+/* ==========================================================================
+   Editor de anuncios (y textos bíblicos de la reunión)
+   ========================================================================== */
+#root .app-shell .item-edit-dialog.visual-dialog {
+  width: min(1240px, calc(100vw - 48px)) !important;
+  max-width: none !important;
+  height: min(860px, calc(100vh - 48px)) !important;
+  max-height: none !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid var(--fl-border-strong) !important;
+  border-radius: 8px !important;
+  background: var(--fl-bg) !important;
+  box-shadow: 0 32px 64px #00000066, 0 2px 21px #00000038 !important;
+}
+#root .app-shell .item-edit-dialog.visual-dialog > .dialog-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 6;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: var(--fl-muted) !important;
+  border: 0 !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+}
+#root .app-shell .item-edit-dialog.visual-dialog > .dialog-close:hover { color: var(--fl-text) !important; background: var(--fl-subtle-hover) !important; }
+#root .app-shell .pro-editor {
+  display: grid !important;
+  height: 100% !important;
+  max-height: none !important;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 42%) !important;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+#root .app-shell .pro-editor > .item-editor-controls {
+  min-height: 0;
+  max-height: none !important;
+  overflow-y: auto;
+  padding: 0 28px 24px !important;
+}
+.pro-editor-header {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 -28px 8px;
+  padding: 22px 28px 14px;
+  border-bottom: 1px solid var(--fl-border);
+  background: var(--fl-bg);
+}
+.pro-editor-kicker { display: inline-flex; align-items: center; gap: 8px; color: var(--fl-muted); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; }
+.pro-editor-kicker svg { width: 16px; height: 16px; color: var(--fl-accent); }
+#root .app-shell .pro-editor-title {
+  width: 100%;
+  height: 40px;
+  margin-left: -9px;
+  padding: 0 8px !important;
+  color: var(--fl-text) !important;
+  border: 1px solid transparent !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  font-family: var(--fl-font-display) !important;
+  font-size: 24px !important;
+  font-weight: 600 !important;
+}
+#root .app-shell .pro-editor-title:hover { background: var(--fl-control-fill) !important; border-color: var(--fl-control-stroke) !important; }
+#root .app-shell .pro-editor-title:focus { outline: 0 !important; background: var(--fl-surface) !important; border-color: var(--fl-control-stroke) !important; border-bottom: 2px solid var(--fl-accent) !important; }
+.pro-editor-header > small { color: var(--fl-tertiary); font-size: 12px; }
+
+.pro-section { display: flex; flex-direction: column; gap: 10px; padding: 18px 0; border-bottom: 1px solid var(--fl-border); }
+.pro-section:last-child { border-bottom: 0; }
+.pro-section h3,
+#root .app-shell .pro-section-title { margin: 0; color: var(--fl-text) !important; font-size: 14px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; }
+.pro-section-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 24px; align-items: start; }
+.pro-section-row > div { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
+@container (max-width: 640px) { .pro-section-row { grid-template-columns: 1fr; } }
+
+/* Contenido */
+.pro-content-section .announcement-rich { display: flex; flex-direction: column; gap: 10px; }
+#root .app-shell .pro-content-section .announcement-editor {
+  min-height: 150px;
+  padding: 14px 16px !important;
+  color: var(--fl-text) !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-bottom-color: var(--fl-control-stroke-bottom) !important;
+  border-radius: 6px !important;
+  background: #111 !important;
+  font-size: 22px;
+  line-height: 1.35;
+}
+html[data-theme="light"] #root .app-shell .pro-content-section .announcement-editor { background: #1f1f1f !important; color: #fff !important; }
+#root .app-shell .pro-content-section .announcement-editor:focus-within { border-bottom: 2px solid var(--fl-accent) !important; }
+.pro-content-section .announcement-rich > small,
+.pro-content-section .announcement-page-note { color: var(--fl-tertiary) !important; font-size: 12px !important; line-height: 1.45; }
+
+/* Tarjetas de elección (ubicación y estilo) */
+#root .app-shell .pro-choice-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)) !important; gap: 8px !important; margin: 0 !important; }
+#root .app-shell .pro-choice-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+@container (max-width: 640px) { #root .app-shell .pro-choice-grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+#root .app-shell .pro-choice-grid button {
+  position: relative;
+  display: flex !important;
+  min-width: 0;
+  height: auto !important;
+  min-height: 0 !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  padding: 10px !important;
+  color: var(--fl-text) !important;
+  text-align: left !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-radius: 6px !important;
+  background: var(--fl-surface) !important;
+  box-shadow: var(--fl-card-shadow) !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  cursor: pointer;
+}
+#root .app-shell .pro-choice-grid button:hover { background: var(--fl-hover) !important; }
+#root .app-shell .pro-choice-grid button.active { border-color: var(--fl-accent) !important; background: var(--fl-accent-soft) !important; box-shadow: inset 0 0 0 1px var(--fl-accent) !important; }
+#root .app-shell .pro-choice-grid button > i { width: 100% !important; height: 46px !important; margin: 0 !important; border-radius: 4px !important; }
+#root .app-shell .pro-choice-grid button > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 13px !important; font-weight: 600 !important; line-height: 1.25; }
+#root .app-shell .pro-choice-grid button > span strong { font-size: 13px; font-weight: 600; }
+#root .app-shell .pro-choice-grid button > span small { color: var(--fl-muted); font-size: 11.5px; font-weight: 400; }
+#root .app-shell .pro-choice-grid button > em {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 6px;
+  color: var(--fl-muted);
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 8px;
+  background: var(--fl-bg);
+  font-size: 10px;
+  font-style: normal;
+}
+
+/* Colores */
+.pro-color-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 4px; }
+.pro-color-row > span { color: var(--fl-muted); font-size: 13px; }
+#root .app-shell .pro-color-row .preset-palette { display: block !important; margin: 0 !important; padding: 0 !important; border: 0 !important; }
+#root .app-shell .pro-color-row .preset-palette > div { display: flex !important; flex-wrap: wrap; gap: 6px !important; }
+#root .app-shell .pro-color-row .preset-palette button { width: 26px !important; height: 26px !important; min-width: 0 !important; padding: 0 !important; border: 1px solid #80808055 !important; border-radius: 50% !important; cursor: pointer; }
+#root .app-shell .pro-color-row .preset-palette button.active { outline: 2px solid var(--fl-accent) !important; outline-offset: 2px; }
+.pro-custom-color { display: inline-flex; align-items: center; gap: 6px; color: var(--fl-text); font-size: 13px; cursor: pointer; }
+.pro-custom-color input { width: 26px; height: 26px; padding: 0; border: 1px solid var(--fl-control-stroke); border-radius: 50%; background: none; cursor: pointer; overflow: hidden; }
+
+/* Botones segmentados */
+.pro-segmented { display: inline-flex; flex-wrap: nowrap; align-self: flex-start; padding: 2px; border: 1px solid var(--fl-control-stroke); border-radius: 5px; background: var(--fl-control-fill); }
+.pro-segmented.wrap { flex-wrap: wrap; }
+.pro-segmented button { display: inline-grid; min-width: 36px; height: 30px; place-items: center; padding: 0 11px; color: var(--fl-text); border: 0; border-radius: 3px; background: transparent; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.pro-segmented button svg { width: 16px; height: 16px; }
+.pro-segmented button:hover:not(.active) { background: var(--fl-subtle-hover); }
+.pro-segmented button.active { color: var(--fl-on-accent); background: var(--fl-accent); font-weight: 600; }
+#root .app-shell .pro-number { width: 96px; height: 34px; padding: 0 10px !important; }
+
+/* Vista previa */
+#root .app-shell .pro-editor > .announcement-preview {
+  position: relative !important;
+  top: auto !important;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  align-self: stretch !important;
+  margin: 0 !important;
+  padding: 58px 24px 24px !important;
+  border: 0 !important;
+  border-left: 1px solid var(--fl-border) !important;
+  border-radius: 0 !important;
+  background: var(--fl-sidebar) !important;
+}
+#root .app-shell .pro-editor .preview-heading { margin-bottom: 12px; color: var(--fl-text) !important; font-size: 13px !important; font-weight: 600 !important; letter-spacing: 0 !important; }
+#root .app-shell .pro-editor .preview-heading small { color: var(--fl-tertiary) !important; font-size: 12px !important; font-weight: 400 !important; }
+#root .app-shell .pro-editor .designer-preview { border: 1px solid var(--fl-border-strong) !important; border-radius: 6px !important; box-shadow: 0 8px 24px #00000059 !important; }
+#root .app-shell .pro-editor .announcement-preview > p { margin-top: 12px !important; color: var(--fl-muted) !important; font-size: 12px !important; }
+#root .app-shell .pro-editor .preview-editor-button { border-radius: 5px !important; }
+
+/* Barra inferior */
+.pro-editor-footer {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--fl-border);
+  background: var(--fl-sidebar);
+}
+.pro-editor-footer-note { margin-right: auto; color: var(--fl-tertiary); font-size: 12px; }
+.pro-button {
+  display: inline-flex;
+  min-width: 110px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  color: var(--fl-text);
+  border: 1px solid var(--fl-control-stroke);
+  border-bottom-color: var(--fl-control-stroke-bottom);
+  border-radius: 4px;
+  background: var(--fl-control-fill);
+  font-size: 14px;
+  cursor: pointer;
+}
+.pro-button:hover { background: var(--fl-control-hover); }
+.pro-button svg { width: 16px; height: 16px; }
+.pro-button.accent { color: var(--fl-on-accent); border-color: transparent; border-bottom-color: #00000033; background: var(--fl-accent); font-weight: 600; }
+.pro-button.accent:hover { background: var(--fl-accent-hover); }
+.pro-button.danger { min-width: 0; color: var(--fl-danger); border-color: transparent; background: transparent; }
+.pro-button.danger:hover { background: var(--fl-danger-soft); }
+.pro-editor-footer .pro-button.danger + .pro-editor-footer-note { margin-left: 4px; }
+#root .app-shell .item-edit-dialog.visual-dialog { container-type: inline-size; }
+@container (max-width: 860px) {
+  #root .app-shell .pro-editor { grid-template-columns: 1fr !important; grid-template-rows: auto minmax(0, 1fr) auto; }
+  #root .app-shell .pro-editor > .announcement-preview { grid-row: 1; padding: 52px 20px 12px !important; border-left: 0 !important; border-bottom: 1px solid var(--fl-border) !important; }
+  #root .app-shell .pro-editor > .announcement-preview .designer-preview { max-height: 200px; }
+}
+#root .app-shell .pro-editor .announcement-toolbar {
+  height: auto;
+  min-height: 44px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-radius: 6px !important;
+  background: var(--fl-surface) !important;
+}
+
+/* Pivot (pestañas de una página de ajustes) */
+.w11-pivot { display: flex; gap: 4px; margin-top: 18px; border-bottom: 1px solid var(--fl-border); }
+.w11-pivot button {
+  position: relative;
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  color: var(--fl-muted);
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+}
+.w11-pivot button:hover { color: var(--fl-text); }
+.w11-pivot button.active { color: var(--fl-text); font-weight: 600; }
+.w11-pivot button.active::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 3px; border-radius: 2px; background: var(--fl-accent); }
+
+/* ==========================================================================
+   PASADA NATIVA WINDOWS 11
+   Sin degradados, brillos ni tarjetas grandes: listas, barras de comandos y
+   controles estándar de 32 px con un único color de acento.
+   ========================================================================== */
+
+/* Títulos pequeños: sin mayúsculas ni espaciado de letras */
+#root .app-shell :is(.eyebrow, .pane-title b, .bible-column-heading span, .summary-heading small, .live-control-title span, .field-label) {
+  color: var(--fl-muted) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+/* Sin brillos ni sombras exageradas dentro de la interfaz */
+#root .app-shell :is(button, .settings-card, .bible-toolbar, .bible-verse-column, .bible-slide-column, .background-controls, .media-card, .meeting-list > button, .rundown-list article, .song-list > button) {
+  text-shadow: none !important;
+}
+
+/* ---------- Deslizadores (Slider de Windows 11) ---------- */
+#root .app-shell input[type="range"] {
+  height: 22px;
+  margin: 0;
+  background: transparent !important;
+  border: 0 !important;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+#root .app-shell input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border: 0 !important;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--fl-accent) 0 var(--range-progress, 0%), var(--fl-control-stroke-bottom) var(--range-progress, 0%) 100%) !important;
+}
+#root .app-shell input[type="range"]::-webkit-slider-thumb {
+  width: 20px;
+  height: 20px;
+  margin-top: -8px;
+  border: 5px solid var(--fl-surface) !important;
+  border-radius: 50%;
+  background: var(--fl-accent) !important;
+  box-shadow: 0 0 0 1px var(--fl-control-stroke-bottom) !important;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-width 100ms ease;
+}
+#root .app-shell input[type="range"]:hover::-webkit-slider-thumb { border-width: 4px !important; }
+#root .app-shell input[type="range"]:active::-webkit-slider-thumb { border-width: 6px !important; }
+
+/* ---------- Barra de comandos: agregar elementos a la reunión ---------- */
+#root .app-shell .add-item-row {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 4px !important;
+  margin-bottom: 12px;
+  padding: 4px;
+  border: 1px solid var(--fl-control-stroke);
+  border-radius: 6px;
+  background: var(--fl-surface);
+}
+#root .app-shell .add-item-row button {
+  display: inline-flex !important;
+  height: 32px !important;
+  flex: 0 0 auto;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  padding: 0 11px !important;
+  color: var(--fl-text) !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+#root .app-shell .add-item-row button:hover { background: var(--fl-subtle-hover) !important; color: var(--fl-text) !important; }
+#root .app-shell .add-item-row button svg { width: 16px !important; height: 16px !important; margin: 0 !important; color: var(--fl-accent); }
+
+/* ---------- Listas (ListView): reuniones, orden del culto, canciones ---------- */
+#root .app-shell :is(.meeting-list > button:not(.create-meeting), .song-list > button:not(.new-song), .song-categories > button, .rundown-list article) {
+  position: relative;
+  min-height: 0 !important;
+  margin: 0 0 2px !important;
+  color: var(--fl-text) !important;
+  border: 1px solid transparent !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: background 80ms ease;
+}
+#root .app-shell :is(.meeting-list > button:not(.create-meeting), .song-list > button:not(.new-song), .song-categories > button, .rundown-list article):hover {
+  background: var(--fl-subtle-hover) !important;
+}
+#root .app-shell :is(.meeting-list > button.active, .song-list > button.active, .song-categories > button.active, .rundown-list article.selected) {
+  background: var(--fl-subtle-hover) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+#root .app-shell :is(.meeting-list > button.active, .song-list > button.active, .song-categories > button.active, .rundown-list article.selected)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--fl-accent);
+  transform: translateY(-50%);
+}
+#root .app-shell .meeting-list > button:not(.create-meeting) { padding: 8px 10px 8px 12px !important; border-left: 1px solid transparent !important; }
+#root .app-shell .song-list > button:not(.new-song) { padding: 7px 10px 7px 14px !important; border-left: 0 !important; }
+#root .app-shell .song-list > button:not(.new-song)::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--song-color, var(--fl-accent));
+  opacity: 0.85;
+}
+#root .app-shell .song-list > button.active::after { display: none; }
+#root .app-shell .song-categories > button { height: 34px; padding: 0 10px 0 12px !important; font-size: 14px !important; }
+#root .app-shell .song-categories > button span { color: var(--fl-tertiary) !important; font-size: 12px; }
+#root .app-shell .meeting-list strong,
+#root .app-shell .song-list > button strong { font-size: 14px !important; font-weight: 400 !important; }
+#root .app-shell :is(.meeting-list > button.active, .song-list > button.active) strong { font-weight: 600 !important; }
+#root .app-shell .meeting-list span,
+#root .app-shell .song-list > button span { color: var(--fl-muted) !important; font-size: 12px !important; }
+
+/* Orden del culto: fila con franja de color fina y estado "al aire" */
+#root .app-shell .rundown-list { gap: 2px !important; }
+#root .app-shell .rundown-list article {
+  height: 52px !important;
+  padding: 0 10px 0 8px !important;
+  border-color: var(--fl-control-stroke) !important;
+  background: var(--fl-surface) !important;
+}
+#root .app-shell .rundown-list article:hover { background: var(--fl-hover) !important; }
+#root .app-shell .rundown-list article.selected { background: var(--fl-accent-soft) !important; border-color: color-mix(in srgb, var(--fl-accent) 45%, transparent) !important; }
+#root .app-shell .rundown-list article > i { width: 3px !important; height: 24px !important; border-radius: 2px !important; box-shadow: none !important; }
+#root .app-shell .rundown-list article > b { color: var(--fl-tertiary) !important; font-size: 12px !important; font-weight: 400 !important; font-variant-numeric: tabular-nums; }
+#root .app-shell .rundown-list article strong { font-size: 14px !important; font-weight: 400 !important; }
+#root .app-shell .rundown-list article.selected strong { font-weight: 600 !important; }
+#root .app-shell .rundown-list article.on-air-item { border-color: #c42b1c !important; box-shadow: inset 3px 0 0 #e81123 !important; }
+
+/* Etiquetas "Al aire" (InfoBadge) */
+#root .app-shell :is(.rundown-on-air, .summary-on-air, .playing-indicator) {
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  padding: 0 8px !important;
+  color: #fff !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: #c42b1c !important;
+  box-shadow: none !important;
+  font-size: 11px !important;
+  font-style: normal;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  animation: none !important;
+}
+
+/* Panel del elemento seleccionado */
+#root .app-shell .summary-edit {
+  min-height: 32px !important;
+  height: 32px !important;
+  color: var(--fl-on-accent) !important;
+  border: 1px solid transparent !important;
+  border-radius: 4px !important;
+  background: var(--fl-accent) !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+#root .app-shell .summary-edit:hover { background: var(--fl-accent-hover) !important; }
+#root .app-shell .summary-heading h3 { font-size: 16px !important; font-weight: 600 !important; }
+#root .app-shell .summary-heading > span { width: 3px !important; border-radius: 2px !important; box-shadow: none !important; }
+
+/* ---------- Panel en vivo: controles compactos ---------- */
+#root .app-shell .master-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 4px !important; }
+#root .app-shell .master-grid button {
+  min-height: 36px !important;
+  height: 36px !important;
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  padding: 0 12px !important;
+  font-size: 13px !important;
+  text-align: left;
+}
+#root .app-shell .master-grid button svg { width: 16px !important; height: 16px !important; flex: 0 0 16px; }
+#root .app-shell .master-grid button small { margin-left: auto; }
+#root .app-shell .background-controls {
+  margin-top: 12px !important;
+  padding: 4px 0 0 !important;
+  border: 0 !important;
+  border-top: 1px solid var(--fl-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#root .app-shell .background-control { padding: 10px 0 2px; }
+#root .app-shell .control-title span { color: var(--fl-text) !important; font-size: 13px !important; font-weight: 400 !important; }
+#root .app-shell .control-title small { color: var(--fl-tertiary) !important; font-size: 11.5px !important; }
+#root .app-shell .control-title b {
+  min-width: 44px;
+  padding: 2px 6px !important;
+  color: var(--fl-text) !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: var(--fl-control-fill) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  text-align: center;
+}
+#root .app-shell :is(.overlay-controls .overlay-action, .alert-control-row .overlay-action, .speed-options button, .video-transport button, .video-volume button, .live-presentation-buttons button) {
+  height: 32px !important;
+  color: var(--fl-text) !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-bottom-color: var(--fl-control-stroke-bottom) !important;
+  border-radius: 4px !important;
+  background: var(--fl-control-fill) !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+#root .app-shell :is(.overlay-controls .overlay-action, .alert-control-row .overlay-action):hover:not(:disabled) { background: var(--fl-control-hover) !important; }
+#root .app-shell :is(.overlay-controls .overlay-action.active, .alert-control-row .overlay-action.active, .speed-options button.active) {
+  color: var(--fl-on-accent) !important;
+  border-color: transparent !important;
+  background: var(--fl-accent) !important;
+}
+#root .app-shell .overlay-controls .stop-overlay:not(:disabled) { color: var(--fl-danger) !important; }
+#root .app-shell .saved-alerts { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--fl-border); }
+#root .app-shell .saved-alerts-heading b { font-size: 13px !important; font-weight: 600 !important; }
+#root .app-shell .saved-alert-item button { height: 32px; border-radius: 4px !important; }
+#root .app-shell .preview-label { padding: 2px 8px !important; border-radius: 4px !important; box-shadow: none !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; }
+#root .app-shell .preview-frame { border: 1px solid var(--fl-border-strong) !important; border-radius: 6px !important; box-shadow: none !important; }
+#root .app-shell .live-media-controls { padding: 12px 0 !important; border: 0 !important; border-top: 1px solid var(--fl-border) !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }
+
+/* ---------- Canciones: encabezado del editor que no se rompe ---------- */
+#root .app-shell .song-editor { container: songeditor / inline-size; }
+@container songeditor (max-width: 680px) {
+  #root .app-shell .song-editor-title-row { flex-direction: column !important; align-items: stretch !important; gap: 12px; }
+  #root .app-shell .song-editor-header-actions { justify-content: space-between; flex-wrap: wrap; }
+  #root .app-shell .song-editor-category-field { flex: 1; }
+  #root .app-shell .song-editor-category-field select { width: 100% !important; }
+}
+#root .app-shell .song-editor .title-input { font-family: var(--fl-font-display) !important; font-size: 24px !important; font-weight: 600 !important; }
+#root .app-shell .song-stanza-size-controls button { border-color: var(--fl-control-stroke) !important; background: var(--fl-control-fill) !important; color: var(--fl-text) !important; }
+#root .app-shell .pane-title { padding: 4px 10px 8px 12px; }
+#root .app-shell .pane-title button { width: 28px; height: 28px; border: 0 !important; border-radius: 4px !important; background: transparent !important; }
+#root .app-shell .pane-title button:hover { background: var(--fl-subtle-hover) !important; }
+
+/* Botones de peligro estándar */
+#root .app-shell :is(.danger, button.danger) {
+  min-height: 32px;
+  color: var(--fl-danger) !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-radius: 4px !important;
+  background: var(--fl-control-fill) !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+#root .app-shell :is(.danger, button.danger):hover { background: var(--fl-danger-soft) !important; }
+
+/* Cuadros de diálogo: esquinas y sombras de Windows 11 */
+#root .app-shell :is(.meeting-dialog, .song-create-dialog, .item-edit-dialog, .library-picker, .bible-picker, .overlay-settings-dialog, .confirm-delete-dialog, .version-history-dialog) {
+  border-radius: 8px !important;
+  box-shadow: 0 32px 64px #00000047, 0 2px 21px #00000038 !important;
+}
+#root .app-shell .modal-backdrop { backdrop-filter: none !important; background: rgb(0 0 0 / 0.45) !important; }
+#root .app-shell .rundown-list article.selected::before { display: none; }
+#root .app-shell .song-categories > button { display: flex !important; align-items: center; justify-content: space-between; gap: 8px; text-align: left; }
+#root .app-shell .master-grid button small {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  color: #fff !important;
+  border-radius: 9px;
+  background: #c42b1c;
+  font-size: 11px !important;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* Biblia: versículos como filas de lista, no como tarjetas */
+#root .app-shell .verse-list { gap: 0 !important; padding: 4px !important; }
+#root .app-shell :is(.verse-entry, .bible-slide-list > button) {
+  position: relative;
+  min-height: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--fl-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#root .app-shell :is(.verse-entry, .bible-slide-list > button):hover { background: var(--fl-subtle-hover) !important; border-radius: 4px !important; }
+#root .app-shell :is(.verse-entry.selected, .bible-slide-list > button.selected) {
+  border-radius: 4px !important;
+  border-bottom-color: transparent !important;
+  background: var(--fl-accent-soft) !important;
+  box-shadow: none !important;
+}
+#root .app-shell :is(.verse-entry.selected, .bible-slide-list > button.selected)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  z-index: 1;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--fl-accent);
+  transform: translateY(-50%);
+}
+#root .app-shell .verse-entry.focused:not(.selected) { box-shadow: inset 0 0 0 1px var(--fl-accent) !important; border-radius: 4px !important; }
+#root .app-shell .verse-full { padding: 10px 12px !important; }
+#root .app-shell .bible-slide-list { gap: 0 !important; padding: 4px !important; }
+#root .app-shell .bible-slide-list > button { padding: 10px 12px !important; }
+#root .app-shell .verse-split-actions { border-left: 1px solid var(--fl-border) !important; }
+#root .app-shell .verse-split-actions button {
+  min-width: 36px !important;
+  color: var(--fl-text) !important;
+  border: 0 !important;
+  border-left: 1px solid var(--fl-border) !important;
+  background: transparent !important;
+  font-size: 13px !important;
+}
+#root .app-shell .verse-split-actions button:hover { background: var(--fl-subtle-hover) !important; }
+#root .app-shell .verse-split-actions button.selected { color: var(--fl-on-accent) !important; background: var(--fl-accent) !important; }
+#root .app-shell .bible-column-heading strong { padding: 0 7px; color: var(--fl-muted) !important; border-radius: 9px; background: var(--fl-control-fill) !important; font-size: 12px; font-weight: 400; }
+#root .app-shell :is(.bible-toolbar, .bible-verse-column, .bible-slide-column) { box-shadow: none !important; }
+#root .app-shell .bible-history-clear { height: 28px; padding: 0 8px !important; color: var(--fl-text) !important; border: 0 !important; border-radius: 4px !important; background: transparent !important; font-size: 13px !important; }
+#root .app-shell .bible-history-clear:hover:not(:disabled) { background: var(--fl-subtle-hover) !important; }
+#root .app-shell .bible-history-clear:disabled { color: var(--fl-tertiary) !important; opacity: 1 !important; }
+#root .app-shell :is(.bible-slide-empty, .win11-empty-state) svg { color: var(--fl-tertiary) !important; }

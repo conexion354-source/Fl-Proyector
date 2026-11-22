@@ -81,6 +81,9 @@ export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem("fl-sidebar-collapsed") === "1",
   );
+  const [livePanelCollapsed, setLivePanelCollapsed] = useState(
+    () => localStorage.getItem("fl-live-panel-collapsed") === "1",
+  );
   const [meetingId, setMeetingId] = useState<number | null>(null);
   const [focusedMeetingItemId, setFocusedMeetingItemId] = useState<
     number | null
@@ -215,7 +218,7 @@ export function App() {
         return;
       }
       if (action === "logo") {
-        await update({ logo: !state.logo, blackout: false });
+        await toggleLogo();
         return;
       }
       if (action === "qr") {
@@ -223,9 +226,7 @@ export function App() {
         return;
       }
       if (action === "congelar") {
-        const frozen = await window.flProyector.setProjectionFrozen(!projectionFrozen);
-        setProjectionFrozen(frozen);
-        setPreviewPanelMode(frozen ? "prepare" : "live");
+        await toggleFreeze();
         return;
       }
       if (action === "pantallaNegra") {
@@ -251,6 +252,9 @@ export function App() {
   useEffect(() => {
     localStorage.setItem("fl-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
   }, [sidebarCollapsed]);
+  useEffect(() => {
+    localStorage.setItem("fl-live-panel-collapsed", livePanelCollapsed ? "1" : "0");
+  }, [livePanelCollapsed]);
   useEffect(() => {
     const refresh = () => window.flProyector.getLiveAudienceStatus().then(setLiveAudienceStatus);
     refresh();
@@ -364,6 +368,21 @@ export function App() {
     frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
   }, [state.background.kind, state.background.speed, state.video.loop, state.video.playing, videoDuration]);
+  // El atajo y el botón hacen exactamente lo mismo: mostrar el logo siempre
+  // saca la pantalla negra, para que el logo realmente se vea.
+  const toggleLogo = () => update({ logo: !state.logo, blackout: false });
+  const toggleFreeze = async () => {
+    const frozen = await window.flProyector.setProjectionFrozen(!projectionFrozen);
+    setProjectionFrozen(frozen);
+    setPreviewPanelMode(frozen ? "prepare" : "live");
+  };
+  const outputState = !status.open
+    ? { tone: "idle", label: "Proyector apagado" }
+    : state.blackout
+      ? { tone: "black", label: "Pantalla negra" }
+      : projectionFrozen
+        ? { tone: "frozen", label: "En vivo · congelado" }
+        : { tone: "live", label: "En vivo" };
   const timerRemaining = Math.max(0, state.timer.remaining - (state.timer.running ? Math.floor((Date.now() - state.timer.startedAt) / 1000) : 0));
   const openOverlaySettings = (kind: "timer" | "clock") => setOverlaySettings(kind);
   const startLiveAudience = async () => {
@@ -462,11 +481,18 @@ export function App() {
             <span>Control de proyección</span>
           </div>
         </div>
-        <div className="on-air">
+        <div
+          className={`on-air on-air-${outputState.tone}`}
+          role="status"
+          aria-live="polite"
+          title={`${status.displays.length} monitor${status.displays.length !== 1 ? "es" : ""} conectado${status.displays.length !== 1 ? "s" : ""}`}
+        >
           <i className={status.open ? "live" : ""} />
-          {status.open ? "Proyección activa" : "Salida cerrada"} ·{" "}
-          {status.displays.length} monitor
-          {status.displays.length !== 1 ? "es" : ""}
+          <strong>{outputState.label}</strong>
+          <span>
+            {status.displays.length} monitor
+            {status.displays.length !== 1 ? "es" : ""}
+          </span>
         </div>
         <button
           className={status.open ? "project-button active" : "project-button"}
@@ -485,7 +511,7 @@ export function App() {
         className="workspace"
         style={
           {
-            "--live-panel-width": `${livePanelWidth}px`,
+            "--live-panel-width": `${showSidePreview && livePanelCollapsed ? 52 : livePanelWidth}px`,
           } as CSSProperties
         }
       >
@@ -597,7 +623,7 @@ export function App() {
             />
           )}
         </main>
-        {showSidePreview && <ColumnResizer
+        {showSidePreview && !livePanelCollapsed && <ColumnResizer
           label="Cambiar ancho de la vista en vivo"
           onResize={(delta) =>
             setLivePanelWidths((widths) => ({
@@ -610,7 +636,61 @@ export function App() {
             }))
           }
         />}
-        {showSidePreview && <aside className="live-panel">
+        {showSidePreview && livePanelCollapsed && (
+          <aside className="live-panel live-panel-rail" aria-label="Controles en vivo (panel contraído)">
+            <button
+              type="button"
+              className="rail-expand"
+              title="Mostrar la vista en vivo"
+              aria-label="Mostrar la vista en vivo"
+              onClick={() => setLivePanelCollapsed(false)}
+            >
+              <ChevronLeft />
+            </button>
+            <span className={`rail-status on-air-${outputState.tone}`} title={outputState.label}>
+              <i />
+            </span>
+            <span className="rail-label">Vista en vivo</span>
+            <div className="rail-actions">
+              <button
+                type="button"
+                className={projectionFrozen ? "active amber" : ""}
+                title={projectionFrozen ? "Publicar" : "Congelar"}
+                aria-label={projectionFrozen ? "Publicar" : "Congelar"}
+                onClick={toggleFreeze}
+              >
+                {projectionFrozen ? <Play /> : <Pause />}
+              </button>
+              <button
+                type="button"
+                className={state.blackout ? "active red" : ""}
+                title="Pantalla negra"
+                aria-label="Pantalla negra"
+                onClick={() => update({ blackout: !state.blackout })}
+              >
+                <Square fill="currentColor" />
+              </button>
+              <button
+                type="button"
+                title="Limpiar pantalla"
+                aria-label="Limpiar pantalla"
+                onClick={() => window.flProyector.clearProjectionContent()}
+              >
+                <Eraser />
+              </button>
+              <button
+                type="button"
+                className={state.logo ? "active blue" : ""}
+                title={state.logo ? "Ocultar logo" : "Mostrar logo"}
+                aria-label={state.logo ? "Ocultar logo" : "Mostrar logo"}
+                onClick={toggleLogo}
+              >
+                <MonitorPlay />
+              </button>
+            </div>
+          </aside>
+        )}
+        {showSidePreview && !livePanelCollapsed && <aside className="live-panel">
           <div className="panel-heading">
             <div>
               <span className="live-dot" />
@@ -637,6 +717,15 @@ export function App() {
                   ? "16:9"
                   : activeDisplaySettings.aspectRatio}
             </span>
+            <button
+              type="button"
+              className="live-panel-collapse"
+              title="Contraer el panel para ganar espacio"
+              aria-label="Contraer la vista en vivo"
+              onClick={() => setLivePanelCollapsed(true)}
+            >
+              <ChevronRight />
+            </button>
           </div>
           <div className="preview-frame" style={{ aspectRatio: previewAspectRatio, backgroundColor: activeDisplaySettings.backgroundColor }}>
             <ProjectionPreview
@@ -673,11 +762,7 @@ export function App() {
               <button
                 className={projectionFrozen ? "active amber" : ""}
                 title="Mantiene intacta la salida mientras preparás otro contenido"
-                onClick={async () => {
-                  const frozen = await window.flProyector.setProjectionFrozen(!projectionFrozen);
-                  setProjectionFrozen(frozen);
-                  setPreviewPanelMode(frozen ? "prepare" : "live");
-                }}
+                onClick={toggleFreeze}
               >
                 {projectionFrozen ? <Play /> : <Pause />}
                 {projectionFrozen ? "Publicar" : "Congelar"}
@@ -700,7 +785,10 @@ export function App() {
                 }}
               >
                 <QrCode aria-hidden="true" />
-                <small aria-hidden="true">{liveAudienceStatus.viewers} conectado{liveAudienceStatus.viewers === 1 ? "" : "s"}</small>
+                {liveAudienceQrOnAir ? "Quitar QR" : "QR en vivo"}
+                {liveAudienceStatus.viewers > 0 && (
+                  <small aria-hidden="true">{liveAudienceStatus.viewers}</small>
+                )}
               </button>
               <button
                 aria-label="Limpiar contenido de la proyección"
@@ -708,11 +796,11 @@ export function App() {
                 onClick={() => window.flProyector.clearProjectionContent()}
               >
                 <Eraser aria-hidden="true" />
-                Limpiar texto
+                Limpiar pantalla
               </button>
               <button
                 className={state.logo ? "active blue" : ""}
-                onClick={() => update({ logo: !state.logo })}
+                onClick={toggleLogo}
               >
                 <MonitorPlay />
                 {state.logo ? "Ocultar logo" : "Mostrar logo"}
@@ -926,16 +1014,8 @@ export function App() {
           ariaLabel={`Opciones de ${savedAlertContext.alert.name}`}
           items={[
             {
-              label: "Editar alerta",
+              label: "Editar alerta (texto, color y tamaño)",
               icon: <Settings />,
-              onClick: () => {
-                setEditingSavedAlert(savedAlertContext.alert);
-                setShowAlertSettings(true);
-              },
-            },
-            {
-              label: "Cambiar color",
-              icon: <BellRing />,
               onClick: () => {
                 setEditingSavedAlert(savedAlertContext.alert);
                 setShowAlertSettings(true);
@@ -1250,7 +1330,7 @@ function LiveContentControls({
     return (
       <section className="live-media-controls presentation-live-controls">
         <div className="live-control-title">
-          <span>CONTROL DE POWERPOINT</span>
+          <span>Control de PowerPoint</span>
           <b>{state.presentation.name}</b>
         </div>
         <div className="live-presentation-status">
@@ -1288,7 +1368,7 @@ function LiveContentControls({
   return (
     <section className="live-media-controls">
       <div className="live-control-title">
-        <span>CONTROL DE VIDEO</span>
+        <span>Control de video</span>
         <b>{state.background.name}</b>
       </div>
       <div className="video-transport">

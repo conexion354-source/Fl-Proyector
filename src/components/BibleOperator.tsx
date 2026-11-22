@@ -37,6 +37,14 @@ type BibleHistoryEntry = {
 let sessionBibleHistory: BibleHistoryEntry[] = [];
 let sessionBibleHistorySequence = 0;
 
+const historyKey = (entry: Pick<BibleHistoryEntry, "verse" | "slides">) =>
+  [
+    entry.slides[0]?.version ?? "",
+    entry.verse.book,
+    entry.verse.chapter,
+    entry.verse.verse,
+  ].join("|");
+
 function loadBiblePosition(): BibleOperatorPosition {
   try {
     const saved = JSON.parse(
@@ -188,7 +196,7 @@ export function BibleOperator({
   // visible so the operator retains surrounding context.
   const displayedVerses = verses;
   const versionCode = versions.find((value) => value.id === versionId)?.code || "";
-  const slidesFor = useCallback((verse: BibleVerse, mode: "full" | "split" = "full") => {
+  const slidesFor = useCallback((verse: BibleVerse, mode: "automatic" | "full" | "split" = "automatic") => {
     const splitAtWord = splitOverrides[
       bibleSplitOverrideKey(versionCode, verse.book, verse.chapter, verse.verse)
     ];
@@ -219,9 +227,13 @@ export function BibleOperator({
   );
   const addToHistory = useCallback((entry: Omit<BibleHistoryEntry, "id">) => {
     setHistory((entries) => {
+      // Un versículo aparece una sola vez: si se vuelve a proyectar, sube al
+      // primer lugar (con la parte A/B que se mostró por última vez) en vez
+      // de repetirse en la lista.
+      const key = historyKey(entry);
       const next = [
         { id: ++sessionBibleHistorySequence, ...entry },
-        ...entries,
+        ...entries.filter((item) => historyKey(item) !== key),
       ].slice(0, 40);
       sessionBibleHistory = next;
       return next;
@@ -277,7 +289,9 @@ export function BibleOperator({
       },
     });
   };
-  const send = (verse: BibleVerse, mode: "full" | "split" = "full", requestedSlide = 0) => {
+  // Un clic proyecta el versículo de la forma recomendada: completo si entra
+  // dentro del rango de tamaño, o en A y B si no entra sin achicarse de más.
+  const send = (verse: BibleVerse, mode: "automatic" | "full" | "split" = "automatic", requestedSlide = 0) => {
     const slides = slidesFor(verse, mode);
     const safeSlide = Math.max(0, Math.min(requestedSlide, slides.length - 1));
     setActiveVerse(verseKey(verse));
@@ -292,7 +306,7 @@ export function BibleOperator({
     if (!activeVerse) return;
     const verse = verses.find((candidate) => verseKey(candidate) === activeVerse);
     if (!verse) return;
-    const slides = slidesFor(verse, activeSlides.length > 1 ? "split" : "full");
+    const slides = slidesFor(verse, activeSlides.length > 1 ? "split" : "automatic");
     const nextSlide = Math.min(activeSlide, Math.max(0, slides.length - 1));
     setActiveSlides(slides);
     projectSlide(slides, nextSlide);
@@ -310,6 +324,8 @@ export function BibleOperator({
     state.bibleStyle.verticalMargin,
     state.bibleStyle.maxLinesPerSlide,
     state.bibleStyle.longVerseMode,
+    state.bibleStyle.growPercent,
+    state.bibleStyle.shrinkPercent,
     splitOverrides,
     slidesFor,
   ]);
@@ -478,7 +494,7 @@ export function BibleOperator({
         return;
       }
 
-      const previousSlides = slidesFor(nextVerse, "full");
+      const previousSlides = slidesFor(nextVerse, "automatic");
       setActiveVerse(verseKey(nextVerse));
       setActiveSlides(previousSlides);
       projectSlide(previousSlides, previousSlides.length - 1);
@@ -644,11 +660,11 @@ export function BibleOperator({
         <section className="bible-verse-column">
           <div className="bible-column-heading">
             <div>
-              <span>VERSÍCULOS</span>
+              <span>Versículos</span>
               <strong>{displayedVerses.length}</strong>
             </div>
             <small>
-              Un clic proyecta el versículo completo
+              Un clic proyecta · los largos se dividen en A y B
             </small>
           </div>
           <div className="verse-list" ref={verseListRef} tabIndex={-1}>
@@ -689,7 +705,7 @@ export function BibleOperator({
                           onClick={() => send(verse, "split", index)}
                           key={slide.label}
                         >
-                          {index === 0 ? "A" : "B"}
+                          {String.fromCharCode(65 + index)}
                         </button>
                       ))}
                       <button type="button" className="verse-split-edit" onClick={() => openSplitEditor(verse)} title="Editar división">
@@ -711,7 +727,7 @@ export function BibleOperator({
         <section className="bible-slide-column">
           <div className="bible-column-heading">
             <div>
-              <span>HISTORIAL DE PROYECCIÓN</span>
+              <span>Historial</span>
               <strong>{history.length || "—"}</strong>
             </div>
             <button
@@ -776,7 +792,7 @@ export function BibleOperator({
           <section className="bible-split-dialog" role="dialog" aria-modal="true" aria-label="Editar división del versículo">
             <header>
               <div>
-                <span>DIVISIÓN A/B</span>
+                <span>División A/B</span>
                 <h3>{splitEditor.verse.book} {splitEditor.verse.chapter}:{splitEditor.verse.verse}</h3>
               </div>
               <button type="button" onClick={() => setSplitEditor(null)} aria-label="Cerrar"><X /></button>

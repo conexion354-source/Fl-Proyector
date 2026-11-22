@@ -1,7 +1,6 @@
 import type { BibleDisplaySettings } from "../shared/types";
 import {
-  shouldSplitBibleVerse,
-  splitBibleVerse,
+  planBiblePassage,
   type ProjectionDimensions,
 } from "../shared/bibleLayout";
 
@@ -9,6 +8,8 @@ export type BibleSlide = {
   html: string;
   contentHtml: string;
   fontSize: number;
+  /** Tamaño calculado para este pasaje dentro del rango permitido. */
+  fittedFontSize: number;
   label: string;
   sourceText: string;
   reference: string;
@@ -43,25 +44,26 @@ export function buildBibleSlides(
   viewport?: ProjectionDimensions,
   options: BibleSlideOptions = {},
 ): BibleSlide[] {
-  // A/B is used only when the passage cannot physically fit at the configured
-  // size. It is divided once; the renderer handles any final safety reduction.
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  const automaticSplit =
-    settings.longVerseMode !== "auto-fit" &&
-    shouldSplitBibleVerse(text, settings, viewport) &&
-    words.length > 1;
-  const wantsSplit =
-    options.mode === "split" ||
-    (options.mode !== "full" && automaticSplit);
+  // Un solo cálculo decide si el pasaje entra completo, si se divide en A y B
+  // y con qué tamaño. El proyector respeta ese mismo rango de tamaño.
   const manualSplitAt = Math.floor(options.splitAtWord ?? 0);
-  const pieces =
-    wantsSplit && words.length > 1
-      ? manualSplitAt > 0 && manualSplitAt < words.length
-        ? [words.slice(0, manualSplitAt).join(" "), words.slice(manualSplitAt).join(" ")]
-        : splitBibleVerse(text, settings, viewport)
-      : [text];
+  const plan = planBiblePassage(text, settings, viewport, {
+    allowSplit: options.mode === "full" ? false : settings.longVerseMode !== "auto-fit",
+    splitAtWord:
+      options.mode === "full"
+        ? undefined
+        : manualSplitAt > 0 &&
+          (options.mode === "split" ||
+            (settings.longVerseMode !== "auto-fit" && planBiblePassage(text, settings, viewport).needsSplit))
+          ? manualSplitAt
+          : options.mode === "split"
+            ? -1
+            : undefined,
+  });
+  const pieces = plan.parts;
   return pieces.map((piece, index) => {
     const fontSize = settings.textFontSize;
+    const fittedFontSize = Math.round(plan.fontSize);
     const partSuffix =
       pieces.length > 1 ? String.fromCharCode(97 + Math.min(index, 25)) : "";
     const displayedReference = settings.showReference
@@ -98,7 +100,11 @@ export function buildBibleSlides(
       : "";
     const verse = `<div class="bible-verse-slot"><p class="bible-verse-text" style="font-family:${escapeHtml(settings.textFontFamily)};color:${settings.textColor}">${escapeHtml(piece)}</p></div>`;
     return {
-      html: `<div class="bible-slide bible-reference-${settings.referencePosition}">${
+      // Las partes A y B llevan el mismo tope de tamaño, para que no se vea
+      // una parte grande y la otra chica.
+      html: `<div class="bible-slide bible-reference-${settings.referencePosition}"${
+        pieces.length > 1 ? ` data-fit-cap="${fittedFontSize}"` : ""
+      }>${
         settings.referencePosition === "before" ? `${ref}${verse}` : `${verse}${ref}`
       }</div>`,
       // Operator cards deliberately contain only the passage. The configured
@@ -106,6 +112,7 @@ export function buildBibleSlides(
       // to the preview and the physical output.
       contentHtml: escapeHtml(piece),
       fontSize,
+      fittedFontSize,
       label: `${reference}${partSuffix}`,
       sourceText: text,
       reference,

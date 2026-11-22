@@ -32,9 +32,9 @@
   cursor: pointer;
 }
 .layout-choice button.active {
-  border-color: #665cff;
-  background: #28234d;
-  color: #d4d1ff;
+  border-color: var(--fl-accent);
+  background: var(--fl-accent-soft);
+  color: var(--fl-accent-text);
 }
 .library-picker {
   position: relative;
@@ -94,12 +94,12 @@
   cursor: pointer;
 }
 .picker-results > button:hover {
-  border-color: #665cff;
+  border-color: var(--fl-accent);
   background: #211e38;
 }
 .picker-results > button > svg {
   width: 20px;
-  color: #9c96ff;
+  color: var(--fl-accent-text);
   flex: none;
 }
 .picker-results strong,
@@ -242,7 +242,7 @@
   box-shadow: inset 3px 0 #bbf7d0;
 }
 .stanza-list > button[data-section-type="chorus"] { --song-section-color: #22c55e; }
-.stanza-list > button[data-section-type="prechorus"] { --song-section-color: #a855f7; }
+.stanza-list > button[data-section-type="prechorus"] { --song-section-color: var(--fl-accent); }
 .stanza-list > button[data-section-type="bridge"] { --song-section-color: #f59e0b; }
 .stanza-list > button[data-section-type="intro"] { --song-section-color: #06b6d4; }
 .stanza-list > button[data-section-type="interlude"] { --song-section-color: #14b8a6; }
@@ -256,7 +256,7 @@
 }
 .stanza-list > button > b {
   display: block;
-  color: #827aff;
+  color: var(--fl-accent);
   font-size: 8px;
   letter-spacing: 0.1em;
   margin-bottom: 6px;
@@ -353,11 +353,11 @@
   cursor: pointer;
 }
 .bible-picker-verses button.active {
-  border-color: #665cff;
+  border-color: var(--fl-accent);
   background: #24203f;
 }
 .bible-picker-verses b {
-  color: #918aff;
+  color: var(--fl-accent-text);
   text-align: center;
 }
 .bible-picker-verses span {
@@ -376,7 +376,7 @@
 .bible-picker-footer button {
   margin-left: auto;
   height: 36px;
-  border: 1px solid #665cff;
+  border: 1px solid var(--fl-accent);
   border-radius: 7px;
   color: white;
   padding: 0 14px;
@@ -397,12 +397,12 @@
 }
 .bible-readonly > svg {
   width: 19px;
-  color: #7972ff;
+  color: var(--fl-accent);
   flex: none;
 }
 .bible-readonly b {
   font-size: 10px;
-  color: #a5a0ff;
+  color: var(--fl-accent-text);
 }
 .bible-readonly p {
   font-size: 10px;
@@ -431,8 +431,8 @@
 }
 .announcement-page-tabs button.active {
   color: #fff;
-  background: #4338a9;
-  border-color: #796cff;
+  background: var(--fl-accent);
+  border-color: var(--fl-accent);
 }
 .announcement-page-note {
   display: block;
@@ -1150,7 +1150,7 @@ html[data-theme="light"] .announcement-editor .tiptap {
 }
 .preset-palette button.active {
   border-color: #fff;
-  box-shadow: 0 0 0 2px #665cff;
+  box-shadow: 0 0 0 2px var(--fl-accent);
 }
 .announcement-position-grid {
   display: grid;
@@ -1177,9 +1177,9 @@ html[data-theme="light"] .announcement-editor .tiptap {
   white-space: normal;
 }
 .announcement-position-grid button.active {
-  border-color: #7168ff;
-  background: #252043;
-  color: #d7d4ff;
+  border-color: var(--fl-accent);
+  background: var(--fl-accent-soft);
+  color: var(--fl-accent-text);
 }
 .announcement-position-grid i {
   display: block;
@@ -1208,7 +1208,7 @@ html[data-theme="light"] .announcement-editor .tiptap {
   right: 10px;
   height: 6px;
   bottom: 3px;
-  border-left: 3px solid #7c6cff;
+  border-left: 3px solid var(--fl-accent);
 }
 .position-top:after {
   left: 0;
@@ -1333,8 +1333,8 @@ html[data-theme="light"] .announcement-editor .tiptap {
   cursor: pointer;
 }
 .background-gallery > button.active {
-  border-color: #756cff;
-  box-shadow: 0 0 0 2px #665cff66;
+  border-color: var(--fl-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--fl-accent) 40%, transparent);
 }
 .background-gallery img,
 .background-gallery video,
@@ -1413,7 +1413,7 @@ html[data-theme="light"] .announcement-editor .tiptap {
   cursor: pointer;
 }
 .background-assignment-cancel:hover {
-  border-color: #7168ff;
+  border-color: var(--fl-accent);
   color: #fff;
 }
 

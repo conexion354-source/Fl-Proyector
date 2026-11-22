@@ -96,17 +96,11 @@ const forceUppercaseHtml = (html: string) =>
     `${prefix}${text.toLocaleUpperCase("es-AR")}`,
   );
 
-// Auto-size should use the available output, not merely protect against
-// clipping.  The ceiling still prevents a one-word verse or a short chorus
-// from becoming comically large, while allowing the readable size to grow
-// substantially when the layout genuinely has room for it.
-// Auto-fit should protect consistency before it tries to occupy every spare
-// pixel. A short verse at 2.6× its configured size followed by a long one at
-// the minimum size is much harder to read than a deliberately modest change.
-// EasyWorship follows the same principle by treating the selected type size
-// as the normal visual scale and flowing text when it can no longer fit.
-const MAX_BIBLE_FILL_SCALE = 1.18;
-const MAX_SONG_FILL_SCALE = 1.25;
+// El tamaño de Biblia y canciones se mueve dentro de un rango fijo alrededor
+// del tamaño normal (Ajustes › Texto en pantalla): así se aprovecha la
+// pantalla sin que un texto corto quede gigante al lado de uno largo.
+// La cita bíblica reserva 2 veces su tamaño de alto + 0,55 de separación
+// (REFERENCE_RESERVE = 2.55 en shared/textFit.ts).
 const BIBLE_REFERENCE_HEIGHT_SCALE = 2;
 const BIBLE_REFERENCE_GAP_SCALE = 0.55;
 
@@ -224,9 +218,6 @@ export function ProjectionStage({
       // Equivalent to EasyWorship's "Resize text to fit element": calculate
       // the largest safe size in the usable rectangle. Stable songs evaluate
       // all their sections together, so their visual scale never jumps.
-      const shouldMaximizeText = isBible
-        ? state.bibleStyle.autoFit
-        : state.songStyle.autoFit;
       const configuredHorizontal = isSong
         ? state.songStyle.horizontalMargin ?? 8
         : isBible
@@ -252,7 +243,8 @@ export function ProjectionStage({
               configuredVertical,
               state.text.fontFamily,
               state.text.fontSize,
-              state.songStyle.minimumFontSize,
+              state.songStyle.growPercent,
+              state.songStyle.shrinkPercent,
               state.songStyle.uppercase,
               stableSongStanzas.join("\u001f"),
             ].join("|")
@@ -264,28 +256,22 @@ export function ProjectionStage({
           element.style.top = `${verticalMargin}%`;
           element.style.bottom = `${verticalMargin}%`;
         }
-        // The selected size is the normal reading scale. Short passages may
-        // grow a little, but never enough to make the next passage feel tiny
-        // by comparison.
-        const responsiveCeiling = Math.max(
-          requestedSize,
-          Math.min(element.clientWidth * 0.32, element.clientHeight * 0.7),
+        // Rango de tamaño compartido por Biblia y canciones: el tamaño normal
+        // puede agrandarse un poco para textos cortos y achicarse un poco para
+        // los largos, pero nunca tanto como para que un texto se vea gigante
+        // y el siguiente diminuto. Por debajo del piso solo se baja como
+        // último recurso, para no cortar nunca el texto.
+        const sizeStyle = isSong ? state.songStyle : state.bibleStyle;
+        const growPercent = Math.max(0, Math.min(60, sizeStyle.growPercent ?? 15));
+        const shrinkPercent = Math.max(0, Math.min(60, sizeStyle.shrinkPercent ?? 20));
+        // Las partes A y B de un versículo traen un tope común calculado al
+        // dividir, así las dos se ven del mismo tamaño.
+        const partCap = isBible ? Number(/data-fit-cap="(\d+(?:\.\d+)?)"/.exec(state.text.html)?.[1]) : NaN;
+        const ceiling = Math.min(
+          requestedSize * (1 + growPercent / 100),
+          Number.isFinite(partCap) && partCap > 0 ? Math.max(partCap * scale, 4 * scale) : Number.POSITIVE_INFINITY,
         );
-        const balancedFillCeiling = Math.min(
-          responsiveCeiling,
-          requestedSize * (isSong ? MAX_SONG_FILL_SCALE : MAX_BIBLE_FILL_SCALE),
-        );
-        const configuredMinimum = isSong
-          ? state.songStyle.minimumFontSize * scale
-          : isBible
-            ? Math.min(
-                state.bibleStyle.textFontSize,
-                Math.max(18, state.bibleStyle.minimumFontSize),
-              ) * scale
-            : 8 * scale;
-        let low = Math.min(requestedSize, Math.max(2, configuredMinimum)),
-          high = shouldMaximizeText ? balancedFillCeiling : requestedSize,
-          best = low;
+        const floor = Math.min(ceiling, Math.max(4 * scale, requestedSize * (1 - shrinkPercent / 100)));
         const applyCandidate = (fontSize: number) => {
           element.style.fontSize = `${fontSize}px`;
           element.style.setProperty("--fit-text-size", `${fontSize}px`);
@@ -370,35 +356,46 @@ export function ProjectionStage({
           measurement.remove();
           return fits;
         };
-        const candidateFits = (fontSize: number) =>
-          stableSongStanzas.length
-            ? stableSongStanzas.every((stanza) => contentFits(fontSize, stanza))
-            : contentFits(fontSize);
-        const cachedSongFit = songFitCacheKey
-          ? songFitCache.get(songFitCacheKey)
-          : undefined;
-        if (cachedSongFit !== undefined) {
-          const cachedAtCurrentScale = cachedSongFit * scale;
-          applyCandidate(cachedAtCurrentScale);
-          return {
-            fontSize: cachedAtCurrentScale,
-            referenceScale: 1,
-            horizontalMargin,
-            verticalMargin,
-          };
+        const search = (test: (fontSize: number) => boolean, low: number, high: number) => {
+          let bottom = low;
+          let top = high;
+          for (let step = 0; step < 11; step++) {
+            const middle = (bottom + top) / 2;
+            applyCandidate(middle);
+            if (test(middle)) bottom = middle;
+            else top = middle;
+          }
+          return bottom;
+        };
+        /** Mayor tamaño dentro del rango, o null si ni el piso alcanza. */
+        const searchBand = (test: (fontSize: number) => boolean) => {
+          applyCandidate(floor);
+          if (!test(floor)) return null;
+          applyCandidate(ceiling);
+          if (test(ceiling)) return ceiling;
+          return search(test, floor, ceiling);
+        };
+        const currentFits = (fontSize: number) => contentFits(fontSize);
+        let best: number;
+        if (stableSongStanzas.length) {
+          // Canción estable: un mismo tamaño para todas las estrofas. Si una
+          // estrofa es mucho más larga, no arrastra a toda la canción por
+          // debajo del piso: solo esa estrofa se achica lo necesario.
+          const cachedSongFit = songFitCacheKey ? songFitCache.get(songFitCacheKey) : undefined;
+          let songSize: number;
+          if (cachedSongFit !== undefined) songSize = cachedSongFit * scale;
+          else {
+            songSize =
+              searchBand((fontSize) => stableSongStanzas.every((stanza) => contentFits(fontSize, stanza))) ?? floor;
+            if (songFitCacheKey) rememberSongFit(songFitCacheKey, songSize / scale);
+          }
+          applyCandidate(songSize);
+          best = currentFits(songSize) ? songSize : search(currentFits, 4 * scale, songSize);
+        } else {
+          best = searchBand(currentFits) ?? search(currentFits, 4 * scale, floor);
         }
-        for (let step = 0; step < 12; step++) {
-          const middle = (low + high) / 2;
-          applyCandidate(middle);
-          if (candidateFits(middle)) {
-            best = middle;
-            low = middle;
-          } else high = middle;
-        }
-        // Leave the DOM at the accepted value even when React can reuse the
-        // previous state value and therefore skip a render.
+        // Dejar el DOM con el valor aceptado aunque React reutilice el estado.
         applyCandidate(best);
-        if (songFitCacheKey) rememberSongFit(songFitCacheKey, best / scale);
         return {
           fontSize: best,
           // The reference is an independent lower-third. Keeping it at its
@@ -460,6 +457,10 @@ export function ProjectionStage({
     state.songStyle.autoFit,
     state.songStyle.minimumFontSize,
     state.songStyle.stableFontSize,
+    state.songStyle.growPercent,
+    state.songStyle.shrinkPercent,
+    state.bibleStyle.growPercent,
+    state.bibleStyle.shrinkPercent,
     state.songStyle.horizontalMargin,
     state.songStyle.verticalMargin,
     state.text.sourceSongStanzas,

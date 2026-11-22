@@ -170,6 +170,10 @@ export type BibleDisplaySettings = {
   verticalMargin: number;
   longVerseMode: "auto-fit" | "split" | "split-halves";
   maxLinesPerSlide: number;
+  /** Cuánto puede agrandarse un pasaje corto respecto del tamaño normal (%). */
+  growPercent: number;
+  /** Cuánto puede achicarse un pasaje largo antes de dividirlo en A y B (%). */
+  shrinkPercent: number;
 };
 
 export type SongDisplaySettings = {
@@ -204,6 +208,10 @@ export type SongDisplaySettings = {
   titleFontSize: number;
   titleStyle: "none" | "bar" | "pill" | "glass" | "ribbon" | "accent";
   titlePosition: "top" | "center" | "bottom";
+  /** Cuánto puede agrandarse una estrofa corta respecto del tamaño normal (%). */
+  growPercent: number;
+  /** Cuánto puede achicarse una estrofa larga (%). */
+  shrinkPercent: number;
 };
 
 export const initialDisplaySettings: DisplaySettings = {
@@ -252,6 +260,8 @@ export const initialBibleDisplaySettings: BibleDisplaySettings = {
   verticalMargin: 10,
   longVerseMode: "split-halves",
   maxLinesPerSlide: 3,
+  growPercent: 15,
+  shrinkPercent: 20,
 };
 export const initialSongDisplaySettings: SongDisplaySettings = {
   uppercase: false,
@@ -275,6 +285,8 @@ export const initialSongDisplaySettings: SongDisplaySettings = {
   titleFontSize: 30,
   titleStyle: "bar",
   titlePosition: "top",
+  growPercent: 15,
+  shrinkPercent: 20,
 };
 
 export type BackgroundState = {

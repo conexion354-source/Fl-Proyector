@@ -6,6 +6,9 @@ import FontFamily from "@tiptap/extension-font-family";
 import Highlight from "@tiptap/extension-highlight";
 import { FontSize, TextStyle } from "@tiptap/extension-text-style";
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   BookOpenText,
   CalendarDays,
   ChevronDown,
@@ -516,9 +519,11 @@ export function MeetingBuilder({
             color: "#ffffff",
             backgroundColor: "#00000099",
             align: "center",
-            borderRadius: 12,
-            template: "lower-third",
-            animation: "slide-left",
+            // Antes arrancaba en "Centro" con el diseño "Lower third", que es
+            // solo para zócalos: una combinación que se veía rota.
+            borderRadius: 14,
+            template: "glass",
+            animation: "fade",
             shadowEnabled: true,
             shadowColor: "#000000",
             shadowBlur: 14,
@@ -1240,7 +1245,7 @@ export function MeetingBuilder({
       next.text = { ...state.text, html: stanza, kind: "canto", visible: true, sourceSongStanzas: song ? splitSongStanzas(song.content) : null, title: state.songStyle.showTitle ? song?.title || item.title : "", fontSize: state.songStyle.fontSize, fontFamily: state.songStyle.fontFamily, color: state.songStyle.textColor, backgroundColor: state.songStyle.backgroundColor, position: state.songStyle.position, align: state.songStyle.align, borderRadius: state.songStyle.borderRadius, template: state.songStyle.template, titlePosition: state.songStyle.titlePosition, titleColor: state.songStyle.titleColor, titleBackground: state.songStyle.titleBackground, titleFontSize: state.songStyle.titleFontSize, titleStyle: state.songStyle.titleStyle };
     } else if (item.type === "announcement") {
       const pages = announcementPages(payload);
-      next.text = { ...state.text, html: pages[Number(payload.announcementPage || 0)] || pages[0], kind: "anuncio", visible: true, position: payload.position || "center", fontSize: Number(payload.fontSize || 64), color: payload.color || "#ffffff", backgroundColor: payload.backgroundColor || "rgba(0,0,0,.55)", align: payload.align || "center", borderRadius: Number(payload.borderRadius || 0), template: payload.template || "plain", animation: payload.animation || "fade", shadowEnabled: payload.shadowEnabled !== false, shadowColor: payload.shadowColor || "#000000", shadowBlur: Number(payload.shadowBlur ?? 14) };
+      next.text = { ...state.text, html: pages[Number(payload.announcementPage || 0)] || pages[0], kind: "anuncio", visible: true, position: payload.position || "center", fontSize: Number(payload.fontSize || 64), fontFamily: payload.fontFamily || "Inter", color: payload.color || "#ffffff", backgroundColor: payload.backgroundColor || "rgba(0,0,0,.55)", align: payload.align || "center", borderRadius: Number(payload.borderRadius || 0), template: payload.template || "plain", animation: payload.animation || "fade", shadowEnabled: payload.shadowEnabled !== false, shadowColor: payload.shadowColor || "#000000", shadowBlur: Number(payload.shadowBlur ?? 14) };
     } else if (item.type === "presentation") {
       next.presentation = { path: String(payload.path || ""), url: String(payload.url || ""), name: String(payload.name || item.title), previewSlides: payload.previewSlides as string[] | undefined, slideIndex: 0, slideCount: Number(payload.slideCount || 0), navigationId: state.presentation.navigationId, navigationDirection: 1, visible: true };
       next.text = { ...state.text, visible: false };
@@ -1509,7 +1514,7 @@ export function MeetingBuilder({
                   <strong>{item.title}</strong>
                   <span>{itemLabels[item.type]}</span>
                 </div>
-                {itemOnAir && <em className="rundown-on-air">AL AIRE</em>}
+                {itemOnAir && <em className="rundown-on-air">Al aire</em>}
               </article>
             );
           })}
@@ -1794,7 +1799,7 @@ export function MeetingBuilder({
             >
               <X />
             </button>
-            <span className="eyebrow">RENOMBRAR REUNIÓN</span>
+            <span className="eyebrow">Renombrar reunión</span>
             <h2>Editar nombre</h2>
             <p>Este cambio se verá en la lista de reuniones guardadas.</p>
             <label>
@@ -1862,9 +1867,17 @@ export function MeetingBuilder({
                     align: (payload.align as ProjectionState["text"]["align"]) || "center",
                     borderRadius: Number(payload.borderRadius || 0),
                     template: (payload.template as ProjectionState["text"]["template"]) || "plain",
+                    // Antes no se enviaban: al corregir un anuncio en el aire
+                    // se perdían la tipografía, la animación y la sombra.
+                    fontFamily: String(payload.fontFamily || "Inter"),
+                    animation: (payload.animation as ProjectionState["text"]["animation"]) || "fade",
+                    shadowEnabled: payload.shadowEnabled !== false,
+                    shadowColor: String(payload.shadowColor || "#000000"),
+                    shadowBlur: Number(payload.shadowBlur ?? 14),
                   },
                 });
               }}
+              onCancel={closeEditor}
               isDraft={selected.id === draftItemId}
             />
           </div>
@@ -1900,7 +1913,7 @@ export function MeetingBuilder({
             >
               <X />
             </button>
-            <span className="eyebrow">FONDO DEL ÍTEM</span>
+            <span className="eyebrow">Fondo del elemento</span>
             <h2>{backgroundTarget.title}</h2>
             <p>
               Elegí un fondo exclusivo para este ítem, o dejalo sin asignar para
@@ -1927,7 +1940,7 @@ export function MeetingBuilder({
         <div className="modal-backdrop preview-only-backdrop" onMouseDown={() => { setPreviewDraft(null); void window.flProyector.clearPreviewState(); }}>
           <div className="preview-only-dialog" role="dialog" aria-modal="true" aria-label="Vista previa sin proyectar" onMouseDown={(event) => event.stopPropagation()}>
             <header>
-              <span className="eyebrow">VISTA PREVIA</span>
+              <span className="eyebrow">Vista previa</span>
               <button type="button" className="dialog-close" aria-label="Cerrar" onClick={() => { setPreviewDraft(null); void window.flProyector.clearPreviewState(); }}><X /></button>
             </header>
             <p>Así se vería en la pantalla. Todavía no se envió al proyector.</p>
@@ -2014,7 +2027,7 @@ function MeetingStanzaEditDialog({
         >
           <X />
         </button>
-        <span className="eyebrow">EDITAR SÓLO ESTA PARTE</span>
+        <span className="eyebrow">Editar solo esta parte</span>
         <h2 id="meeting-stanza-edit-title">{label}</h2>
         <p>
           Enter crea una nueva estrofa al guardar. Shift + Enter agrega una
@@ -2095,7 +2108,7 @@ function ItemSummary({
           <small>{itemLabels[item.type]}</small>
           <h3>{item.title}</h3>
         </div>
-        {isOnAir && <strong className="summary-on-air">AL AIRE</strong>}
+        {isOnAir && <strong className="summary-on-air">Al aire</strong>}
       </div>
       {song ? (
         <>
@@ -2259,7 +2272,7 @@ function PresentationSummary({
         <i className={active ? "live" : ""} />
         <div>
           <strong>
-            {active ? "PRESENTACIÓN AL AIRE" : "LISTA PARA PRESENTAR"}
+            {active ? "Presentación al aire" : "Lista para presentar"}
           </strong>
           <span>
             {count
@@ -2310,7 +2323,7 @@ function LibraryPicker({
         <button type="button" className="dialog-close" aria-label="Cerrar" onClick={onClose}>
           <X />
         </button>
-        <span className="eyebrow">AGREGAR A LA REUNIÓN</span>
+        <span className="eyebrow">Agregar a la reunión</span>
         <h2>
           {type === "song"
             ? "Seleccionar canción"
@@ -2456,7 +2469,7 @@ function BiblePicker({
         <button type="button" className="dialog-close" aria-label="Cerrar" onClick={onClose}>
           <X />
         </button>
-        <span className="eyebrow">AGREGAR CITA A LA REUNIÓN</span>
+        <span className="eyebrow">Agregar cita a la reunión</span>
         <h2>Seleccionar pasaje bíblico</h2>
         <div className="bible-picker-controls">
           <label>
@@ -2553,6 +2566,7 @@ function ItemEditor({
   onDelete,
   onPreview,
   onAnnouncementPage,
+  onCancel,
   isDraft,
 }: {
   item: MeetingItem;
@@ -2582,22 +2596,25 @@ function ItemEditor({
   onDelete: () => void;
   onPreview: () => void;
   onAnnouncementPage: (html: string, payload: Record<string, unknown>) => void;
+  onCancel: () => void;
   isDraft: boolean;
 }) {
   const p = item.payload as any;
   const visual = ["announcement", "bible"].includes(item.type);
+  const ItemIcon = itemIcons[item.type];
   return (
-    <div className={`item-editor ${visual ? "visual-item-editor" : ""}`}>
+    <div className={`item-editor ${visual ? "visual-item-editor pro-editor" : ""}`}>
       <div className="item-editor-controls">
-        <div className="item-editor-heading">
-          <span className="eyebrow">
-            EDITAR {itemLabels[item.type].toUpperCase()}
-          </span>
-        </div>
-        {item.type !== "song" && (
-          <label>
-            Nombre del ítem
+        {visual ? (
+          <header className="pro-editor-header">
+            <span className="pro-editor-kicker">
+              <ItemIcon aria-hidden="true" />
+              {itemLabels[item.type]} · orden del culto
+            </span>
             <input
+              className="pro-editor-title"
+              aria-label={`Nombre del ${itemLabels[item.type].toLowerCase()} en la reunión`}
+              placeholder={`Nombre del ${itemLabels[item.type].toLowerCase()}`}
               value={item.title}
               onChange={(event) =>
                 setItem({
@@ -2610,7 +2627,25 @@ function ItemEditor({
                 })
               }
             />
-          </label>
+            <small>Así aparece en el orden del culto.</small>
+          </header>
+        ) : (
+          <>
+            <div className="item-editor-heading">
+              <span className="eyebrow">
+                Editar {itemLabels[item.type].toLowerCase()}
+              </span>
+            </div>
+            {item.type !== "song" && (
+              <label>
+                Nombre del ítem
+                <input
+                  value={item.title}
+                  onChange={(event) => setItem({ ...item, title: event.target.value })}
+                />
+              </label>
+            )}
+          </>
         )}
         {item.type === "song" && songDraft && (
           <RichSongEditor draft={songDraft} onChange={setSongDraft} />
@@ -2633,11 +2668,13 @@ function ItemEditor({
           </label>
         )}
         {item.type === "announcement" && (
-          <AnnouncementPagesEditor
-            payload={p}
-            setPayload={setPayload}
-            onPreview={onAnnouncementPage}
-          />
+          <section className="pro-section pro-content-section">
+            <AnnouncementPagesEditor
+              payload={p}
+              setPayload={setPayload}
+              onPreview={onAnnouncementPage}
+            />
+          </section>
         )}
         {item.type === "bible" && (
           <div className="bible-readonly">
@@ -2660,18 +2697,23 @@ function ItemEditor({
             <div className="file-path">{String(p.path || "")}</div>
           </>
         )}
-        <div className="inspector-actions">
-          {!isDraft && (
-            <button className="danger" onClick={onDelete}>
-              <Trash2 />
-              Eliminar
+        {!visual && (
+          <div className="inspector-actions">
+            {!isDraft && (
+              <button className="danger" onClick={onDelete}>
+                <Trash2 />
+                Eliminar
+              </button>
+            )}
+            <button className="secondary" onClick={onCancel}>
+              Cancelar
             </button>
-          )}
-          <button className="primary" onClick={onSave}>
-            <Save />
-            Guardar
-          </button>
-        </div>
+            <button className="primary" onClick={onSave}>
+              <Save />
+              Guardar
+            </button>
+          </div>
+        )}
       </div>
       {visual && (
         <AnnouncementPreview
@@ -2681,6 +2723,26 @@ function ItemEditor({
           previewAspectRatio={previewAspectRatio}
           onOpenPreview={onPreview}
         />
+      )}
+      {visual && (
+        <footer className="pro-editor-footer">
+          {!isDraft && (
+            <button type="button" className="pro-button danger" onClick={onDelete}>
+              <Trash2 aria-hidden="true" />
+              Eliminar
+            </button>
+          )}
+          <span className="pro-editor-footer-note">
+            {isDraft ? "Se agrega a la reunión al guardar." : "Los cambios se aplican al guardar."}
+          </span>
+          <button type="button" className="pro-button" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button type="button" className="pro-button accent" onClick={onSave}>
+            <Save aria-hidden="true" />
+            {isDraft ? "Agregar a la reunión" : "Guardar cambios"}
+          </button>
+        </footer>
       )}
     </div>
   );
@@ -2824,7 +2886,7 @@ function RichAnnouncementEditor({
   });
   return (
     <div className="announcement-rich">
-      <span className="field-label">Contenido del anuncio</span>
+      <h3 className="pro-section-title">Texto del anuncio</h3>
       <RichTextToolbar
         editor={editor}
         fontSize={fontSize}
@@ -2848,8 +2910,8 @@ function RichAnnouncementEditor({
         }}
       />
       <small>
-        Seleccioná una palabra o frase para cambiar solamente esa parte. Sin
-        selección, el tamaño modifica todo el anuncio.
+        Seleccioná una palabra o frase para darle formato solo a esa parte. Sin
+        selección, el tamaño y el color se aplican a todo el anuncio.
       </small>
     </div>
   );
@@ -2969,6 +3031,9 @@ function RichSongEditor({
   );
 }
 
+/** Estilos que solo tienen sentido como zócalo en la parte inferior. */
+const lowerOnlyTemplates = ["lower-third", "broadcast", "glass-accent"];
+
 function DesignControls({
   payload: p,
   setPayload,
@@ -2981,133 +3046,172 @@ function DesignControls({
   const position = p.position || "center";
   const template = p.template || "plain";
   const positions = [
-    { value: "center", label: "Centro", icon: "position-center" },
-    { value: "lower", label: "Zócalo abajo", icon: "position-lower" },
-    { value: "top", label: "Franja superior", icon: "position-top" },
-    { value: "bottom", label: "Franja inferior", icon: "position-bottom" },
+    { value: "center", label: "Centro", detail: "Caja en el medio", icon: "position-center" },
+    { value: "lower", label: "Zócalo", detail: "Caja sobre el borde inferior", icon: "position-lower" },
+    { value: "top", label: "Franja arriba", detail: "Ancho completo", icon: "position-top" },
+    { value: "bottom", label: "Franja abajo", detail: "Ancho completo", icon: "position-bottom" },
   ];
   const templates = [
-    { value: "plain", label: "Minimalista", icon: "design-minimal", radius: 0 },
+    { value: "plain", label: "Solo texto", icon: "design-minimal", radius: 0 },
     { value: "classic", label: "Clásico", icon: "design-classic", radius: 4 },
     { value: "accent", label: "Acento", icon: "design-accent", radius: 6 },
     { value: "glass", label: "Vidrio", icon: "design-glass", radius: 14 },
     { value: "solid", label: "Sólido", icon: "design-solid", radius: 8 },
-    {
-      value: "gradient",
-      label: "Degradado",
-      icon: "design-gradient",
-      radius: 10,
-    },
-    {
-      value: "lower-third",
-      label: "Lower third",
-      icon: "design-lower-third",
-      radius: 6,
-    },
-    {
-      value: "broadcast",
-      label: "TV en vivo",
-      icon: "design-broadcast",
-      radius: 2,
-    },
-    {
-      value: "glass-accent",
-      label: "Cristal animado",
-      icon: "design-glass-accent",
-      radius: 12,
-    },
+    { value: "gradient", label: "Degradado", icon: "design-gradient", radius: 10 },
+    { value: "lower-third", label: "Lower third", icon: "design-lower-third", radius: 6 },
+    { value: "broadcast", label: "TV en vivo", icon: "design-broadcast", radius: 2 },
+    { value: "glass-accent", label: "Cristal animado", icon: "design-glass-accent", radius: 12 },
   ];
+  const animations = [
+    { value: "none", label: "Ninguno" },
+    { value: "fade", label: "Suave" },
+    { value: "slide-left", label: "Desde la izquierda" },
+    { value: "slide-up", label: "Desde abajo" },
+    { value: "zoom", label: "Zoom" },
+  ];
+  const alignments = [
+    { value: "left", label: "Izquierda", icon: <AlignLeft /> },
+    { value: "center", label: "Centrado", icon: <AlignCenter /> },
+    { value: "right", label: "Derecha", icon: <AlignRight /> },
+  ];
+  const backgroundColor = String(p.backgroundColor || "#000000");
   return (
     <>
-      <span className="field-label">Posición en pantalla</span>
-      <div className="announcement-position-grid">
-        {positions.map((option) => (
-          <button
-            type="button"
-            className={position === option.value ? "active" : ""}
-            onClick={() => setPayload({ position: option.value })}
-            key={option.value}
-          >
-            <i className={option.icon} />
-            <span>{option.label}</span>
-          </button>
-        ))}
-      </div>
-      <span className="field-label">Diseño del zócalo</span>
-      <div className="lower-third-gallery announcement-design-gallery">
-        {templates.map((option) => (
-          <button
-            type="button"
-            className={template === option.value ? "active" : ""}
-            onClick={() =>
-              setPayload({
-                template: option.value,
-                borderRadius: option.radius,
-                ...(["lower-third", "broadcast", "glass-accent"].includes(
-                  option.value,
-                )
-                  ? { position: "lower" }
-                  : {}),
-              })
-            }
-            key={option.value}
-          >
-            <i className={option.icon} />
-            <span>{option.label}</span>
-          </button>
-        ))}
-      </div>
-      <label className="announcement-animation-field">
-        Movimiento de entrada
-        <select
-          value={p.animation || "fade"}
-          onChange={(event) => setPayload({ animation: event.target.value })}
-        >
-          <option value="none">Sin movimiento</option>
-          <option value="fade">Aparecer suavemente</option>
-          <option value="slide-left">Entrar desde la izquierda</option>
-          <option value="slide-up">Subir desde abajo</option>
-          <option value="zoom">Zoom suave</option>
-        </select>
-      </label>
-      <div className={`design-fields ${showSize ? "" : "single"}`}>
-        <label>
-          Alineación
-          <select
-            value={p.align || "center"}
-            onChange={(event) => setPayload({ align: event.target.value })}
-          >
-            <option value="left">Izquierda</option>
-            <option value="center">Centrada</option>
-            <option value="right">Derecha</option>
-          </select>
-        </label>
+      <section className="pro-section">
+        <h3>Ubicación en la pantalla</h3>
+        <div className="announcement-position-grid pro-choice-grid four">
+          {positions.map((option) => (
+            <button
+              type="button"
+              className={position === option.value ? "active" : ""}
+              aria-pressed={position === option.value}
+              onClick={() =>
+                setPayload({
+                  position: option.value,
+                  // Los diseños de zócalo no funcionan fuera de la parte
+                  // inferior: se cambia a uno compatible en lugar de dejar
+                  // una combinación que se ve rota.
+                  ...(option.value !== "lower" && lowerOnlyTemplates.includes(template)
+                    ? { template: "solid", borderRadius: 8 }
+                    : {}),
+                })
+              }
+              key={option.value}
+            >
+              <i className={option.icon} />
+              <span>
+                <strong>{option.label}</strong>
+                <small>{option.detail}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="pro-section">
+        <h3>Estilo del fondo</h3>
+        <div className="lower-third-gallery announcement-design-gallery pro-choice-grid">
+          {templates.map((option) => {
+            const lowerOnly = lowerOnlyTemplates.includes(option.value);
+            return (
+              <button
+                type="button"
+                className={template === option.value ? "active" : ""}
+                aria-pressed={template === option.value}
+                title={lowerOnly && position !== "lower" ? "Al elegirlo, el anuncio pasa a la ubicación Zócalo" : undefined}
+                onClick={() =>
+                  setPayload({
+                    template: option.value,
+                    borderRadius: option.radius,
+                    ...(lowerOnly ? { position: "lower" } : {}),
+                  })
+                }
+                key={option.value}
+              >
+                <i className={option.icon} />
+                <span>{option.label}</span>
+                {lowerOnly && <em>Zócalo</em>}
+              </button>
+            );
+          })}
+        </div>
+        {template !== "plain" && (
+          <div className="pro-color-row">
+            <span>Color del fondo</span>
+            <PresetPalette
+              label="Color del fondo"
+              colors={panelColors}
+              value={backgroundColor.slice(0, 7)}
+              onChange={(color) => setPayload({ backgroundColor: color })}
+            />
+            <label className="pro-custom-color" title="Elegir otro color">
+              <input
+                type="color"
+                value={/^#[0-9a-f]{6}/i.test(backgroundColor) ? backgroundColor.slice(0, 7) : "#000000"}
+                onChange={(event) => setPayload({ backgroundColor: event.target.value })}
+              />
+              Otro
+            </label>
+          </div>
+        )}
+      </section>
+
+      <section className="pro-section pro-section-row">
+        <div>
+          <h3>Alineación del texto</h3>
+          <div className="pro-segmented" role="radiogroup" aria-label="Alineación del texto">
+            {alignments.map((option) => (
+              <button
+                type="button"
+                role="radio"
+                aria-checked={(p.align || "center") === option.value}
+                aria-label={option.label}
+                title={option.label}
+                className={(p.align || "center") === option.value ? "active" : ""}
+                onClick={() => setPayload({ align: option.value })}
+                key={option.value}
+              >
+                {option.icon}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h3>Animación de entrada</h3>
+          <div className="pro-segmented wrap" role="radiogroup" aria-label="Animación de entrada">
+            {animations.map((option) => (
+              <button
+                type="button"
+                role="radio"
+                aria-checked={(p.animation || "fade") === option.value}
+                className={(p.animation || "fade") === option.value ? "active" : ""}
+                onClick={() => setPayload({ animation: option.value })}
+                key={option.value}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
         {showSize && (
-          <label>
-            Tamaño en puntos
+          <div>
+            <h3>Tamaño del texto</h3>
             <input
+              className="pro-number"
               type="number"
               min="18"
               max="140"
+              aria-label="Tamaño del texto"
               value={p.fontSize || 64}
               onChange={(event) =>
                 setPayload({
-                  fontSize: Math.max(
-                    18,
-                    Math.min(140, Number(event.target.value)),
-                  ),
+                  fontSize: Math.max(18, Math.min(140, Number(event.target.value) || 18)),
                 })
               }
             />
-          </label>
+          </div>
         )}
-      </div>
-      <PresetPalette
-        label="Color del zócalo"
-        colors={panelColors}
-        value={String(p.backgroundColor || "#000000").slice(0, 7)}
-        onChange={(backgroundColor) => setPayload({ backgroundColor })}
-      />
+      </section>
     </>
   );
 }
@@ -3124,8 +3228,7 @@ function PresetPalette({
   onChange: (color: string) => void;
 }) {
   return (
-    <div className="preset-palette">
-      <span>{label}</span>
+    <div className="preset-palette" role="group" aria-label={label}>
       <div>
         {colors.map((color) => (
           <button
@@ -3134,6 +3237,8 @@ function PresetPalette({
             }
             style={{ background: color }}
             title={color}
+            aria-label={`${label} ${color}`}
+            type="button"
             onClick={() => onChange(color)}
             key={color}
           />
@@ -3222,7 +3327,14 @@ function AnnouncementPreview({
     lowerThird: { ...state.lowerThird, visible: false },
     text: {
       ...state.text,
-      html: previewPages[previewPage] || String(p.html || ""),
+      html: (() => {
+        const html = previewPages[previewPage] || String(p.html || "");
+        // Con el anuncio vacío se muestra un texto de ejemplo, para poder
+        // elegir ubicación y estilo antes de escribir.
+        return html.replace(/<[^>]+>/g, "").trim()
+          ? html
+          : "<p>Escribí tu anuncio</p>";
+      })(),
       visible: true,
       kind: item.type === "bible" ? "biblia" : "anuncio",
       position: p.position || "center",
@@ -3244,7 +3356,7 @@ function AnnouncementPreview({
       <div className="preview-heading">
         <div>
           <span className="live-dot" />
-          VISTA PREVIA
+          Vista previa
         </div>
         <div className="preview-heading-actions">
           <small>{previewAspectRatio.replace(/\s*\/\s*/, ":")} · cambios en vivo</small>
@@ -3262,7 +3374,7 @@ function AnnouncementPreview({
       <div className="designer-preview" style={{ aspectRatio: previewAspectRatio }}>
         <ProjectionPreview state={previewState} />
       </div>
-      <p>Esta pantalla representa cómo se verá el anuncio en el proyector.</p>
+      <p>Así se verá en el proyector, con el fondo y el formato reales.</p>
     </aside>
   );
 }
