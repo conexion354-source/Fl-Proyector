@@ -94,6 +94,7 @@ if (!window.flProyector) {
       stateListeners.forEach((listener) => listener(state));
     },
     clearPreviewState: async () => {},
+    listCaptureSources: async () => [],
     clearProjectionContent: async () => {
       state = {
         ...state,

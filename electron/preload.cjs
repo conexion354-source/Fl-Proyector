@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("flProyector", {
   setPreviewState: (state) => ipcRenderer.invoke("preview:set-state", state),
   clearPreviewState: () => ipcRenderer.invoke("preview:clear"),
   clearProjectionContent: () => ipcRenderer.invoke("projection:clear-content"),
+  listCaptureSources: () => ipcRenderer.invoke("capture:sources"),
   finishVideoPlayback: () => ipcRenderer.invoke("projection:video-ended"),
   onState: (callback) => {
     const listener = (_event, state) => callback(state);

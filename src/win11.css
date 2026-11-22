@@ -1687,7 +1687,7 @@ html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); 
 #root .app-shell .image-zoom-map { position: relative; width: 100%; overflow: hidden; margin: 8px 0 10px; border: 1px solid var(--fl-control-stroke); border-radius: 6px; background: #000; cursor: zoom-in; touch-action: none; user-select: none; }
 #root .app-shell .image-zoom-map.is-zoomed { cursor: grab; }
 #root .app-shell .image-zoom-map.is-zoomed:active { cursor: grabbing; }
-#root .app-shell .image-zoom-map img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+#root .app-shell .image-zoom-map img { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 #root .app-shell .image-zoom-map.is-zoomed img { opacity: 0.55; }
 #root .app-shell .image-zoom-view { position: absolute; border: 2px solid var(--fl-accent); border-radius: 2px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35); pointer-events: none; transition: left 120ms ease, top 120ms ease, width 120ms ease, height 120ms ease; }
 #root .app-shell .image-zoom-bar { display: flex; align-items: center; gap: 6px; }
@@ -1696,3 +1696,41 @@ html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); 
 #root .app-shell .image-zoom-bar input { flex: 1; min-width: 60px; }
 #root .app-shell .image-zoom-bar b { min-width: 42px; color: var(--fl-text); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
 #root .app-shell .image-zoom-bar .image-zoom-reset { width: auto; padding: 0 10px !important; font-size: 12px; }
+
+/* Ventana capturada en vivo */
+.projection-capture { position: absolute; inset: 0; z-index: 7; background: #000; }
+.projection-capture video { width: 100%; height: 100%; display: block; }
+.projection-capture-error { position: absolute; inset: auto 0 8%; color: #fff; font: 600 2.2vmin "Segoe UI", sans-serif; text-align: center; text-shadow: 0 1px 4px #000; }
+
+/* Elemento "Ventana" en el panel del elemento */
+.summary-capture { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border: 1px solid var(--fl-control-stroke); border-radius: 6px; background: var(--fl-surface); }
+.summary-capture > svg { width: 22px; height: 22px; color: var(--fl-accent); }
+.summary-capture strong { color: var(--fl-text); font-size: 14px; font-weight: 600; }
+.summary-capture span { color: var(--fl-muted); font-size: 12px; }
+.summary-capture small { color: var(--fl-muted); font-size: 12px; }
+
+/* Selector de ventana */
+#root .capture-picker { display: flex; width: min(860px, calc(100vw - 48px)); max-height: calc(100vh - 48px); flex-direction: column; gap: 14px; padding: 20px 24px; border: 1px solid var(--fl-border); border-radius: 8px; background: var(--fl-surface-raised, var(--fl-surface)); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); }
+#root .capture-picker-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+#root .capture-picker-header h2 { margin: 0; color: var(--fl-text); font-size: 20px; font-weight: 600; }
+#root .capture-picker-header p { margin: 4px 0 0; color: var(--fl-muted); font-size: 13px; }
+#root .capture-picker-refresh { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; }
+#root .capture-picker-refresh svg { width: 14px; height: 14px; }
+#root .capture-picker-tabs { align-self: flex-start; }
+#root .capture-picker-grid { display: grid; min-height: 180px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); align-content: start; gap: 10px; overflow-y: auto; padding: 2px; }
+#root .capture-picker-empty { grid-column: 1 / -1; margin: auto; padding: 40px 0; color: var(--fl-muted); font-size: 13px; text-align: center; }
+#root .capture-source { display: flex; min-width: 0; flex-direction: column; gap: 6px; padding: 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--fl-text); text-align: left; cursor: pointer; }
+#root .capture-source:hover { background: var(--fl-control-fill); }
+#root .capture-source.selected { border-color: var(--fl-accent); background: var(--fl-control-fill); box-shadow: inset 0 0 0 1px var(--fl-accent); }
+#root .capture-source-thumb { display: grid; aspect-ratio: 16 / 9; place-items: center; overflow: hidden; border-radius: 4px; background: #000; }
+#root .capture-source-thumb img { width: 100%; height: 100%; object-fit: contain; }
+#root .capture-source-thumb svg { width: 28px; height: 28px; color: var(--fl-muted); }
+#root .capture-source-name { display: flex; min-width: 0; align-items: center; gap: 6px; font-size: 12px; }
+#root .capture-source-name img { width: 16px; height: 16px; flex: 0 0 16px; }
+#root .capture-source-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#root .capture-picker-options { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: 16px; }
+#root .capture-picker-options .summary-loop { margin: 0; }
+#root .capture-fit { display: flex; flex-direction: column; gap: 6px; color: var(--fl-muted); font-size: 12px; }
+#root .capture-picker-footer { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--fl-border); }
+#root .capture-picker-footer small { flex: 1; color: var(--fl-muted); font-size: 12px; }
+#root .capture-picker-footer button { height: 32px; padding: 0 16px; }

@@ -25,6 +25,9 @@ import {
   Plus,
   Presentation,
   Repeat2,
+  AppWindow,
+  MousePointer2,
+  RefreshCw,
   Save,
   Search,
   Trash2,
@@ -35,6 +38,7 @@ import type {
   BibleDisplaySettings,
   BibleVerse,
   BibleVersion,
+  CaptureSource,
   MediaItem,
   Meeting,
   MeetingItem,
@@ -71,6 +75,7 @@ const itemIcons = {
   bible: BookOpenText,
   media: Image,
   presentation: Presentation,
+  capture: AppWindow,
 };
 const itemLabels = {
   announcement: "Anuncio",
@@ -78,6 +83,7 @@ const itemLabels = {
   bible: "Cita bíblica",
   media: "Fondo / video",
   presentation: "PowerPoint",
+  capture: "Ventana",
 };
 const defaultColors = {
   announcement: "#f59e0b",
@@ -85,6 +91,7 @@ const defaultColors = {
   bible: "#3b82f6",
   media: "#10b981",
   presentation: "#ef4444",
+  capture: "#0ea5e9",
 };
 const itemColors = [
   "#ef4444",
@@ -260,6 +267,8 @@ export function MeetingBuilder({
     palette: boolean;
   } | null>(null);
   const [editing, setEditing] = useState(false);
+  // Selector de ventana/pantalla para un elemento "Ventana" (nuevo o existente).
+  const [capturePicker, setCapturePicker] = useState<{ itemId: number | null } | null>(null);
   const [draftItemId, setDraftItemId] = useState<number | null>(null);
   const [picker, setPicker] = useState<"song" | "media" | "bible" | null>(null);
   const [pickerSearch, setPickerSearch] = useState("");
@@ -493,6 +502,10 @@ export function MeetingBuilder({
       } finally {
         setAddingMedia(false);
       }
+      return;
+    }
+    if (type === "capture") {
+      setCapturePicker({ itemId: null });
       return;
     }
     if (type === "presentation") {
@@ -817,6 +830,11 @@ export function MeetingBuilder({
         state.presentation.visible &&
         state.presentation.path === String(payload.path || "")
       );
+    if (item.type === "capture")
+      return (
+        !!state.capture?.visible &&
+        (state.capture.sourceId === payload.sourceId || state.capture.name === payload.sourceName)
+      );
     if (item.type === "media") {
       const source = meetingMediaForItem(item);
       if (!source) return false;
@@ -1110,6 +1128,73 @@ export function MeetingBuilder({
     return () => window.removeEventListener("keydown", handleKeys);
   }, [selected, editing, picker, songs, activeStanza, state.presentation]);
 
+  /** Proyecta la ventana guardada; si ya no existe, pide elegirla de nuevo. */
+  const fireCapture = async (item: MeetingItem) => {
+    const payload = item.payload as Record<string, unknown>;
+    const sources = await window.flProyector.listCaptureSources();
+    const source =
+      sources.find((value) => value.id === payload.sourceId) ??
+      sources.find((value) => value.name === payload.sourceName);
+    if (!source) {
+      setSelected(item);
+      setCapturePicker({ itemId: item.id });
+      return;
+    }
+    const restoredBackground = releaseMeetingVideoBackground();
+    setOnAirItemId(item.id);
+    update({
+      blackout: false,
+      logo: false,
+      text: { visible: false },
+      lowerThird: { visible: false },
+      presentation: { visible: false },
+      background: restoredBackground,
+      capture: {
+        visible: true,
+        sourceId: source.id,
+        name: source.name,
+        kind: source.kind,
+        cursor: payload.cursor !== false,
+        fit: payload.fit === "cover" ? "cover" : "contain",
+        sessionId: (state.capture?.sessionId ?? 0) + 1,
+      },
+    });
+  };
+
+  const saveCaptureItem = async (
+    choice: { source: CaptureSource; cursor: boolean; fit: "contain" | "cover" },
+    itemId: number | null,
+  ) => {
+    if (!meetingId) return;
+    const payload = {
+      sourceId: choice.source.id,
+      sourceName: choice.source.name,
+      kind: choice.source.kind,
+      cursor: choice.cursor,
+      fit: choice.fit,
+    };
+    const existing = itemId ? items.find((entry) => entry.id === itemId) : undefined;
+    const id = await window.flProyector.saveMeetingItem(
+      existing
+        ? { ...existing, title: choice.source.name, payload: { ...existing.payload, ...payload } }
+        : {
+            meetingId,
+            type: "capture",
+            title: choice.source.name,
+            color: defaultColors.capture,
+            payload,
+          },
+    );
+    const list = await window.flProyector.listMeetingItems(meetingId);
+    setItems(list);
+    const saved = list.find((entry) => entry.id === (existing?.id ?? id)) ?? null;
+    setSelected(saved);
+    setCapturePicker(null);
+    reloadMeetings();
+    // Si esa ventana ya está en el aire, aplica los cambios en el momento.
+    if (saved && existing && isItemOnAir(existing)) void fireCapture(saved);
+  };
+
   const fire = async (item: MeetingItem) => {
     if (isItemOnAir(item)) {
       const restoredBackground = releaseMeetingVideoBackground();
@@ -1118,6 +1203,7 @@ export function MeetingBuilder({
         text: { visible: false },
         lowerThird: { visible: false },
         presentation: { visible: false },
+        capture: { visible: false },
         background: restoredBackground,
         video: { playing: false, loop: true },
       });
@@ -1127,6 +1213,7 @@ export function MeetingBuilder({
     const attachment = payload.meetingMedia as MediaItem | undefined;
     const background = attachment ?? mediaById(payload.backgroundId ?? payload.mediaId);
     if (item.type === "presentation") return firePresentation(item, 0);
+    if (item.type === "capture") return fireCapture(item);
     if (item.type === "media" && background) {
       const activeItem = items.find((entry) => entry.id === onAirItemId);
       setOnAirItemId(item.id);
@@ -1248,6 +1335,9 @@ export function MeetingBuilder({
     } else if (item.type === "announcement") {
       const pages = announcementPages(payload);
       next.text = { ...state.text, html: pages[Number(payload.announcementPage || 0)] || pages[0], kind: "anuncio", visible: true, position: payload.position || "center", fontSize: Number(payload.fontSize || 64), fontFamily: payload.fontFamily || "Inter", color: payload.color || "#ffffff", backgroundColor: payload.backgroundColor || "rgba(0,0,0,.55)", align: payload.align || "center", borderRadius: Number(payload.borderRadius || 0), template: payload.template || "plain", animation: payload.animation || "fade", shadowEnabled: payload.shadowEnabled !== false, shadowColor: payload.shadowColor || "#000000", shadowBlur: Number(payload.shadowBlur ?? 14) };
+    } else if (item.type === "capture") {
+      next.text = { ...state.text, visible: false };
+      next.capture = { visible: true, sourceId: String(payload.sourceId || ""), name: String(payload.sourceName || item.title), kind: payload.kind === "screen" ? "screen" : "window", cursor: payload.cursor !== false, fit: payload.fit === "cover" ? "cover" : "contain", sessionId: (state.capture?.sessionId ?? 0) + 1 };
     } else if (item.type === "presentation") {
       next.presentation = { path: String(payload.path || ""), url: String(payload.url || ""), name: String(payload.name || item.title), previewSlides: payload.previewSlides as string[] | undefined, slideIndex: 0, slideCount: Number(payload.slideCount || 0), navigationId: state.presentation.navigationId, navigationDirection: 1, visible: true };
       next.text = { ...state.text, visible: false };
@@ -1559,7 +1649,11 @@ export function MeetingBuilder({
             onStanzaContextMenu={(index, x, y) =>
               setStanzaContextMenu({ index, x, y })
             }
-            onEdit={() => setEditing(true)}
+            onEdit={() =>
+              selected.type === "capture"
+                ? setCapturePicker({ itemId: selected.id })
+                : setEditing(true)
+            }
             loopable={isLoopableMeetingItem(selected)}
             onToggleLoop={() =>
               void setMeetingItemLoop(selected, (selected.payload as Record<string, unknown>).loop !== true)
@@ -1644,10 +1738,12 @@ export function MeetingBuilder({
               icon: <Edit3 />,
               onClick: () => {
                 setSelected(contextMenu.item);
-                setEditing(true);
+                if (contextMenu.item.type === "capture")
+                  setCapturePicker({ itemId: contextMenu.item.id });
+                else setEditing(true);
               },
             },
-            ...(!["media", "presentation"].includes(contextMenu.item.type) ? [{
+            ...(!["media", "presentation", "capture"].includes(contextMenu.item.type) ? [{
               label: "Asignar fondo",
               icon: <Image />,
               onClick: () => setBackgroundTarget(contextMenu.item),
@@ -1836,6 +1932,17 @@ export function MeetingBuilder({
         </div>
       )}
 
+      {capturePicker && (
+        <CaptureSourcePicker
+          initial={
+            capturePicker.itemId
+              ? (items.find((entry) => entry.id === capturePicker.itemId)?.payload as Record<string, unknown> | undefined)
+              : undefined
+          }
+          onCancel={() => setCapturePicker(null)}
+          onChoose={(choice) => void saveCaptureItem(choice, capturePicker.itemId)}
+        />
+      )}
       {editing && selected && (
         <div className="modal-backdrop">
           <div
@@ -2243,6 +2350,17 @@ function ItemSummary({
         </div>
       ) : item.type === "presentation" ? (
         <PresentationSummary item={item} projection={projection} />
+      ) : item.type === "capture" ? (
+        <div className="summary-capture">
+          <AppWindow aria-hidden="true" />
+          <strong>{String(payload.sourceName || item.title)}</strong>
+          <span>
+            {payload.kind === "screen" ? "Pantalla completa" : "Ventana"} ·{" "}
+            {payload.cursor === false ? "sin puntero" : "con puntero"} ·{" "}
+            {payload.fit === "cover" ? "llenar pantalla" : "ajustar"}
+          </span>
+          <small>El sonido sale del programa original, como siempre.</small>
+        </div>
       ) : (
         <p className="summary-empty">
           Este elemento todavía no tiene contenido.
@@ -3399,5 +3517,132 @@ function AnnouncementPreview({
       </div>
       <p>Así se verá en el proyector, con el fondo y el formato reales.</p>
     </aside>
+  );
+}
+
+/**
+ * Selector de ventana o pantalla para proyectar en vivo (Chrome, Zoom,
+ * otro programa), con miniaturas actualizables.
+ */
+function CaptureSourcePicker({
+  initial,
+  onCancel,
+  onChoose,
+}: {
+  initial?: Record<string, unknown>;
+  onCancel: () => void;
+  onChoose: (choice: { source: CaptureSource; cursor: boolean; fit: "contain" | "cover" }) => void;
+}) {
+  const [sources, setSources] = useState<CaptureSource[] | null>(null);
+  const [kind, setKind] = useState<"window" | "screen">(initial?.kind === "screen" ? "screen" : "window");
+  const [selectedId, setSelectedId] = useState<string | null>((initial?.sourceId as string) ?? null);
+  const [cursor, setCursor] = useState(initial?.cursor !== false);
+  const [fit, setFit] = useState<"contain" | "cover">(initial?.fit === "cover" ? "cover" : "contain");
+  const [error, setError] = useState("");
+  const load = async () => {
+    try {
+      setError("");
+      const list = await window.flProyector.listCaptureSources();
+      setSources(list);
+      // Si la ventana guardada cambió de identificador, se reconoce por nombre.
+      setSelectedId((current) => {
+        if (current && list.some((value) => value.id === current)) return current;
+        const byName = list.find((value) => value.name === initial?.sourceName);
+        return byName?.id ?? null;
+      });
+    } catch {
+      setSources([]);
+      setError("No se pudo obtener la lista de ventanas. En Mac, habilitá FL Proyector en Configuración del Sistema > Privacidad > Grabación de pantalla.");
+    }
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+  const visible = (sources ?? []).filter((value) => value.kind === kind);
+  const chosen = sources?.find((value) => value.id === selectedId) ?? null;
+  return (
+    <div className="modal-backdrop">
+      <div className="capture-picker win11-settings-dialog" role="dialog" aria-label="Elegir ventana">
+        <header className="capture-picker-header">
+          <div>
+            <h2>Proyectar una ventana</h2>
+            <p>Elegí qué querés mostrar en vivo: un navegador, Zoom u otro programa.</p>
+          </div>
+          <button className="capture-picker-refresh" onClick={() => void load()} title="Actualizar lista">
+            <RefreshCw />
+            Actualizar
+          </button>
+        </header>
+        <div className="dlg-segmented capture-picker-tabs" role="tablist">
+          <button className={kind === "window" ? "active" : ""} onClick={() => setKind("window")}>
+            Ventanas
+          </button>
+          <button className={kind === "screen" ? "active" : ""} onClick={() => setKind("screen")}>
+            Pantallas completas
+          </button>
+        </div>
+        <div className="capture-picker-grid">
+          {sources === null ? (
+            <p className="capture-picker-empty">Buscando ventanas…</p>
+          ) : visible.length === 0 ? (
+            <p className="capture-picker-empty">
+              {error ||
+                (kind === "window"
+                  ? "No hay ventanas abiertas para proyectar. Abrí el programa y tocá Actualizar."
+                  : "No hay otra pantalla disponible. El monitor del proyector no se puede capturar a sí mismo.")}
+            </p>
+          ) : (
+            visible.map((source) => (
+              <button
+                key={source.id}
+                className={`capture-source ${selectedId === source.id ? "selected" : ""}`}
+                onClick={() => setSelectedId(source.id)}
+                onDoubleClick={() => onChoose({ source, cursor, fit })}
+                title={source.name}
+              >
+                <span className="capture-source-thumb">
+                  {source.thumbnail ? <img src={source.thumbnail} alt="" /> : <AppWindow />}
+                </span>
+                <span className="capture-source-name">
+                  {source.icon && <img src={source.icon} alt="" />}
+                  <span>{source.name}</span>
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+        <div className="capture-picker-options">
+          <label className="summary-loop">
+            <MousePointer2 aria-hidden="true" />
+            <span>
+              <b>Mostrar el puntero</b>
+              <small>Útil para señalar en una página o programa.</small>
+            </span>
+            <input type="checkbox" role="switch" checked={cursor} onChange={(event) => setCursor(event.target.checked)} />
+            <i aria-hidden="true" />
+          </label>
+          <div className="capture-fit">
+            <span>Encuadre</span>
+            <div className="dlg-segmented">
+              <button className={fit === "contain" ? "active" : ""} onClick={() => setFit("contain")}>
+                Ajustar (sin recortar)
+              </button>
+              <button className={fit === "cover" ? "active" : ""} onClick={() => setFit("cover")}>
+                Llenar pantalla
+              </button>
+            </div>
+          </div>
+        </div>
+        <footer className="capture-picker-footer">
+          <small>Si la ventana se minimiza, la imagen se congela. Dejala abierta, aunque esté detrás de otras.</small>
+          <button className="win11-settings-cancel" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button className="primary" disabled={!chosen} onClick={() => chosen && onChoose({ source: chosen, cursor, fit })}>
+            Usar esta ventana
+          </button>
+        </footer>
+      </div>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import type {
+  CaptureSource,
   BibleBook,
   BibleDisplaySettings,
   BibleVerse,
@@ -39,6 +40,7 @@ declare global {
       setPreviewState(state: ProjectionState | null): Promise<void>;
       clearPreviewState(): Promise<void>;
       clearProjectionContent(): Promise<void>;
+      listCaptureSources(): Promise<CaptureSource[]>;
       finishVideoPlayback(): Promise<void>;
       onState(callback: (state: ProjectionState) => void): () => void;
       onLiveState(callback: (state: ProjectionState) => void): () => void;

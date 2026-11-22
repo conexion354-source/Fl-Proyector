@@ -1356,6 +1356,22 @@ function LiveContentControls({
   videoDuration: number;
   setVideoTime: (value: number) => void;
 }) {
+  // Imagen proyectada desde la reunión: se muestra como una sola diapositiva.
+  if (
+    state.presentation.visible &&
+    !state.presentation.path &&
+    state.presentation.previewSlides?.length === 1
+  )
+    return (
+      <ImageZoomControls
+        url={state.presentation.previewSlides[0]}
+        name={state.presentation.name}
+        zoom={state.presentation.zoom}
+        fit="contain"
+        ratio={state.outputViewport.width / Math.max(1, state.outputViewport.height)}
+        onZoom={(zoom) => update({ presentation: { zoom } })}
+      />
+    );
   if (state.presentation.visible) {
     const count = state.presentation.slideCount;
     const index = state.presentation.slideIndex;
@@ -1391,7 +1407,16 @@ function LiveContentControls({
     );
   }
   if (state.background.kind === "image" && state.background.url)
-    return <ImageZoomControls state={state} update={update} />;
+    return (
+      <ImageZoomControls
+        url={state.background.url}
+        name={state.background.name}
+        zoom={state.background.zoom}
+        fit="fill"
+        ratio={state.outputViewport.width / Math.max(1, state.outputViewport.height)}
+        onZoom={(zoom) => update({ background: { zoom } })}
+      />
+    );
   if (state.background.kind !== "video") return null;
   const videoProgress =
     videoDuration > 0
@@ -1496,13 +1521,21 @@ function LiveContentControls({
  * punto, arrastrar para moverse y la rueda del mouse para acercar o alejar.
  */
 function ImageZoomControls({
-  state,
-  update,
+  url,
+  name,
+  zoom: currentZoom,
+  fit,
+  ratio: rawRatio,
+  onZoom,
 }: {
-  state: ReturnType<typeof useProjectionState>["state"];
-  update: ReturnType<typeof useProjectionState>["update"];
+  url: string;
+  name: string;
+  zoom: ImageZoom | undefined;
+  fit: "fill" | "contain";
+  ratio: number;
+  onZoom: (zoom: ImageZoom) => void;
 }) {
-  const zoom = clampImageZoom(state.background.zoom);
+  const zoom = clampImageZoom(currentZoom);
   const [draft, setDraft] = useState<ImageZoom>(zoom);
   const dragging = useRef<{ startX: number; startY: number; origin: ImageZoom; moved: boolean } | null>(null);
   const frame = useRef<number | null>(null);
@@ -1518,7 +1551,7 @@ function ImageZoomControls({
     if (frame.current !== null) return;
     frame.current = window.requestAnimationFrame(() => {
       frame.current = null;
-      if (pending.current) update({ background: { zoom: pending.current } });
+      if (pending.current) onZoom(pending.current);
       pending.current = null;
     });
   };
@@ -1556,7 +1589,7 @@ function ImageZoomControls({
         : [...steps].reverse().find((value) => value < current - 0.01) ?? 1;
     send({ scale: next });
   };
-  const ratio = state.outputViewport.width / Math.max(1, state.outputViewport.height) || 16 / 9;
+  const ratio = Number.isFinite(rawRatio) && rawRatio > 0 ? rawRatio : 16 / 9;
   const view = {
     left: `${(draft.x - 0.5 / draft.scale) * 100}%`,
     top: `${(draft.y - 0.5 / draft.scale) * 100}%`,
@@ -1567,7 +1600,7 @@ function ImageZoomControls({
     <section className="live-media-controls image-zoom-controls">
       <div className="live-control-title">
         <span>Zoom de imagen</span>
-        <b>{state.background.name}</b>
+        <b>{name}</b>
       </div>
       <div
         ref={map}
@@ -1598,7 +1631,7 @@ function ImageZoomControls({
         }}
         onPointerCancel={() => (dragging.current = null)}
       >
-        <img src={state.background.url!} alt="" draggable={false} />
+        <img src={url} alt="" draggable={false} style={{ objectFit: fit }} />
         {draft.scale > 1.001 && <span className="image-zoom-view" style={view} />}
       </div>
       <div className="image-zoom-bar">

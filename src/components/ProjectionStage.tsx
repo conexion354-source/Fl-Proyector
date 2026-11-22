@@ -603,6 +603,10 @@ export function ProjectionStage({
         />
       </div>
 
+      {state.capture?.visible && state.capture.sourceId && (
+        <CaptureLayer capture={state.capture} preview={preview} />
+      )}
+
       <div
         // Keep this layer mounted while its visibility changes so the exit
         // transition can finish when the operator clears projected text.
@@ -827,6 +831,7 @@ function PresentationLayer({
         <img
           src={mockSlide}
           alt={`Diapositiva ${presentation.slideIndex + 1}`}
+          style={presentation.zoom ? zoomTransform(presentation.zoom) : undefined}
         />
       ) : content ? (
         <PresentationErrorBoundary
@@ -1173,11 +1178,70 @@ function VideoLayer({
 /** Acerca una zona de la imagen proyectada con una transición suave. */
 function imageZoomStyle(background: ProjectionState["background"]): CSSProperties | undefined {
   if (background.kind !== "image" || !background.zoom) return undefined;
-  const { scale, x, y } = clampImageZoom(background.zoom);
+  return zoomTransform(background.zoom);
+}
+
+function zoomTransform(zoom: Partial<import("../../shared/types").ImageZoom>): CSSProperties {
+  const { scale, x, y } = clampImageZoom(zoom);
   return {
     transformOrigin: "0 0",
     transform: `translate(${(0.5 - scale * x) * 100}%, ${(0.5 - scale * y) * 100}%) scale(${scale})`,
     transition: "transform 450ms cubic-bezier(0.2, 0, 0, 1)",
     willChange: "transform",
   };
+}
+
+/**
+ * Ventana o pantalla capturada en vivo. La pide con getDisplayMedia; el
+ * proceso principal entrega la fuente elegida sin mostrar el selector.
+ * El sonido sigue saliendo del programa original (capturarlo y volver a
+ * reproducirlo generaría eco).
+ */
+function CaptureLayer({
+  capture,
+  preview,
+}: {
+  capture: ProjectionState["capture"];
+  preview: boolean;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    let cancelled = false;
+    setError("");
+    const video = {
+      frameRate: { ideal: preview ? 12 : 30, max: 60 },
+      cursor: capture.cursor ? "always" : "never",
+    } as MediaTrackConstraints;
+    navigator.mediaDevices
+      .getDisplayMedia({ video, audio: false })
+      .then((value) => {
+        if (cancelled) {
+          value.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        stream = value;
+        const track = value.getVideoTracks()[0];
+        track?.addEventListener("ended", () => setError("La ventana se cerró o ya no está disponible."));
+        if (ref.current) {
+          ref.current.srcObject = value;
+          void ref.current.play().catch(() => {});
+        }
+      })
+      .catch((reason) => {
+        console.warn("No se pudo capturar la ventana", reason);
+        if (!cancelled) setError("No se pudo capturar la ventana. Volvé a elegirla.");
+      });
+    return () => {
+      cancelled = true;
+      stream?.getTracks().forEach((track) => track.stop());
+    };
+  }, [capture.sourceId, capture.sessionId, capture.cursor, preview]);
+  return (
+    <div className="projection-capture">
+      <video ref={ref} muted playsInline autoPlay style={{ objectFit: capture.fit }} />
+      {error && <div className="projection-capture-error">{error}</div>}
+    </div>
+  );
 }

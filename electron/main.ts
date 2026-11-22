@@ -8,6 +8,8 @@ import {
   net,
   dialog,
   shell,
+  desktopCapturer,
+  session,
 } from "electron";
 import { join, basename, extname } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -29,6 +31,7 @@ import {
   type ChurchSettings,
   type DisplaySettings,
   type ProjectionPatch,
+  type CaptureSource,
   type ProjectionState,
   type SongDisplaySettings,
   type MediaItem,
@@ -624,6 +627,15 @@ function mergeState(patch: ProjectionPatch) {
     videoReturnBackground = { ...state.background };
   if (patch.video?.loop === true) videoReturnBackground = null;
   const previousPresentation = state.presentation;
+  // Poner otro contenido al aire saca la captura de ventana.
+  if (
+    !patch.capture &&
+    state.capture?.visible &&
+    (patch.text?.visible === true ||
+      patch.presentation?.visible === true ||
+      (patch.background?.url !== undefined && patch.background.url !== state.background.url))
+  )
+    patch = { ...patch, capture: { visible: false } };
   // Una imagen nueva empieza siempre sin zoom.
   if (
     patch.background &&
@@ -632,6 +644,13 @@ function mergeState(patch: ProjectionPatch) {
     patch.background.zoom === undefined
   )
     patch = { ...patch, background: { ...patch.background, zoom: undefined } };
+  if (
+    patch.presentation &&
+    patch.presentation.url !== undefined &&
+    patch.presentation.url !== state.presentation.url &&
+    patch.presentation.zoom === undefined
+  )
+    patch = { ...patch, presentation: { ...patch.presentation, zoom: undefined } };
   state = {
     ...state,
     ...patch,
@@ -646,6 +665,7 @@ function mergeState(patch: ProjectionPatch) {
     timer: { ...state.timer, ...patch.timer },
     clock: { ...state.clock, ...patch.clock },
     alert: { ...state.alert, ...patch.alert },
+    capture: { ...initialProjectionState.capture, ...state.capture, ...patch.capture },
     outputViewport: { ...state.outputViewport, ...patch.outputViewport },
   };
   if (
@@ -838,6 +858,74 @@ function restoreProjectorAfterNative(force = false) {
     projectionTargets(database.getDisplaySettings()).mainTarget,
     database.getDisplaySettings(),
   );
+}
+
+/**
+ * Ventanas y pantallas que se pueden proyectar. Se excluyen las ventanas de
+ * FL Proyector y el monitor del proyector (capturarlo crearía un efecto
+ * espejo infinito).
+ */
+async function listCaptureSources(): Promise<CaptureSource[]> {
+  const sources = await desktopCapturer.getSources({
+    types: ["window", "screen"],
+    thumbnailSize: { width: 320, height: 180 },
+    fetchWindowIcons: true,
+  });
+  const ownIds = new Set(
+    BrowserWindow.getAllWindows()
+      .filter((win) => !win.isDestroyed())
+      .map((win) => {
+        try {
+          return win.getMediaSourceId();
+        } catch {
+          return "";
+        }
+      }),
+  );
+  const projectorDisplay = projectionTargets(database.getDisplaySettings()).mainTarget;
+  return sources
+    .filter((source) => !ownIds.has(source.id))
+    .filter((source) => !(projectorDisplay && source.display_id === String(projectorDisplay.id)))
+    .filter((source) => source.name.trim() !== "")
+    .map((source) => ({
+      id: source.id,
+      name: source.id.startsWith("screen:") ? screenLabel(source) : source.name,
+      kind: source.id.startsWith("screen:") ? ("screen" as const) : ("window" as const),
+      thumbnail: source.thumbnail.isEmpty() ? "" : source.thumbnail.toDataURL(),
+      icon: source.appIcon && !source.appIcon.isEmpty() ? source.appIcon.toDataURL() : null,
+    }));
+}
+
+function screenLabel(source: Electron.DesktopCapturerSource) {
+  const display = screen.getAllDisplays().find((value) => String(value.id) === source.display_id);
+  return display
+    ? `Pantalla ${display.label || source.name} (${display.size.width} × ${display.size.height})`
+    : source.name;
+}
+
+/**
+ * Entrega a getDisplayMedia la ventana elegida por el operador, sin mostrar
+ * el selector del sistema. Solo responde a las ventanas de FL Proyector.
+ */
+function installCaptureHandler() {
+  session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
+    try {
+      const wanted = state.capture.sourceId;
+      if (!wanted) return callback({});
+      const sources = await desktopCapturer.getSources({
+        types: ["window", "screen"],
+        thumbnailSize: { width: 0, height: 0 },
+      });
+      const source =
+        sources.find((value) => value.id === wanted) ??
+        sources.find((value) => value.name === state.capture.name);
+      if (!source) return callback({});
+      callback({ video: source });
+    } catch (error) {
+      console.warn("No se pudo iniciar la captura", error);
+      callback({});
+    }
+  });
 }
 
 function currentLiveState() {
@@ -1733,6 +1821,7 @@ function clearProjectionContent() {
     lowerThird: { visible: false },
     presentation: { visible: false },
     alert: { visible: false },
+    capture: { visible: false },
     video: {
       ...(restoredVideo ?? {}),
       playing: resumeLoopingBackground,
@@ -2315,6 +2404,8 @@ if (hasSingleInstanceLock)
       return Boolean(floatingPreviewWindow && !floatingPreviewWindow.isDestroyed());
     });
     ipcMain.handle("projection:clear-content", clearProjectionContent);
+    ipcMain.handle("capture:sources", () => listCaptureSources());
+    installCaptureHandler();
     ipcMain.handle("app:open-external", async (_event, value: unknown) => {
       if (typeof value !== "string") return false;
       try {

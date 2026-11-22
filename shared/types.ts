@@ -93,7 +93,8 @@ export type MeetingItemType =
   | "song"
   | "bible"
   | "media"
-  | "presentation";
+  | "presentation"
+  | "capture";
 export type MeetingItem = {
   id: number;
   meetingId: number;
@@ -343,6 +344,8 @@ export type PresentationState = {
   previewSlides?: string[];
   /** La presentación la está mostrando el PowerPoint instalado. */
   native?: boolean;
+  /** Zoom de una imagen proyectada desde la reunión (una sola diapositiva). */
+  zoom?: ImageZoom;
 };
 export type OverlayTimer = { visible: boolean; running: boolean; startedAt: number; duration: number; remaining: number; position: "top" | "center" | "bottom"; fontSize: number; color: string };
 export type OverlayClock = { visible: boolean; position: "top" | "center" | "bottom"; fontSize: number; color: string };
@@ -408,8 +411,30 @@ export type ProjectionState = {
   timer: OverlayTimer;
   clock: OverlayClock;
   alert: OverlayAlert;
+  /** Ventana o pantalla capturada en vivo (Chrome, Zoom, otro programa). */
+  capture: CaptureState;
   blackout: boolean;
   logo: boolean;
+};
+
+export type CaptureState = {
+  visible: boolean;
+  sourceId: string | null;
+  name: string;
+  kind: "window" | "screen";
+  /** Mostrar el puntero del mouse en la captura. */
+  cursor: boolean;
+  fit: "contain" | "cover";
+  /** Cambia en cada inicio para reabrir la captura. */
+  sessionId: number;
+};
+
+export type CaptureSource = {
+  id: string;
+  name: string;
+  kind: "window" | "screen";
+  thumbnail: string;
+  icon: string | null;
 };
 
 export const initialProjectionState: ProjectionState = {
@@ -470,6 +495,7 @@ export const initialProjectionState: ProjectionState = {
   timer: { visible: false, running: false, startedAt: 0, duration: 300, remaining: 300, position: "top", fontSize: 42, color: "#ffffff" },
   clock: { visible: false, position: "top", fontSize: 36, color: "#ffffff" },
   alert: { visible: false, message: "Bebé llorando", position: "bottom", fontSize: 42, color: "#ffffff", animation: "pulse" },
+  capture: { visible: false, sourceId: null, name: "", kind: "window", cursor: true, fit: "contain", sessionId: 0 },
   blackout: false,
   logo: false,
 };
@@ -488,9 +514,11 @@ export type ProjectionPatch = Partial<
     | "timer"
     | "clock"
     | "alert"
+    | "capture"
     | "outputViewport"
   >
 > & {
+  capture?: Partial<CaptureState>;
   background?: Partial<BackgroundState>;
   text?: Partial<ProjectionState["text"]>;
   lowerThird?: Partial<ProjectionState["lowerThird"]>;
