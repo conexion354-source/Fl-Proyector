@@ -1304,6 +1304,12 @@ html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); 
 /* Etiquetas "Al aire" (InfoBadge) */
 #root .app-shell :is(.rundown-on-air, .summary-on-air, .playing-indicator) {
   display: inline-flex;
+  /* Nunca se parte en dos renglones ni se achica en columnas angostas. */
+  flex: 0 0 auto;
+  width: auto !important;
+  min-width: max-content;
+  white-space: nowrap !important;
+  line-height: 20px !important;
   height: 20px;
   align-items: center;
   padding: 0 8px !important;
