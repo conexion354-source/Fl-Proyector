@@ -1255,6 +1255,30 @@ export function SettingsPanel({
                 </SettingRow>
               </SettingsGroup>
 
+              <SettingsGroup title="Presentaciones de PowerPoint">
+                <SettingRow
+                  title="Mostrar con"
+                  description={
+                    (window.flProyector as { platform?: string }).platform === "win32"
+                      ? "PowerPoint instalado reproduce animaciones, transiciones y videos exactamente como en el archivo. Requiere Microsoft Office."
+                      : "En Mac se usa el visor incorporado; las animaciones complejas se muestran simplificadas."
+                  }
+                >
+                  <Select
+                    label="Mostrar presentaciones con"
+                    value={(window.flProyector as { platform?: string }).platform === "win32" ? (settings.presentationEngine ?? "powerpoint") : "builtin"}
+                    disabled={(window.flProyector as { platform?: string }).platform !== "win32"}
+                    onChange={(presentationEngine) =>
+                      setSettings((value) => ({ ...value, presentationEngine }))
+                    }
+                    options={[
+                      { value: "powerpoint", label: "PowerPoint instalado (recomendado)" },
+                      { value: "builtin", label: "Visor incorporado" },
+                    ]}
+                  />
+                </SettingRow>
+              </SettingsGroup>
+
               <SettingsGroup title="Salidas adicionales">
                 <SettingExpander
                   title="Tercera pantalla"

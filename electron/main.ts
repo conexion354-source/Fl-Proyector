@@ -22,6 +22,7 @@ import chokidar from "chokidar";
 import { XMLParser } from "fast-xml-parser";
 import { AppDatabase } from "./database.js";
 import { startRemoteServer } from "./server.js";
+import { NativePowerPoint } from "./powerpointNative.js";
 import {
   initialProjectionState,
   type BibleDisplaySettings,
@@ -127,6 +128,17 @@ let remoteServer: ReturnType<typeof startRemoteServer>;
 let remoteActiveMediaItemId: number | null = null;
 let remoteReturnState: Pick<ProjectionState, "background" | "video"> | null = null;
 let videoReturnBackground: ProjectionState["background"] | null = null;
+/** Presentación abierta en el PowerPoint instalado (Windows). */
+let nativeShow: {
+  controller: NativePowerPoint;
+  path: string;
+  slide: number;
+  navigationId: number;
+  hidProjector: boolean;
+} | null = null;
+/** Archivos que PowerPoint no pudo abrir: vuelven al visor incorporado. */
+const nativeShowFailures = new Set<string>();
+const POWERPOINT_EXTENSIONS = /\.(pptx|ppsx|pptm|ppsm|potx|potm|ppt|pps|pot)$/i;
 let videoFinishScheduled = false;
 let mediaDir = "";
 let meetingMediaDir = "";
@@ -611,6 +623,7 @@ function mergeState(patch: ProjectionPatch) {
   )
     videoReturnBackground = { ...state.background };
   if (patch.video?.loop === true) videoReturnBackground = null;
+  const previousPresentation = state.presentation;
   state = {
     ...state,
     ...patch,
@@ -651,6 +664,7 @@ function mergeState(patch: ProjectionPatch) {
       finishVideoPlayback();
     });
   }
+  syncNativePowerPoint(previousPresentation);
   const liveState = currentLiveState();
   if (controlWindow && !controlWindow.isDestroyed()) {
     controlWindow.webContents.send("projection:state", state);
@@ -665,6 +679,157 @@ function mergeState(patch: ProjectionPatch) {
     floatingPreviewWindow.webContents.send("projection:state", previewState ?? state);
   remoteServer?.broadcast(liveState);
   scheduleLiveAudienceFrame();
+}
+
+function wantsNativePowerPoint(presentation: ProjectionState["presentation"]) {
+  return (
+    NativePowerPoint.supported() &&
+    presentation.visible &&
+    !!presentation.path &&
+    POWERPOINT_EXTENSIONS.test(presentation.path) &&
+    !presentation.previewSlides?.length &&
+    !nativeShowFailures.has(presentation.path) &&
+    database.getDisplaySettings().presentationEngine !== "builtin" &&
+    // Sin monitor de proyección, PowerPoint taparía la pantalla del operador.
+    !!projectionTargets(database.getDisplaySettings()).mainTarget
+  );
+}
+
+/**
+ * Mantiene el PowerPoint instalado en sintonía con el estado de proyección:
+ * lo abre al poner una presentación al aire, le pasa Siguiente/Anterior/Ir a,
+ * y lo cierra cuando la presentación sale del aire.
+ */
+function syncNativePowerPoint(previous: ProjectionState["presentation"]) {
+  const current = state.presentation;
+  const wanted = wantsNativePowerPoint(current);
+  if (nativeShow && (!wanted || nativeShow.path !== current.path)) stopNativePowerPoint();
+  if (!wanted) {
+    if (current.native) state.presentation = { ...current, native: false };
+    return;
+  }
+  if (!nativeShow) {
+    startNativePowerPoint(current);
+    state.presentation = { ...current, native: true };
+    return;
+  }
+  if (!current.native) state.presentation = { ...current, native: true };
+  applyNativeCover();
+  const navigationId = Number(current.navigationId || 0);
+  if (navigationId !== nativeShow.navigationId) {
+    nativeShow.navigationId = navigationId;
+    if (current.navigationDirection === -1) nativeShow.controller.previous();
+    else nativeShow.controller.next();
+  } else if (
+    current.slideIndex !== previous.slideIndex &&
+    current.slideIndex + 1 !== nativeShow.slide
+  ) {
+    nativeShow.controller.goTo(current.slideIndex + 1);
+  }
+}
+
+function startNativePowerPoint(presentation: ProjectionState["presentation"]) {
+  const path = presentation.path!;
+  const settings = database.getDisplaySettings();
+  const target = projectionTargets(settings).mainTarget ?? screen.getPrimaryDisplay();
+  // PowerPoint trabaja en píxeles físicos; Electron entrega píxeles lógicos.
+  const physical =
+    process.platform === "win32" ? screen.dipToScreenRect(null, target.bounds) : target.bounds;
+  const controller = new NativePowerPoint({
+    onReady: (slideCount) => {
+      if (nativeShow?.controller !== controller) return;
+      mergeState({ presentation: { slideCount } });
+      // El foco vuelve al operador para que el teclado siga funcionando.
+      setTimeout(() => {
+        if (controlWindow && !controlWindow.isDestroyed()) controlWindow.focus();
+      }, 400);
+    },
+    onSlide: (slideNumber) => {
+      if (nativeShow?.controller !== controller) return;
+      nativeShow.slide = slideNumber;
+      if (state.presentation.slideIndex !== slideNumber - 1)
+        mergeState({ presentation: { slideIndex: slideNumber - 1 } });
+    },
+    onEnded: (reason, message) => {
+      if (nativeShow?.controller !== controller) return;
+      restoreProjectorAfterNative();
+      nativeShow = null;
+      if (reason === "error") {
+        // Sin PowerPoint (o archivo que no abre): sigue con el visor incorporado.
+        console.warn("PowerPoint no pudo mostrar la presentación:", message);
+        nativeShowFailures.add(path);
+        if (state.presentation.path === path) mergeState({ presentation: { native: false } });
+        if (controlWindow && !controlWindow.isDestroyed())
+          void dialog.showMessageBox(controlWindow, {
+            type: "warning",
+            title: "PowerPoint",
+            message: "No se pudo abrir la presentación con PowerPoint.",
+            detail: `${message ?? "Error desconocido."}\n\nSe muestra con el visor incorporado; algunas animaciones pueden verse simplificadas.`,
+          });
+      } else if (state.presentation.path === path && state.presentation.visible) {
+        // El operador cerró la presentación desde PowerPoint (Esc).
+        mergeState({ presentation: { visible: false, native: false } });
+      }
+    },
+  });
+  nativeShow = {
+    controller,
+    path,
+    slide: 1,
+    navigationId: Number(presentation.navigationId || 0),
+    hidProjector: false,
+  };
+  applyNativeCover();
+  void controller.start(path, physical, app.getPath("temp")).catch((error) => {
+    if (nativeShow?.controller === controller) {
+      nativeShow = null;
+      restoreProjectorAfterNative();
+      nativeShowFailures.add(path);
+      mergeState({ presentation: { native: false } });
+    }
+    console.warn("No se pudo iniciar PowerPoint", error);
+  });
+}
+
+/**
+ * La ventana del proyector está siempre encima (nivel protector de pantalla).
+ * Mientras PowerPoint muestra la presentación se oculta; vuelve a aparecer
+ * encima si el operador pone la pantalla en negro o el logo.
+ */
+function applyNativeCover() {
+  if (!nativeShow) return;
+  const win = projectionWindow;
+  if (!win || win.isDestroyed()) return;
+  const cover = state.blackout || state.logo;
+  if (cover && nativeShow.hidProjector) {
+    nativeShow.hidProjector = false;
+    restoreProjectorAfterNative(true);
+  } else if (!cover && !nativeShow.hidProjector && win.isVisible()) {
+    win.setAlwaysOnTop(false);
+    win.hide();
+    nativeShow.hidProjector = true;
+    nativeShow.controller.bringToFront();
+  }
+}
+
+function stopNativePowerPoint() {
+  if (!nativeShow) return;
+  const show = nativeShow;
+  nativeShow = null;
+  show.controller.stop();
+  if (show.hidProjector) restoreProjectorAfterNative(true);
+}
+
+function restoreProjectorAfterNative(force = false) {
+  if (!force && nativeShow && !nativeShow.hidProjector) return;
+  const win = projectionWindow;
+  if (!win || win.isDestroyed() || win.isVisible()) return;
+  win.showInactive();
+  applyDisplaySettingsToWindow(
+    win,
+    projectionTargets(database.getDisplaySettings()).mainTarget,
+    database.getDisplaySettings(),
+  );
 }
 
 function currentLiveState() {
@@ -1584,7 +1749,7 @@ function projectRemoteMultimedia(itemId: number) {
   beginRemoteMultimedia(itemId);
   const payload = item.payload as Record<string, unknown>;
   if (item.type === "presentation") {
-    if (payload.nativeOnly) {
+    if (payload.nativeOnly && !(NativePowerPoint.supported() && database.getDisplaySettings().presentationEngine !== "builtin")) {
       void shell.openPath(String(payload.path || ""));
       return;
     }
@@ -2707,4 +2872,7 @@ app.on("second-instance", () => {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
-app.on("before-quit", () => remoteServer?.close());
+app.on("before-quit", () => {
+  stopNativePowerPoint();
+  remoteServer?.close();
+});

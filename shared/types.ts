@@ -123,6 +123,8 @@ export type DisplaySettings = {
   thirdDisplayId: number | null;
   previewEnabled: boolean;
   previewDisplayId: number | null;
+  /** "powerpoint": usa el PowerPoint instalado (Windows) para ver los efectos tal cual. */
+  presentationEngine: "powerpoint" | "builtin";
 };
 
 export type ChurchSettings = {
@@ -223,6 +225,7 @@ export const initialDisplaySettings: DisplaySettings = {
   thirdDisplayId: null,
   previewEnabled: false,
   previewDisplayId: null,
+  presentationEngine: "powerpoint",
 };
 export const initialChurchSettings: ChurchSettings = {
   name: "Mi Iglesia",
@@ -323,6 +326,8 @@ export type PresentationState = {
   navigationDirection: -1 | 1;
   visible: boolean;
   previewSlides?: string[];
+  /** La presentación la está mostrando el PowerPoint instalado. */
+  native?: boolean;
 };
 export type OverlayTimer = { visible: boolean; running: boolean; startedAt: number; duration: number; remaining: number; position: "top" | "center" | "bottom"; fontSize: number; color: string };
 export type OverlayClock = { visible: boolean; position: "top" | "center" | "bottom"; fontSize: number; color: string };

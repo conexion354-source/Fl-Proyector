@@ -1675,3 +1675,10 @@ html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); 
 #root .app-shell .video-transport { display: flex; align-items: center; gap: 6px; }
 #root .app-shell .video-transport .transport-stop { display: grid; width: 32px; min-width: 32px; height: 32px; place-items: center; padding: 0 !important; }
 #root .app-shell .video-transport .transport-stop svg { width: 12px; height: 12px; }
+
+/* Presentación mostrada por el PowerPoint instalado */
+.presentation-layer.presentation-native { background: #000; display: grid; place-items: center; }
+.presentation-native-card { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #fff; font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif; text-align: center; }
+.presentation-native-card svg { width: 28px; height: 28px; opacity: 0.8; }
+.presentation-native-card strong { font-size: 15px; font-weight: 600; }
+.presentation-native-card span { font-size: 13px; opacity: 0.75; }

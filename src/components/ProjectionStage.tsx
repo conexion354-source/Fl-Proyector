@@ -719,7 +719,8 @@ function PresentationLayer({
     setViewerMode("edit");
     if (
       (!presentation.path && !presentation.url) ||
-      presentation.previewSlides?.length
+      presentation.previewSlides?.length ||
+      presentation.native
     )
       return;
     let cancelled = false;
@@ -748,7 +749,7 @@ function PresentationLayer({
     return () => {
       cancelled = true;
     };
-  }, [presentation.path, presentation.url, presentation.previewSlides]);
+  }, [presentation.path, presentation.url, presentation.previewSlides, presentation.native]);
 
   useEffect(() => {
     if (!content || !presentation.visible) return;
@@ -798,6 +799,24 @@ function PresentationLayer({
 
   if (!presentation.visible)
     return <div className="presentation-layer layer-hidden" />;
+
+  // La muestra el PowerPoint instalado sobre el monitor del proyector, con
+  // sus animaciones y transiciones originales.
+  if (presentation.native)
+    return (
+      <div className={`presentation-layer layer-visible presentation-native ${preview ? "presentation-preview" : ""}`}>
+        {preview && (
+          <div className="presentation-native-card">
+            <PresentationIcon />
+            <strong>En PowerPoint</strong>
+            <span>
+              Diapositiva {presentation.slideIndex + 1}
+              {presentation.slideCount > 0 ? ` de ${presentation.slideCount}` : ""}
+            </span>
+          </div>
+        )}
+      </div>
+    );
 
   return (
     <div
