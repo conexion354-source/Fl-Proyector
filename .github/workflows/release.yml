@@ -69,12 +69,14 @@ jobs:
         # dañada. La notarización se agregará cuando existan credenciales Apple.
         run: bash scripts/build-mac.sh
 
-      - name: Guardar instaladores para publicar
-        if: startsWith(github.ref, 'refs/tags/v')
+      # Con una etiqueta v* se publican; ejecutado a mano ("Run workflow")
+      # quedan como instaladores de prueba descargables durante 14 días.
+      - name: Guardar instaladores
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && matrix.artifact || format('prueba-{0}', matrix.artifact) }}
           if-no-files-found: error
+          retention-days: 14
           path: ${{ matrix.files }}
 
   release:
