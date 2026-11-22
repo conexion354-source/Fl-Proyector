@@ -1710,27 +1710,67 @@ html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); 
 .summary-capture small { color: var(--fl-muted); font-size: 12px; }
 
 /* Selector de ventana */
-#root .capture-picker { display: flex; width: min(860px, calc(100vw - 48px)); max-height: calc(100vh - 48px); flex-direction: column; gap: 14px; padding: 20px 24px; border: 1px solid var(--fl-border); border-radius: 8px; background: var(--fl-surface-raised, var(--fl-surface)); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); }
-#root .capture-picker-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-#root .capture-picker-header h2 { margin: 0; color: var(--fl-text); font-size: 20px; font-weight: 600; }
-#root .capture-picker-header p { margin: 4px 0 0; color: var(--fl-muted); font-size: 13px; }
-#root .capture-picker-refresh { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; }
-#root .capture-picker-refresh svg { width: 14px; height: 14px; }
-#root .capture-picker-tabs { align-self: flex-start; }
-#root .capture-picker-grid { display: grid; min-height: 180px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); align-content: start; gap: 10px; overflow-y: auto; padding: 2px; }
-#root .capture-picker-empty { grid-column: 1 / -1; margin: auto; padding: 40px 0; color: var(--fl-muted); font-size: 13px; text-align: center; }
-#root .capture-source { display: flex; min-width: 0; flex-direction: column; gap: 6px; padding: 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--fl-text); text-align: left; cursor: pointer; }
-#root .capture-source:hover { background: var(--fl-control-fill); }
-#root .capture-source.selected { border-color: var(--fl-accent); background: var(--fl-control-fill); box-shadow: inset 0 0 0 1px var(--fl-accent); }
-#root .capture-source-thumb { display: grid; aspect-ratio: 16 / 9; place-items: center; overflow: hidden; border-radius: 4px; background: #000; }
-#root .capture-source-thumb img { width: 100%; height: 100%; object-fit: contain; }
-#root .capture-source-thumb svg { width: 28px; height: 28px; color: var(--fl-muted); }
-#root .capture-source-name { display: flex; min-width: 0; align-items: center; gap: 6px; font-size: 12px; }
-#root .capture-source-name img { width: 16px; height: 16px; flex: 0 0 16px; }
-#root .capture-source-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#root .capture-picker-options { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: 16px; }
-#root .capture-picker-options .summary-loop { margin: 0; }
-#root .capture-fit { display: flex; flex-direction: column; gap: 6px; color: var(--fl-muted); font-size: 12px; }
-#root .capture-picker-footer { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--fl-border); }
-#root .capture-picker-footer small { flex: 1; color: var(--fl-muted); font-size: 12px; }
-#root .capture-picker-footer button { height: 32px; padding: 0 16px; }
+#root .cap-dialog { display: flex; width: min(880px, calc(100vw - 48px)); max-height: calc(100vh - 48px); flex-direction: column; overflow: hidden; color: var(--fl-text); border: 1px solid var(--fl-border); border-radius: 8px; background: var(--fl-surface); box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4); font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+#root .cap-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 24px 12px; }
+#root .cap-header h2 { margin: 0; color: var(--fl-text); font-size: 20px; font-weight: 600; line-height: 28px; }
+#root .cap-header p { margin: 2px 0 0; color: var(--fl-muted); font-size: 14px; line-height: 20px; }
+#root .cap-icon-button { display: grid; width: 32px; height: 32px; place-items: center; padding: 0; color: var(--fl-muted); border: 0; border-radius: 4px; background: transparent; cursor: pointer; }
+#root .cap-icon-button:hover { color: var(--fl-text); background: var(--fl-subtle-hover); }
+#root .cap-icon-button svg { width: 16px; height: 16px; }
+#root .cap-toolbar { display: flex; align-items: center; gap: 8px; padding: 0 24px 12px; }
+#root .cap-tabs { display: inline-flex; flex: 0 0 auto; padding: 2px; border: 1px solid var(--fl-control-stroke); border-radius: 5px; background: var(--fl-control-fill); }
+#root .cap-tabs button { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; color: var(--fl-text); border: 0; border-radius: 3px; background: transparent; font-size: 13px; white-space: nowrap; cursor: pointer; }
+#root .cap-tabs button svg { width: 15px; height: 15px; }
+#root .cap-tabs button:hover:not(.active) { background: var(--fl-subtle-hover); }
+#root .cap-tabs button.active { color: var(--fl-on-accent); background: var(--fl-accent); font-weight: 600; }
+#root .cap-count { min-width: 18px; padding: 0 5px; border-radius: 9px; background: rgba(127, 127, 127, 0.22); font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; }
+#root .cap-tabs button.active .cap-count { background: rgba(0, 0, 0, 0.18); }
+#root .cap-search { display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border: 1px solid var(--fl-control-stroke); border-bottom-color: var(--fl-muted); border-radius: 4px; background: var(--fl-control-fill); }
+#root .cap-search:focus-within { border-bottom: 2px solid var(--fl-accent); }
+#root .cap-search svg { width: 15px; height: 15px; flex: 0 0 15px; color: var(--fl-muted); }
+#root .cap-search input { width: 100%; min-width: 0; height: 100% !important; padding: 0 !important; color: var(--fl-text); border: 0 !important; outline: 0; background: transparent !important; font-size: 13px; box-shadow: none !important; }
+#root .cap-button { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 8px; height: 32px; min-width: 96px; padding: 0 14px; color: var(--fl-text); border: 1px solid var(--fl-control-stroke); border-radius: 4px; background: var(--fl-control-fill); font-size: 13px; font-weight: 400; white-space: nowrap; cursor: pointer; }
+#root .cap-button:hover:not(:disabled) { background: var(--fl-control-hover); }
+#root .cap-button:disabled { opacity: 0.5; cursor: default; }
+#root .cap-button svg { width: 15px; height: 15px; }
+#root .cap-button.cap-primary { color: var(--fl-on-accent); border-color: transparent; background: var(--fl-accent); font-weight: 600; }
+#root .cap-button.cap-primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--fl-accent); }
+#root .spinning { animation: cap-spin 900ms linear infinite; }
+@keyframes cap-spin { to { transform: rotate(360deg); } }
+#root .cap-grid { display: grid; height: 300px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); align-content: start; gap: 12px; overflow-y: auto; margin: 0 24px; padding: 12px; border: 1px solid var(--fl-border); border-radius: 6px; background: var(--fl-bg, rgba(0, 0, 0, 0.12)); }
+#root .cap-empty { display: flex; grid-column: 1 / -1; height: 100%; min-height: 250px; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 40px; text-align: center; }
+#root .cap-empty svg { width: 32px; height: 32px; margin-bottom: 6px; color: var(--fl-muted); }
+#root .cap-empty strong { color: var(--fl-text); font-size: 14px; font-weight: 600; }
+#root .cap-empty span { max-width: 460px; color: var(--fl-muted); font-size: 13px; line-height: 19px; }
+#root .cap-source { display: flex; min-width: 0; flex-direction: column; gap: 8px; padding: 6px; color: var(--fl-text); border: 1px solid transparent; border-radius: 6px; background: transparent; text-align: left; cursor: pointer; }
+#root .cap-source:hover { background: var(--fl-subtle-hover); }
+#root .cap-source.selected { border-color: var(--fl-accent); background: var(--fl-subtle-hover); box-shadow: inset 0 0 0 1px var(--fl-accent); }
+#root .cap-thumb { display: grid; aspect-ratio: 16 / 9; place-items: center; overflow: hidden; border-radius: 4px; background: #000; }
+#root .cap-thumb img { width: 100%; height: 100%; object-fit: contain; }
+#root .cap-thumb svg { width: 28px; height: 28px; color: #ffffff66; }
+#root .cap-name { display: flex; min-width: 0; align-items: center; gap: 6px; padding: 0 2px 2px; font-size: 12px; }
+#root .cap-name img, #root .cap-name svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--fl-muted); }
+#root .cap-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#root .cap-options { display: flex; flex-direction: column; gap: 4px; padding: 16px 24px 0; }
+#root .cap-option { display: flex; min-height: 64px; align-items: center; gap: 16px; padding: 10px 16px; border: 1px solid var(--fl-border); border-radius: 6px; background: var(--fl-control-fill); }
+#root .cap-option > svg { width: 20px; height: 20px; flex: 0 0 20px; color: var(--fl-text); }
+#root .cap-option > div:not(.dlg-segmented) { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+#root .cap-option strong { color: var(--fl-text); font-size: 14px; font-weight: 400; }
+#root .cap-option span:not(.w11-toggle-state) { color: var(--fl-muted); font-size: 12px; }
+#root .cap-fit { flex: 0 0 auto; }
+#root .cap-fit button { min-width: 84px; white-space: nowrap; }
+#root .cap-footer { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding: 16px 24px; border-top: 1px solid var(--fl-border); background: var(--fl-control-fill); }
+#root .cap-footer > span { flex: 1; min-width: 0; color: var(--fl-muted); font-size: 12px; line-height: 17px; }
+#root .cap-footer .cap-button { min-width: 120px; }
+
+/* Listas desplegables nativas: la lista abierta la dibuja el sistema y
+   tomaba texto claro sobre fondo blanco. Colores sólidos por tema. */
+html[data-theme="dark"] select { color-scheme: dark; }
+html[data-theme="light"] select { color-scheme: light; }
+html[data-theme="dark"] select option,
+html[data-theme="dark"] select optgroup { color: #ffffff; background-color: #2c2c2c; }
+html[data-theme="light"] select option,
+html[data-theme="light"] select optgroup { color: #1b1b1b; background-color: #ffffff; }
+html select option:disabled { color: #8a8a8a; }
+html[data-theme="dark"] select option:checked { color: #ffffff; background-color: #3d3d3d; }
+html[data-theme="light"] select option:checked { color: #1b1b1b; background-color: #e5e5e5; }

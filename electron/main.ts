@@ -866,11 +866,18 @@ function restoreProjectorAfterNative(force = false) {
  * espejo infinito).
  */
 async function listCaptureSources(): Promise<CaptureSource[]> {
-  const sources = await desktopCapturer.getSources({
-    types: ["window", "screen"],
-    thumbnailSize: { width: 320, height: 180 },
-    fetchWindowIcons: true,
-  });
+  // Ventanas y pantallas se piden por separado: si una de las dos falla en
+  // algún equipo, la otra lista igual aparece.
+  const request = (type: "window" | "screen") =>
+    desktopCapturer
+      .getSources({ types: [type], thumbnailSize: { width: 320, height: 180 }, fetchWindowIcons: type === "window" })
+      .catch((error) => {
+        console.warn(`No se pudieron listar las fuentes (${type})`, error);
+        return [] as Electron.DesktopCapturerSource[];
+      });
+  const [windowSources, screenSources] = await Promise.all([request("window"), request("screen")]);
+  const sources = [...windowSources, ...screenSources];
+  console.info(`Captura: ${windowSources.length} ventanas, ${screenSources.length} pantallas`);
   const ownIds = new Set(
     BrowserWindow.getAllWindows()
       .filter((win) => !win.isDestroyed())

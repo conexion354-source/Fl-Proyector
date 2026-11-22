@@ -3534,12 +3534,15 @@ function CaptureSourcePicker({
   onChoose: (choice: { source: CaptureSource; cursor: boolean; fit: "contain" | "cover" }) => void;
 }) {
   const [sources, setSources] = useState<CaptureSource[] | null>(null);
+  const [loading, setLoading] = useState(false);
   const [kind, setKind] = useState<"window" | "screen">(initial?.kind === "screen" ? "screen" : "window");
   const [selectedId, setSelectedId] = useState<string | null>((initial?.sourceId as string) ?? null);
   const [cursor, setCursor] = useState(initial?.cursor !== false);
   const [fit, setFit] = useState<"contain" | "cover">(initial?.fit === "cover" ? "cover" : "contain");
+  const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   const load = async () => {
+    setLoading(true);
     try {
       setError("");
       const list = await window.flProyector.listCaptureSources();
@@ -3552,97 +3555,161 @@ function CaptureSourcePicker({
       });
     } catch {
       setSources([]);
-      setError("No se pudo obtener la lista de ventanas. En Mac, habilitá FL Proyector en Configuración del Sistema > Privacidad > Grabación de pantalla.");
+      setError(
+        "No se pudo obtener la lista de ventanas. En Mac, habilitá FL Proyector en Configuración del Sistema > Privacidad y seguridad > Grabación de pantalla.",
+      );
+    } finally {
+      setLoading(false);
     }
   };
   useEffect(() => {
     void load();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
-  const visible = (sources ?? []).filter((value) => value.kind === kind);
+  const counts = {
+    window: (sources ?? []).filter((value) => value.kind === "window").length,
+    screen: (sources ?? []).filter((value) => value.kind === "screen").length,
+  };
+  const needle = query.trim().toLowerCase();
+  const visible = (sources ?? []).filter(
+    (value) => value.kind === kind && (!needle || value.name.toLowerCase().includes(needle)),
+  );
   const chosen = sources?.find((value) => value.id === selectedId) ?? null;
   return (
-    <div className="modal-backdrop">
-      <div className="capture-picker win11-settings-dialog" role="dialog" aria-label="Elegir ventana">
-        <header className="capture-picker-header">
+    <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onCancel()}>
+      <section className="cap-dialog" role="dialog" aria-modal="true" aria-labelledby="cap-title">
+        <header className="cap-header">
           <div>
-            <h2>Proyectar una ventana</h2>
-            <p>Elegí qué querés mostrar en vivo: un navegador, Zoom u otro programa.</p>
+            <h2 id="cap-title">Proyectar una ventana</h2>
+            <p>Mostrá en vivo un navegador, una reunión de Zoom u otro programa.</p>
           </div>
-          <button className="capture-picker-refresh" onClick={() => void load()} title="Actualizar lista">
-            <RefreshCw />
-            Actualizar
+          <button className="cap-icon-button" onClick={onCancel} aria-label="Cerrar" title="Cerrar">
+            <X />
           </button>
         </header>
-        <div className="dlg-segmented capture-picker-tabs" role="tablist">
-          <button className={kind === "window" ? "active" : ""} onClick={() => setKind("window")}>
-            Ventanas
-          </button>
-          <button className={kind === "screen" ? "active" : ""} onClick={() => setKind("screen")}>
-            Pantallas completas
+
+        <div className="cap-toolbar">
+          <div className="cap-tabs" role="tablist" aria-label="Tipo de fuente">
+            <button role="tab" aria-selected={kind === "window"} className={kind === "window" ? "active" : ""} onClick={() => setKind("window")}>
+              <AppWindow aria-hidden="true" />
+              Ventanas
+              {sources && <span className="cap-count">{counts.window}</span>}
+            </button>
+            <button role="tab" aria-selected={kind === "screen"} className={kind === "screen" ? "active" : ""} onClick={() => setKind("screen")}>
+              <MonitorPlay aria-hidden="true" />
+              Pantallas
+              {sources && <span className="cap-count">{counts.screen}</span>}
+            </button>
+          </div>
+          <label className="cap-search">
+            <Search aria-hidden="true" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar ventana"
+              aria-label="Buscar ventana"
+            />
+          </label>
+          <button className="cap-button" onClick={() => void load()} disabled={loading}>
+            <RefreshCw aria-hidden="true" className={loading ? "spinning" : ""} />
+            Actualizar
           </button>
         </div>
-        <div className="capture-picker-grid">
+
+        <div className="cap-grid" role="listbox" aria-label={kind === "window" ? "Ventanas" : "Pantallas"}>
           {sources === null ? (
-            <p className="capture-picker-empty">Buscando ventanas…</p>
+            <div className="cap-empty">
+              <RefreshCw className="spinning" aria-hidden="true" />
+              <strong>Buscando ventanas…</strong>
+            </div>
           ) : visible.length === 0 ? (
-            <p className="capture-picker-empty">
-              {error ||
-                (kind === "window"
-                  ? "No hay ventanas abiertas para proyectar. Abrí el programa y tocá Actualizar."
-                  : "No hay otra pantalla disponible. El monitor del proyector no se puede capturar a sí mismo.")}
-            </p>
+            <div className="cap-empty">
+              <AppWindow aria-hidden="true" />
+              <strong>
+                {error
+                  ? "No se pudo leer la lista"
+                  : needle
+                    ? "Ninguna ventana coincide con la búsqueda"
+                    : kind === "window"
+                      ? "No hay ventanas para proyectar"
+                      : "No hay otra pantalla disponible"}
+              </strong>
+              <span>
+                {error ||
+                  (needle
+                    ? "Probá con otra palabra."
+                    : kind === "window"
+                      ? "Abrí el programa (Chrome, Zoom…), asegurate de que no esté minimizado y tocá Actualizar."
+                      : "El monitor del proyector no aparece porque se capturaría a sí mismo.")}
+              </span>
+            </div>
           ) : (
             visible.map((source) => (
               <button
                 key={source.id}
-                className={`capture-source ${selectedId === source.id ? "selected" : ""}`}
+                role="option"
+                aria-selected={selectedId === source.id}
+                className={`cap-source ${selectedId === source.id ? "selected" : ""}`}
                 onClick={() => setSelectedId(source.id)}
                 onDoubleClick={() => onChoose({ source, cursor, fit })}
                 title={source.name}
               >
-                <span className="capture-source-thumb">
-                  {source.thumbnail ? <img src={source.thumbnail} alt="" /> : <AppWindow />}
+                <span className="cap-thumb">
+                  {source.thumbnail ? <img src={source.thumbnail} alt="" /> : <AppWindow aria-hidden="true" />}
                 </span>
-                <span className="capture-source-name">
-                  {source.icon && <img src={source.icon} alt="" />}
+                <span className="cap-name">
+                  {source.icon ? <img src={source.icon} alt="" /> : <AppWindow aria-hidden="true" />}
                   <span>{source.name}</span>
                 </span>
               </button>
             ))
           )}
         </div>
-        <div className="capture-picker-options">
-          <label className="summary-loop">
+
+        <div className="cap-options">
+          <div className="cap-option">
             <MousePointer2 aria-hidden="true" />
-            <span>
-              <b>Mostrar el puntero</b>
-              <small>Útil para señalar en una página o programa.</small>
-            </span>
-            <input type="checkbox" role="switch" checked={cursor} onChange={(event) => setCursor(event.target.checked)} />
-            <i aria-hidden="true" />
-          </label>
-          <div className="capture-fit">
-            <span>Encuadre</span>
-            <div className="dlg-segmented">
-              <button className={fit === "contain" ? "active" : ""} onClick={() => setFit("contain")}>
-                Ajustar (sin recortar)
+            <div>
+              <strong>Mostrar el puntero</strong>
+              <span>Útil para señalar en una página o programa.</span>
+            </div>
+            <label className="w11-toggle">
+              <span className="w11-toggle-state">{cursor ? "Activado" : "Desactivado"}</span>
+              <input type="checkbox" role="switch" aria-label="Mostrar el puntero" checked={cursor} onChange={(event) => setCursor(event.target.checked)} />
+              <i aria-hidden="true" />
+            </label>
+          </div>
+          <div className="cap-option">
+            <Image aria-hidden="true" />
+            <div>
+              <strong>Encuadre</strong>
+              <span>{fit === "contain" ? "Se ve completa, con bordes negros si hace falta." : "Ocupa toda la pantalla y puede recortar los bordes."}</span>
+            </div>
+            <div className="dlg-segmented cap-fit" role="radiogroup" aria-label="Encuadre">
+              <button role="radio" aria-checked={fit === "contain"} className={fit === "contain" ? "active" : ""} onClick={() => setFit("contain")}>
+                Ajustar
               </button>
-              <button className={fit === "cover" ? "active" : ""} onClick={() => setFit("cover")}>
-                Llenar pantalla
+              <button role="radio" aria-checked={fit === "cover"} className={fit === "cover" ? "active" : ""} onClick={() => setFit("cover")}>
+                Llenar
               </button>
             </div>
           </div>
         </div>
-        <footer className="capture-picker-footer">
-          <small>Si la ventana se minimiza, la imagen se congela. Dejala abierta, aunque esté detrás de otras.</small>
-          <button className="win11-settings-cancel" onClick={onCancel}>
+
+        <footer className="cap-footer">
+          <span>El sonido sale del programa original. Si minimizás la ventana, la imagen se congela.</span>
+          <button className="cap-button" onClick={onCancel}>
             Cancelar
           </button>
-          <button className="primary" disabled={!chosen} onClick={() => chosen && onChoose({ source: chosen, cursor, fit })}>
+          <button className="cap-button cap-primary" disabled={!chosen} onClick={() => chosen && onChoose({ source: chosen, cursor, fit })}>
             Usar esta ventana
           </button>
         </footer>
-      </div>
+      </section>
     </div>
   );
 }
