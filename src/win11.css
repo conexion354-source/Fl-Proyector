@@ -1682,3 +1682,17 @@ html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); 
 .presentation-native-card svg { width: 28px; height: 28px; opacity: 0.8; }
 .presentation-native-card strong { font-size: 15px; font-weight: 600; }
 .presentation-native-card span { font-size: 13px; opacity: 0.75; }
+
+/* Zoom de imagen en el panel en vivo */
+#root .app-shell .image-zoom-map { position: relative; width: 100%; overflow: hidden; margin: 8px 0 10px; border: 1px solid var(--fl-control-stroke); border-radius: 6px; background: #000; cursor: zoom-in; touch-action: none; user-select: none; }
+#root .app-shell .image-zoom-map.is-zoomed { cursor: grab; }
+#root .app-shell .image-zoom-map.is-zoomed:active { cursor: grabbing; }
+#root .app-shell .image-zoom-map img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+#root .app-shell .image-zoom-map.is-zoomed img { opacity: 0.55; }
+#root .app-shell .image-zoom-view { position: absolute; border: 2px solid var(--fl-accent); border-radius: 2px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35); pointer-events: none; transition: left 120ms ease, top 120ms ease, width 120ms ease, height 120ms ease; }
+#root .app-shell .image-zoom-bar { display: flex; align-items: center; gap: 6px; }
+#root .app-shell .image-zoom-bar > button { display: grid; width: 32px; min-width: 32px; height: 32px; place-items: center; padding: 0 !important; }
+#root .app-shell .image-zoom-bar > button svg { width: 16px; height: 16px; }
+#root .app-shell .image-zoom-bar input { flex: 1; min-width: 60px; }
+#root .app-shell .image-zoom-bar b { min-width: 42px; color: var(--fl-text); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+#root .app-shell .image-zoom-bar .image-zoom-reset { width: auto; padding: 0 10px !important; font-size: 12px; }

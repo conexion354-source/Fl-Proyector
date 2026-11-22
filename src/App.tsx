@@ -24,6 +24,8 @@ import {
   Volume2,
   VolumeX,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { ProjectionPreview } from "./components/ProjectionStage";
 import { MediaLibrary } from "./components/MediaLibrary";
@@ -49,6 +51,9 @@ import { isEditableTarget, loadShortcuts, normalizeShortcut, type ShortcutAction
 import {
   initialDisplaySettings,
   initialProjectionState,
+  clampImageZoom,
+  MAX_IMAGE_ZOOM,
+  type ImageZoom,
   type DisplayInfo,
   type DisplaySettings,
   type LiveAudienceStatus,
@@ -1385,6 +1390,8 @@ function LiveContentControls({
       </section>
     );
   }
+  if (state.background.kind === "image" && state.background.url)
+    return <ImageZoomControls state={state} update={update} />;
   if (state.background.kind !== "video") return null;
   const videoProgress =
     videoDuration > 0
@@ -1479,6 +1486,146 @@ function LiveContentControls({
             ? "MUTE"
             : `${Math.round(state.video.volume * 100)}%`}
         </b>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Zoom sobre la imagen proyectada. En la miniatura: clic para acercar ese
+ * punto, arrastrar para moverse y la rueda del mouse para acercar o alejar.
+ */
+function ImageZoomControls({
+  state,
+  update,
+}: {
+  state: ReturnType<typeof useProjectionState>["state"];
+  update: ReturnType<typeof useProjectionState>["update"];
+}) {
+  const zoom = clampImageZoom(state.background.zoom);
+  const [draft, setDraft] = useState<ImageZoom>(zoom);
+  const dragging = useRef<{ startX: number; startY: number; origin: ImageZoom; moved: boolean } | null>(null);
+  const frame = useRef<number | null>(null);
+  const pending = useRef<ImageZoom | null>(null);
+  const map = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!dragging.current) setDraft(zoom);
+  }, [zoom.scale, zoom.x, zoom.y]);
+  const send = (next: Partial<ImageZoom>) => {
+    const value = clampImageZoom({ ...draft, ...next });
+    setDraft(value);
+    pending.current = value;
+    if (frame.current !== null) return;
+    frame.current = window.requestAnimationFrame(() => {
+      frame.current = null;
+      if (pending.current) update({ background: { zoom: pending.current } });
+      pending.current = null;
+    });
+  };
+  const pointFromEvent = (event: { clientX: number; clientY: number }) => {
+    const box = map.current!.getBoundingClientRect();
+    // Coordenadas dentro de la parte visible → coordenadas de la imagen.
+    const px = (event.clientX - box.left) / box.width;
+    const py = (event.clientY - box.top) / box.height;
+    return { x: Math.max(0, Math.min(1, px)), y: Math.max(0, Math.min(1, py)) };
+  };
+  // La rueda se escucha sin "passive" para que no desplace el panel.
+  const wheel = useRef<(event: WheelEvent) => void>(() => {});
+  wheel.current = (event: WheelEvent) => {
+    event.preventDefault();
+    const point = pointFromEvent(event);
+    const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+    const scale = Math.max(1, Math.min(MAX_IMAGE_ZOOM, draft.scale * factor));
+    // Mantiene fijo el punto bajo el mouse mientras cambia el zoom.
+    const keep = (center: number, target: number) => target + (center - target) * (draft.scale / scale);
+    send({ scale, x: keep(draft.x, point.x), y: keep(draft.y, point.y) });
+  };
+  useEffect(() => {
+    const element = map.current;
+    if (!element) return;
+    const listener = (event: WheelEvent) => wheel.current(event);
+    element.addEventListener("wheel", listener, { passive: false });
+    return () => element.removeEventListener("wheel", listener);
+  }, []);
+  const steps = [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, MAX_IMAGE_ZOOM];
+  const stepZoom = (direction: 1 | -1) => {
+    const current = draft.scale;
+    const next =
+      direction === 1
+        ? steps.find((value) => value > current + 0.01) ?? MAX_IMAGE_ZOOM
+        : [...steps].reverse().find((value) => value < current - 0.01) ?? 1;
+    send({ scale: next });
+  };
+  const ratio = state.outputViewport.width / Math.max(1, state.outputViewport.height) || 16 / 9;
+  const view = {
+    left: `${(draft.x - 0.5 / draft.scale) * 100}%`,
+    top: `${(draft.y - 0.5 / draft.scale) * 100}%`,
+    width: `${100 / draft.scale}%`,
+    height: `${100 / draft.scale}%`,
+  };
+  return (
+    <section className="live-media-controls image-zoom-controls">
+      <div className="live-control-title">
+        <span>Zoom de imagen</span>
+        <b>{state.background.name}</b>
+      </div>
+      <div
+        ref={map}
+        className={`image-zoom-map ${draft.scale > 1.001 ? "is-zoomed" : ""}`}
+        style={{ aspectRatio: String(ratio) }}
+        title="Clic para acercar ese punto · arrastrá para moverte · rueda para acercar o alejar"
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          dragging.current = { startX: event.clientX, startY: event.clientY, origin: draft, moved: false };
+        }}
+        onPointerMove={(event) => {
+          const drag = dragging.current;
+          if (!drag) return;
+          const box = map.current!.getBoundingClientRect();
+          const dx = (event.clientX - drag.startX) / box.width;
+          const dy = (event.clientY - drag.startY) / box.height;
+          if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 4) return;
+          drag.moved = true;
+          // Arrastrar el recuadro: se mueve en la misma dirección que el mouse.
+          send({ scale: drag.origin.scale, x: drag.origin.x + dx, y: drag.origin.y + dy });
+        }}
+        onPointerUp={(event) => {
+          const drag = dragging.current;
+          dragging.current = null;
+          if (!drag || drag.moved) return;
+          const point = pointFromEvent(event);
+          send({ scale: draft.scale > 1.001 ? draft.scale : 2, ...point });
+        }}
+        onPointerCancel={() => (dragging.current = null)}
+      >
+        <img src={state.background.url!} alt="" draggable={false} />
+        {draft.scale > 1.001 && <span className="image-zoom-view" style={view} />}
+      </div>
+      <div className="image-zoom-bar">
+        <button title="Alejar" aria-label="Alejar" disabled={draft.scale <= 1.001} onClick={() => stepZoom(-1)}>
+          <ZoomOut />
+        </button>
+        <input
+          aria-label="Nivel de zoom"
+          type="range"
+          min="1"
+          max={MAX_IMAGE_ZOOM}
+          step="0.05"
+          value={draft.scale}
+          style={{ "--range-progress": `${((draft.scale - 1) / (MAX_IMAGE_ZOOM - 1)) * 100}%` } as CSSProperties}
+          onChange={(event) => send({ scale: Number(event.target.value) })}
+        />
+        <button title="Acercar" aria-label="Acercar" disabled={draft.scale >= MAX_IMAGE_ZOOM - 0.001} onClick={() => stepZoom(1)}>
+          <ZoomIn />
+        </button>
+        <b>{Math.round(draft.scale * 100)}%</b>
+        <button
+          className="image-zoom-reset"
+          disabled={draft.scale <= 1.001}
+          onClick={() => send({ scale: 1, x: 0.5, y: 0.5 })}
+        >
+          Ver completa
+        </button>
       </div>
     </section>
   );

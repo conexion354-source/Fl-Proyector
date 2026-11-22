@@ -624,6 +624,14 @@ function mergeState(patch: ProjectionPatch) {
     videoReturnBackground = { ...state.background };
   if (patch.video?.loop === true) videoReturnBackground = null;
   const previousPresentation = state.presentation;
+  // Una imagen nueva empieza siempre sin zoom.
+  if (
+    patch.background &&
+    patch.background.url !== undefined &&
+    patch.background.url !== state.background.url &&
+    patch.background.zoom === undefined
+  )
+    patch = { ...patch, background: { ...patch.background, zoom: undefined } };
   state = {
     ...state,
     ...patch,

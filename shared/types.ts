@@ -300,7 +300,22 @@ export type BackgroundState = {
   dim: number;
   blur: number;
   speed: 0.5 | 1 | 1.5;
+  /** Zoom de una imagen proyectada: escala y punto central (0–1). */
+  zoom?: ImageZoom;
 };
+
+export type ImageZoom = { scale: number; x: number; y: number };
+
+export const MAX_IMAGE_ZOOM = 6;
+
+/** Limita el zoom para que nunca se vea el borde de la imagen. */
+export function clampImageZoom(zoom: Partial<ImageZoom> | undefined): ImageZoom {
+  const scale = Math.max(1, Math.min(MAX_IMAGE_ZOOM, Number(zoom?.scale) || 1));
+  const half = 0.5 / scale;
+  const clamp = (value: unknown) =>
+    Math.max(half, Math.min(1 - half, Number.isFinite(Number(value)) ? Number(value) : 0.5));
+  return { scale, x: clamp(zoom?.x), y: clamp(zoom?.y) };
+}
 
 export type VideoPlaybackState = {
   playing: boolean;

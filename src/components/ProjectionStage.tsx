@@ -12,6 +12,7 @@ import {
   type PowerPointViewerHandle,
 } from "pptx-react-viewer";
 import type { ProjectionState } from "../../shared/types";
+import { clampImageZoom } from "../../shared/types";
 
 type Props = {
   state: ProjectionState;
@@ -567,7 +568,7 @@ export function ProjectionStage({
           : undefined
       }
     >
-      <div className="projection-background">
+      <div className="projection-background" style={imageZoomStyle(state.background)}>
         {previousUrl && (
           <MediaLayer
             key={`old-${previousUrl}`}
@@ -1167,4 +1168,16 @@ function VideoLayer({
       onEnded={(event) => notifyPlaybackEnded(event.currentTarget)}
     />
   );
+}
+
+/** Acerca una zona de la imagen proyectada con una transición suave. */
+function imageZoomStyle(background: ProjectionState["background"]): CSSProperties | undefined {
+  if (background.kind !== "image" || !background.zoom) return undefined;
+  const { scale, x, y } = clampImageZoom(background.zoom);
+  return {
+    transformOrigin: "0 0",
+    transform: `translate(${(0.5 - scale * x) * 100}%, ${(0.5 - scale * y) * 100}%) scale(${scale})`,
+    transition: "transform 450ms cubic-bezier(0.2, 0, 0, 1)",
+    willChange: "transform",
+  };
 }
