@@ -25,6 +25,7 @@ import './styles.css'
 import './features.css'
 import './meeting-review.css'
 import './fluent.css'
+import './win11.css'
 import './browserPreview'
 
 const isProjection = location.hash.startsWith('#/projection')

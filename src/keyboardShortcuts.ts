@@ -26,7 +26,7 @@ export const shortcutLabels: Record<ShortcutAction, string> = {
   qr: "Mostrar / ocultar QR",
   congelar: "Congelar / publicar pantalla",
   pantallaNegra: "Pantalla negra",
-  limpiar: "Limpiar texto y contenido",
+  limpiar: "Limpiar pantalla (textos y contenido)",
 };
 
 export const defaultShortcuts: Record<ShortcutAction, string> = {
@@ -66,7 +66,10 @@ export function loadShortcuts(): Record<ShortcutAction, string> {
     const merged = { ...defaultShortcuts, ...(saved && typeof saved === "object" ? saved : {}) };
     const used = new Set<string>();
     return (Object.keys(defaultShortcuts) as ShortcutAction[]).reduce((result, action) => {
-      const shortcut = String(merged[action] || "").trim().toUpperCase();
+      const raw = String(merged[action] || "").trim().toUpperCase();
+      // Guardar siempre con la misma forma ("Alt+P") que usan los valores
+      // predeterminados y el lector de teclas, para poder compararlos.
+      const shortcut = raw.startsWith("ALT+") ? `Alt+${raw.slice(4)}` : raw;
       if (isAllowedShortcut(shortcut) && !used.has(shortcut)) {
         used.add(shortcut);
         result[action] = shortcut;

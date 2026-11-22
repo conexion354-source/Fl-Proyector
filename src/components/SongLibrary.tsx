@@ -8,6 +8,7 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import {
   CalendarPlus,
   Check,
+  Clock,
   FolderPlus,
   Music2,
   Minus,
@@ -312,7 +313,7 @@ export function SongLibrary({
     editor?.commands.setContent(withoutLegacyEditorPrompt(song.content, "song"));
   };
   const create = (
-    title = "Nuevo canto",
+    title = "Nueva canción",
     content = emptyRichText,
     importedSectionTypes?: SongSectionType[],
   ) => {
@@ -633,7 +634,7 @@ export function SongLibrary({
           className={categoryId === null ? "active" : ""}
           onClick={() => setCategoryId(null)}
         >
-          Todos los cantos <span>{totalSongs}</span>
+          Todas las canciones <span>{totalSongs}</span>
         </button>
         {categories.map((category) => (
           <button
@@ -664,7 +665,7 @@ export function SongLibrary({
           />
         </div>
         <button className="new-song" onClick={openNewSong}>
-          <Plus size={16} /> Nuevo canto
+          <Plus size={16} /> Nueva canción
         </button>
         {songs.map((song) => (
           <button
@@ -687,7 +688,7 @@ export function SongLibrary({
             <span>{song.categoryName || "Sin categoría"}</span>
           </button>
         ))}
-        {!songs.length && (
+        {!songs.length && (query || categoryId !== null) && (
           <EmptyState
             compact
             icon={<Music2 />}
@@ -706,16 +707,17 @@ export function SongLibrary({
       />
       <div className={`song-editor ${editing ? "is-editing" : "is-reading"}`}>
         {!selected.id && !editing ? (
-          <EmptyState
-            icon={<Music2 />}
-            title="No hay canción seleccionada"
-            detail="Seleccioná una canción o creá una nueva para comenzar."
-            action={(
-              <button className="primary win11-empty-action" onClick={openNewSong}>
-                <Plus />
-                Nueva canción
-              </button>
-            )}
+          <SongHome
+            songs={songs}
+            totalSongs={totalSongs}
+            categoryCount={categories.length}
+            onOpen={choose}
+            onNew={openNewSong}
+            onSearch={() =>
+              songsPageRef.current
+                ?.querySelector<HTMLInputElement>(".song-search input")
+                ?.focus()
+            }
           />
         ) : (
         <>
@@ -1203,5 +1205,97 @@ export function SongLibrary({
         </div>
       )}
     </section>
+  );
+}
+
+function relativeDate(value: string) {
+  const time = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`).getTime();
+  if (!Number.isFinite(time)) return "";
+  const days = Math.floor((Date.now() - time) / 86_400_000);
+  if (days <= 0) return "Hoy";
+  if (days === 1) return "Ayer";
+  if (days < 7) return `Hace ${days} días`;
+  return new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short" }).format(time);
+}
+
+/** Pantalla de inicio de la biblioteca cuando no hay ninguna canción abierta. */
+function SongHome({
+  songs,
+  totalSongs,
+  categoryCount,
+  onOpen,
+  onNew,
+  onSearch,
+}: {
+  songs: Song[];
+  totalSongs: number;
+  categoryCount: number;
+  onOpen: (song: Song) => void;
+  onNew: () => void;
+  onSearch: () => void;
+}) {
+  if (!totalSongs)
+    return (
+      <EmptyState
+        icon={<Music2 />}
+        title="Todavía no hay canciones"
+        detail="Creá tu primera canción para empezar a armar la biblioteca."
+        action={(
+          <button className="primary win11-empty-action" onClick={onNew}>
+            <Plus />
+            Nueva canción
+          </button>
+        )}
+      />
+    );
+  const recent = [...songs]
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+    .slice(0, 8);
+  return (
+    <div className="song-home">
+      <header>
+        <span className="eyebrow">Biblioteca</span>
+        <h2>Canciones</h2>
+        <p>
+          {totalSongs} {totalSongs === 1 ? "canción" : "canciones"} ·{" "}
+          {categoryCount} {categoryCount === 1 ? "categoría" : "categorías"}
+        </p>
+        <div className="song-home-actions">
+          <button type="button" className="primary" onClick={onNew}>
+            <Plus /> Nueva canción
+          </button>
+          <button type="button" className="secondary" onClick={onSearch}>
+            <Search /> Buscar por nombre o letra
+          </button>
+        </div>
+      </header>
+      {recent.length > 0 && (
+        <section aria-label="Editadas recientemente">
+          <h3>
+            <Clock aria-hidden="true" /> Editadas recientemente
+          </h3>
+          <div className="song-home-grid">
+            {recent.map((song) => (
+              <button
+                type="button"
+                key={song.id}
+                style={{ "--song-color": song.color || "#8b5cf6" } as CSSProperties}
+                onClick={() => onOpen(song)}
+              >
+                <i aria-hidden="true" />
+                <strong>{song.title}</strong>
+                <span>
+                  {song.categoryName || "Sin categoría"}
+                  {relativeDate(song.updatedAt) && ` · ${relativeDate(song.updatedAt)}`}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      <p className="song-home-tip">
+        Tip: hacé clic derecho sobre una canción de la lista para renombrarla, cambiarle el color o eliminarla.
+      </p>
+    </div>
   );
 }
