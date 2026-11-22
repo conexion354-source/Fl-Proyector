@@ -1813,3 +1813,55 @@ html[data-theme="dark"] #root .stanza-row[data-section-type="bridge"] .stanza-ta
 #root .stanza-row:focus-visible { outline: 2px solid var(--fl-accent); outline-offset: 1px; }
 #root .stanza-toolbar > span { white-space: nowrap; }
 #root .stanza-toolbar > small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Biblioteca de canciones: dos paneles ---------- */
+#root .app-shell .songs-page { grid-template-columns: var(--song-list-width, 300px) 4px minmax(300px, 1fr) !important; }
+#root .app-shell .songs-page .song-browser { display: flex; min-height: 0; flex-direction: column; overflow: hidden; padding: 0 !important; }
+#root .app-shell .song-browser-head { display: flex; flex-direction: column; gap: 10px; padding: 14px 12px 10px; border-bottom: 1px solid var(--fl-border); }
+#root .app-shell .song-browser-search { display: flex; gap: 6px; }
+#root .app-shell .song-browser-search .song-search { display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; height: 34px; margin: 0; padding: 0 8px 0 10px; border-radius: 4px; }
+#root .app-shell .song-browser-search .song-search input { height: 100%; font-size: 13px !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+#root .app-shell .song-search-clear { display: grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; padding: 0 !important; color: var(--fl-muted); border: 0 !important; border-radius: 3px; background: transparent !important; cursor: pointer; }
+#root .app-shell .song-search-clear:hover { color: var(--fl-text); background: var(--fl-subtle-hover) !important; }
+#root .app-shell .song-browser-add { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; padding: 0 !important; color: var(--fl-on-accent) !important; border: 0 !important; border-radius: 4px; background: var(--fl-accent) !important; cursor: pointer; }
+#root .app-shell .song-browser-add:hover { filter: brightness(1.08); }
+#root .app-shell .song-category-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#root .app-shell .song-category-chips button { display: inline-flex; height: 26px; align-items: center; gap: 6px; padding: 0 10px !important; color: var(--fl-text) !important; border: 1px solid var(--fl-control-stroke) !important; border-radius: 13px !important; background: var(--fl-control-fill) !important; font-size: 12px !important; font-weight: 400 !important; white-space: nowrap; cursor: pointer; }
+#root .app-shell .song-category-chips button:hover { background: var(--fl-control-hover, var(--fl-subtle-hover)) !important; }
+#root .app-shell .song-category-chips button span { color: var(--fl-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+#root .app-shell .song-category-chips button.active { color: var(--fl-on-accent) !important; border-color: transparent !important; background: var(--fl-accent) !important; font-weight: 600 !important; }
+#root .app-shell .song-category-chips button.active span { color: inherit; opacity: 0.8; }
+#root .app-shell .song-category-chips .song-chip-add { color: var(--fl-muted) !important; border-style: dashed !important; background: transparent !important; }
+#root .app-shell .song-category-chips .song-chip-add:hover { color: var(--fl-text) !important; }
+#root .app-shell .song-browser-sort { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--fl-muted); font-size: 12px; }
+#root .app-shell .song-sort-toggle { display: inline-flex; padding: 2px; border: 1px solid var(--fl-control-stroke); border-radius: 5px; background: var(--fl-control-fill); }
+#root .app-shell .song-sort-toggle button { height: 22px; padding: 0 9px !important; color: var(--fl-muted) !important; border: 0 !important; border-radius: 3px !important; background: transparent !important; font-size: 12px !important; cursor: pointer; }
+#root .app-shell .song-sort-toggle button.active { color: var(--fl-text) !important; background: var(--fl-surface) !important; box-shadow: 0 0 0 1px var(--fl-control-stroke); font-weight: 600 !important; }
+#root .app-shell .song-browser-list { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 2px; overflow-y: auto; padding: 8px 6px 12px; }
+#root .app-shell .song-row { position: relative; display: flex; width: 100%; min-height: 48px; align-items: center; gap: 10px; padding: 6px 10px !important; color: var(--fl-text) !important; border: 0 !important; border-radius: 5px !important; background: transparent !important; box-shadow: none !important; text-align: left; cursor: pointer; }
+#root .app-shell .song-row:hover { background: var(--fl-subtle-hover) !important; }
+#root .app-shell .song-row.active { background: var(--fl-subtle-hover) !important; }
+#root .app-shell .song-row.active::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 2px; background: var(--fl-accent); }
+#root .app-shell .song-row-avatar { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; color: var(--song-color); border-radius: 6px; background: color-mix(in srgb, var(--song-color) 18%, transparent); font-size: 13px; font-weight: 600; }
+#root .app-shell .song-row-text { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+#root .app-shell .song-row-text strong { overflow: hidden; color: var(--fl-text); font-size: 14px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+#root .app-shell .song-row.active .song-row-text strong { font-weight: 600; }
+#root .app-shell .song-row-text small { overflow: hidden; color: var(--fl-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Canción seleccionada (modo lectura): acciones arriba y estrofas en tarjetas */
+#root .app-shell .song-editor.is-reading .song-editor-title-row { order: 0; }
+#root .app-shell .song-editor.is-reading .editor-actions { order: 1; justify-content: flex-start; margin: 0 0 14px; padding: 0 0 14px; border-bottom: 1px solid var(--fl-border); }
+#root .app-shell .song-editor.is-reading .editor-actions .danger { order: 9; margin-left: auto; }
+#root .app-shell .song-editor.is-reading .song-library-toolbar { display: none; }
+#root .app-shell .song-editor.is-reading .song-rich-editor { order: 2; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+#root .app-shell .song-editor.is-reading .title-input { padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+#root .app-shell .song-editor.is-reading .song-rich-editor .tiptap { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); align-content: start; gap: 8px; padding: 2px; }
+#root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > p[data-song-section-label] { margin: 0; padding: calc(32px * var(--song-editor-stanza-scale, 1)) 14px 12px 14px; color: var(--fl-text); border: 1px solid var(--fl-border); border-left: 1px solid var(--fl-border); border-radius: 6px; background: var(--fl-surface); }
+#root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > p[data-song-section-label]:hover { border-color: var(--fl-control-stroke); background: var(--fl-surface); }
+#root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > p[data-song-section-label]::before { content: attr(data-song-section-label); top: 10px; left: 12px; height: 18px; padding: 0 6px; color: var(--fl-muted); border-radius: 4px; background: var(--fl-control-fill); font: 600 11px/18px "Segoe UI Variable Text", "Segoe UI", sans-serif; letter-spacing: 0; }
+#root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > p[data-song-section-type="chorus"]::before { color: #6d28d9; background: rgba(124, 58, 237, 0.12); }
+#root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > p:is([data-song-section-type="prechorus"], [data-song-section-type="bridge"])::before { color: #92400e; background: rgba(217, 119, 6, 0.14); }
+html[data-theme="dark"] #root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > p[data-song-section-type="chorus"]::before { color: #c4b5fd; background: rgba(167, 139, 250, 0.16); }
+html[data-theme="dark"] #root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > p:is([data-song-section-type="prechorus"], [data-song-section-type="bridge"])::before { color: #fcd34d; background: rgba(251, 191, 36, 0.14); }
+#root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > :is(hr, p:not([data-song-section-label])) { display: none; }
+#root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > p[data-song-section-label] { text-shadow: none; }

@@ -219,27 +219,24 @@ export function SongLibrary({
     index: number;
     label: string;
   } | null>(null);
-  const [categoriesWidth, setCategoriesWidth] = useState(() =>
-    clampColumnWidth(
-      storedColumnWidth("fl-layout-songs-categories", 170),
-      100,
-      900,
-    ),
-  );
   const [songListWidth, setSongListWidth] = useState(() =>
-    clampColumnWidth(storedColumnWidth("fl-layout-songs-list", 220), 150, 1200),
+    clampColumnWidth(storedColumnWidth("fl-layout-songs-list-v2", 300), 220, 1200),
+  );
+  const [sortMode, setSortMode] = useState<"az" | "recent">(() =>
+    localStorage.getItem("fl-songs-sort") === "recent" ? "recent" : "az",
+  );
+  useEffect(() => {
+    localStorage.setItem("fl-songs-sort", sortMode);
+  }, [sortMode]);
+  const sortedSongs = [...songs].sort((a, b) =>
+    sortMode === "recent"
+      ? String(b.updatedAt).localeCompare(String(a.updatedAt))
+      : a.title.localeCompare(b.title, "es", { sensitivity: "base" }),
   );
   const songsPageRef = useRef<HTMLElement | null>(null);
   const [songsPageWidth, setSongsPageWidth] = useState(0);
   const editorMinimum = 300;
-  const categoriesMaximum = Math.max(
-    100,
-    songsPageWidth - songListWidth - editorMinimum - 8,
-  );
-  const songListMaximum = Math.max(
-    150,
-    songsPageWidth - categoriesWidth - editorMinimum - 8,
-  );
+  const songListMaximum = Math.max(220, songsPageWidth - editorMinimum - 4);
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -284,10 +281,7 @@ export function SongLibrary({
     return () => window.removeEventListener("click", close);
   }, []);
   useEffect(() => {
-    localStorage.setItem("fl-layout-songs-categories", String(categoriesWidth));
-  }, [categoriesWidth]);
-  useEffect(() => {
-    localStorage.setItem("fl-layout-songs-list", String(songListWidth));
+    localStorage.setItem("fl-layout-songs-list-v2", String(songListWidth));
   }, [songListWidth]);
   useEffect(() => {
     const page = songsPageRef.current;
@@ -300,18 +294,20 @@ export function SongLibrary({
   }, []);
   useEffect(() => {
     if (!songsPageWidth) return;
-    setCategoriesWidth((current) =>
-      clampColumnWidth(current, 100, categoriesMaximum),
-    );
     setSongListWidth((current) =>
-      clampColumnWidth(current, 150, songListMaximum),
+      clampColumnWidth(current, 220, songListMaximum),
     );
-  }, [songsPageWidth, categoriesMaximum, songListMaximum]);
+  }, [songsPageWidth, songListMaximum]);
   const choose = (song: Song) => {
     setSelected(song);
     setEditing(false);
     editor?.commands.setContent(withoutLegacyEditorPrompt(song.content, "song"));
   };
+  // Al entrar, se muestra la primera canción de la lista en vez de un panel vacío.
+  useEffect(() => {
+    if (!editor || editing || selected.id || newSongDialog || !sortedSongs.length) return;
+    choose(sortedSongs[0]);
+  }, [editor, songs, sortMode]);
   const create = (
     title = "Nueva canción",
     content = emptyRichText,
@@ -618,84 +614,112 @@ export function SongLibrary({
       className="songs-page"
       style={
         {
-          "--song-categories-width": `${categoriesWidth}px`,
           "--song-list-width": `${songListWidth}px`,
         } as CSSProperties
       }
     >
-      <aside className="song-categories">
-        <div className="pane-title">
-          <b>Categorías</b>
-          <button onClick={() => openNewCategory(false)} aria-label="Nueva categoría" title="Nueva categoría">
-            <FolderPlus size={16} />
-          </button>
+      <div className="song-list song-browser">
+        <div className="song-browser-head">
+          <div className="song-browser-search">
+            <label className="song-search">
+              <Search size={16} aria-hidden="true" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar título o letra"
+                aria-label="Buscar título o letra"
+              />
+              {query && (
+                <button type="button" className="song-search-clear" onClick={() => setQuery("")} aria-label="Borrar búsqueda">
+                  <X size={14} />
+                </button>
+              )}
+            </label>
+            <button type="button" className="song-browser-add" onClick={openNewSong} title="Nueva canción" aria-label="Nueva canción">
+              <Plus size={18} />
+            </button>
+          </div>
+          <div className="song-category-chips" role="tablist" aria-label="Categorías">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={categoryId === null}
+              className={categoryId === null ? "active" : ""}
+              onClick={() => setCategoryId(null)}
+            >
+              Todas <span>{totalSongs}</span>
+            </button>
+            {categories.map((category) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={categoryId === category.id}
+                className={categoryId === category.id ? "active" : ""}
+                onClick={() => setCategoryId(category.id)}
+                key={category.id}
+              >
+                {category.name} <span>{category.songCount}</span>
+              </button>
+            ))}
+            <button type="button" className="song-chip-add" onClick={() => openNewCategory(false)}>
+              <FolderPlus size={13} aria-hidden="true" /> Categoría
+            </button>
+          </div>
+          <div className="song-browser-sort">
+            <span>
+              {songs.length} {songs.length === 1 ? "canción" : "canciones"}
+            </span>
+            <div className="song-sort-toggle" role="radiogroup" aria-label="Ordenar">
+              <button type="button" role="radio" aria-checked={sortMode === "az"} className={sortMode === "az" ? "active" : ""} onClick={() => setSortMode("az")}>
+                A–Z
+              </button>
+              <button type="button" role="radio" aria-checked={sortMode === "recent"} className={sortMode === "recent" ? "active" : ""} onClick={() => setSortMode("recent")}>
+                Recientes
+              </button>
+            </div>
+          </div>
         </div>
-        <button
-          className={categoryId === null ? "active" : ""}
-          onClick={() => setCategoryId(null)}
-        >
-          Todas las canciones <span>{totalSongs}</span>
-        </button>
-        {categories.map((category) => (
-          <button
-            className={categoryId === category.id ? "active" : ""}
-            onClick={() => setCategoryId(category.id)}
-            key={category.id}
-          >
-            {category.name}
-            <span>{category.songCount}</span>
-          </button>
-        ))}
-      </aside>
-      <ColumnResizer
-        label="Cambiar ancho de categorías"
-        onResize={(delta) =>
-          setCategoriesWidth((current) =>
-            clampColumnWidth(current + delta, 100, categoriesMaximum),
-          )
-        }
-      />
-      <div className="song-list">
-        <div className="song-search">
-          <Search size={16} />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por nombre o letra"
-          />
+        <div className="song-browser-list">
+          {sortedSongs.map((song) => {
+            const parts = splitSongStanzas(song.content).length;
+            return (
+              <button
+                className={`song-row ${selected.id === song.id ? "active" : ""}`}
+                style={{ "--song-color": song.color || "#8b5cf6" } as CSSProperties}
+                onClick={() => choose(song)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setSongContextMenu({
+                    song,
+                    x: event.clientX,
+                    y: event.clientY,
+                    palette: false,
+                  });
+                }}
+                key={song.id}
+              >
+                <span className="song-row-avatar" aria-hidden="true">
+                  {song.title.trim().charAt(0).toLocaleUpperCase("es-AR") || "♪"}
+                </span>
+                <span className="song-row-text">
+                  <strong>{song.title}</strong>
+                  <small>
+                    {song.categoryName || "Sin categoría"} · {parts} {parts === 1 ? "parte" : "partes"}
+                  </small>
+                </span>
+              </button>
+            );
+          })}
+          {!songs.length && (query || categoryId !== null) && (
+            <EmptyState
+              compact
+              icon={<Music2 />}
+              title={query ? "No encontramos canciones" : "No hay canciones en esta categoría"}
+              detail={query ? "Probá con otra búsqueda." : "Asigná canciones desde el editor."}
+            />
+          )}
         </div>
-        <button className="new-song" onClick={openNewSong}>
-          <Plus size={16} /> Nueva canción
-        </button>
-        {songs.map((song) => (
-          <button
-            className={selected.id === song.id ? "active" : ""}
-            style={{ "--song-color": song.color || "#8b5cf6" } as CSSProperties}
-            onClick={() => choose(song)}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              setSongContextMenu({
-                song,
-                x: event.clientX,
-                y: event.clientY,
-                palette: false,
-              });
-            }}
-            key={song.id}
-          >
-            <strong>{song.title}</strong>
-            <span>{song.categoryName || "Sin categoría"}</span>
-          </button>
-        ))}
-        {!songs.length && (query || categoryId !== null) && (
-          <EmptyState
-            compact
-            icon={<Music2 />}
-            title={query ? "No encontramos canciones" : "No hay canciones guardadas"}
-            detail={query ? "Probá con otra búsqueda." : "Creá una canción para comenzar."}
-          />
-        )}
       </div>
       <ColumnResizer
         label="Cambiar ancho de la lista de canciones"
