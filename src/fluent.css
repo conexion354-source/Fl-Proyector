@@ -1483,11 +1483,11 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
 .app-shell :is(
   .meeting-dialog,.song-create-dialog,.item-edit-dialog,.library-picker,
   .bible-picker,.reference-design-dialog,.overlay-settings-dialog
-) :is(h2,h3) { color:var(--fl-text)!important; }
+) :is(h2,h3):not(.projection-stage *) { color:var(--fl-text)!important; }
 .app-shell :is(
   .meeting-dialog,.song-create-dialog,.item-edit-dialog,.library-picker,
   .bible-picker,.reference-design-dialog,.overlay-settings-dialog
-) :is(p,small,label) { color:var(--fl-muted)!important; }
+) :is(p,small,label):not(.projection-stage *) { color:var(--fl-muted)!important; }
 .app-shell .dialog-close {
   color:var(--fl-text)!important;
   border-color:transparent!important;
@@ -1851,12 +1851,12 @@ html[data-theme] #root { color:var(--fl-text); background:var(--fl-bg); }
   .meeting-dialog,.song-create-dialog,.item-edit-dialog,.library-picker,
   .bible-picker,.reference-design-dialog,.background-assignment-dialog,
   .overlay-settings-dialog,.confirm-delete-dialog
-) :is(h1,h2,h3,h4) { color:var(--fl-text)!important; }
+) :is(h1,h2,h3,h4):not(.projection-stage *) { color:var(--fl-text)!important; }
 .app-shell :is(
   .meeting-dialog,.song-create-dialog,.item-edit-dialog,.library-picker,
   .bible-picker,.reference-design-dialog,.background-assignment-dialog,
   .overlay-settings-dialog,.confirm-delete-dialog
-) :is(p,small,.field-label,.picker-empty) { color:var(--fl-muted)!important; }
+) :is(p,small,.field-label,.picker-empty):not(.projection-stage *) { color:var(--fl-muted)!important; }
 
 .app-shell :is(
   .rich-editor,.song-rich-editor,.announcement-toolbar,.announcement-editor,

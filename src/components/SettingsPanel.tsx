@@ -826,15 +826,22 @@ export function SettingsPanel({
 
   /* ---------------- Biblias ---------------- */
 
-  const saveBible = () => {
+  /* ---------------- Texto en pantalla (General, Biblia y Canciones) ---------------- */
+
+  // Las tres pestañas se guardan juntas con un solo botón: antes cada pestaña
+  // tenía su propio "Guardar" y era fácil cambiar algo en General, pasar a
+  // Canciones y creer que estaba guardado.
+  const saveTextSettings = () => {
+    const baseBible = dirty.biblias ? bible : savedBible;
+    const baseSong = dirty.canciones ? songStyle : savedSongStyle;
     const nextBible: BibleDisplaySettings = {
-      ...bible,
-      // La protección contra cortes y el uso del área configurada son fijos,
-      // así la vista previa y el proyector coinciden siempre.
+      ...withBibleLayout(baseBible, layout),
+      // La protección contra cortes es fija: la vista previa y el proyector
+      // siempre coinciden.
       autoFit: true,
       fillScreen: false,
-      minimumFontSize: Math.min(bible.minimumFontSize, bible.textFontSize),
     };
+    const nextSong: SongDisplaySettings = { ...withSongLayout(baseSong, layout), autoFit: true };
     const source = biblePreviewSource(state);
     const hasLiveBibleSource = Boolean(
       state.text.sourceBibleText?.trim() ||
@@ -846,8 +853,11 @@ export function SettingsPanel({
         : null;
     return runSave(async () => {
       await window.flProyector.saveBibleDisplaySettings(nextBible);
+      await window.flProyector.saveSongDisplaySettings(nextSong);
       update({
         bibleStyle: nextBible,
+        songStyle: nextSong,
+        // Lo que está en el aire se actualiza al instante.
         ...(liveSlide
           ? {
               text: {
@@ -863,87 +873,40 @@ export function SettingsPanel({
                 sourceBibleVersion: liveSlide.version,
               },
             }
-          : {}),
+          : state.text.kind === "canto"
+            ? {
+                text: {
+                  ...state.text,
+                  fontSize: nextSong.fontSize,
+                  fontFamily: nextSong.fontFamily,
+                  color: nextSong.textColor,
+                  backgroundColor: nextSong.backgroundColor,
+                  position: nextSong.position,
+                  align: nextSong.align,
+                  borderRadius: nextSong.borderRadius,
+                  template: nextSong.template,
+                  title: nextSong.showTitle ? state.text.title : "",
+                  titlePosition: nextSong.titlePosition,
+                  titleColor: nextSong.titleColor,
+                  titleBackground: nextSong.titleBackground,
+                  titleFontSize: nextSong.titleFontSize,
+                  titleStyle: nextSong.titleStyle,
+                },
+              }
+            : {}),
       });
       setBible(nextBible);
       setSavedBible(nextBible);
-    }, "La configuración bíblica fue guardada.");
+      setSongStyle(nextSong);
+      setSavedSongStyle(nextSong);
+      setSavedLayout(layout);
+    }, "Se guardó la configuración del texto para Biblia y canciones.");
   };
   const importBible = async () => {
     if (await window.flProyector.importBible()) reloadVersions();
   };
   const enabledVersions = versions.filter((version) => version.enabled !== false).length;
 
-  /* ---------------- Canciones ---------------- */
-
-  const saveSongStyle = () => {
-    const nextSongStyle: SongDisplaySettings = {
-      ...songStyle,
-      // Nunca guardar una configuración que pueda dejar la letra cortada.
-      autoFit: true,
-      stableFontSize: songStyle.stableFontSize ?? true,
-      horizontalMargin: songStyle.horizontalMargin ?? 8,
-      verticalMargin: songStyle.verticalMargin ?? 10,
-    };
-    return runSave(async () => {
-      await window.flProyector.saveSongDisplaySettings(nextSongStyle);
-      update({
-        songStyle: nextSongStyle,
-        ...(state.text.kind === "canto"
-          ? {
-              text: {
-                ...state.text,
-                fontSize: nextSongStyle.fontSize,
-                fontFamily: nextSongStyle.fontFamily,
-                color: nextSongStyle.textColor,
-                backgroundColor: nextSongStyle.backgroundColor,
-                position: nextSongStyle.position,
-                align: nextSongStyle.align,
-                borderRadius: nextSongStyle.borderRadius,
-                template: nextSongStyle.template,
-                title: nextSongStyle.showTitle ? state.text.title : "",
-                titlePosition: nextSongStyle.titlePosition,
-                titleColor: nextSongStyle.titleColor,
-                titleBackground: nextSongStyle.titleBackground,
-                titleFontSize: nextSongStyle.titleFontSize,
-                titleStyle: nextSongStyle.titleStyle,
-              },
-            }
-          : {}),
-      });
-      setSongStyle(nextSongStyle);
-      setSavedSongStyle(nextSongStyle);
-    }, "El diseño de canciones fue guardado.");
-  };
-
-  /* ---------------- Texto en pantalla ---------------- */
-
-  const saveLayout = () =>
-    runSave(async () => {
-      const nextBible = withBibleLayout(savedBible, layout);
-      const nextSong = withSongLayout(savedSongStyle, layout);
-      await window.flProyector.saveBibleDisplaySettings(nextBible);
-      await window.flProyector.saveSongDisplaySettings(nextSong);
-      update({
-        bibleStyle: nextBible,
-        songStyle: nextSong,
-        ...(state.text.kind === "biblia" || state.text.kind === "canto"
-          ? {
-              text: {
-                ...state.text,
-                fontSize: layout.size,
-                fontFamily: layout.fontFamily,
-                color: layout.textColor,
-              },
-            }
-          : {}),
-      });
-      setSavedBible(nextBible);
-      setSavedSongStyle(nextSong);
-      setBible((value) => withBibleLayout(value, layout));
-      setSongStyle((value) => withSongLayout(value, layout));
-      setSavedLayout(layout);
-    }, "El tamaño del texto se guardó para Biblia y canciones.");
   const layoutBible = withBibleLayout(bible, layout);
   const layoutBand = bibleSizeBand(layoutBible);
   const calculateIdealSize = () => {
@@ -974,10 +937,10 @@ export function SettingsPanel({
   const saveCurrent = async () => {
     const save = {
       pantalla: saveDisplay,
-      texto: saveLayout,
+      texto: saveTextSettings,
       iglesia: saveChurch,
-      biblias: saveBible,
-      canciones: saveSongStyle,
+      biblias: saveTextSettings,
+      canciones: saveTextSettings,
       atajos: saveShortcuts,
     }[section as "pantalla"];
     if (!save) return;
@@ -990,10 +953,12 @@ export function SettingsPanel({
   };
   const discardCurrent = () => {
     if (section === "pantalla") setSettings(savedSettings);
-    if (section === "texto") setLayout(savedLayout);
+    if (section === "texto" || section === "biblias" || section === "canciones") {
+      setLayout(savedLayout);
+      setBible(savedBible);
+      setSongStyle(savedSongStyle);
+    }
     if (section === "iglesia") setChurch(savedChurch);
-    if (section === "biblias") setBible(savedBible);
-    if (section === "canciones") setSongStyle(savedSongStyle);
     if (section === "atajos") {
       setShortcuts(savedShortcuts);
       setShortcutError("");
@@ -1002,28 +967,32 @@ export function SettingsPanel({
 
   /* ---------------- Vista previa en el panel derecho ---------------- */
 
+  // Las vistas previas muestran siempre lo que se va a guardar, incluidos los
+  // cambios de General todavía sin guardar (letra, tamaño, mayúsculas…).
+  const effectiveBible = withBibleLayout(bible, layout);
+  const effectiveSong = withSongLayout(songStyle, layout);
   const previewBibleSource = biblePreviewSource(state);
   const biblePreview = buildBibleSlides(
     previewBibleSource.text,
     previewBibleSource.reference,
     previewBibleSource.version,
-    bible,
+    effectiveBible,
     state.outputViewport,
   )[0];
   const previewState: ProjectionState = {
     ...state,
-    bibleStyle: bible,
+    bibleStyle: effectiveBible,
     text: {
       ...state.text,
       html: biblePreview.html,
       kind: "biblia",
       visible: true,
-      fontSize: bible.longVerseMode === "auto-fit" ? bible.textFontSize : biblePreview.fontSize,
-      fontFamily: bible.textFontFamily,
-      color: bible.textColor,
-      shadowEnabled: bible.textShadowEnabled,
-      shadowColor: bible.textShadowColor,
-      shadowBlur: bible.textShadowBlur,
+      fontSize: effectiveBible.textFontSize,
+      fontFamily: effectiveBible.textFontFamily,
+      color: effectiveBible.textColor,
+      shadowEnabled: effectiveBible.textShadowEnabled,
+      shadowColor: effectiveBible.textShadowColor,
+      shadowBlur: effectiveBible.textShadowBlur,
       position: "center",
       align: "center",
       backgroundColor: "rgba(0,0,0,.25)",
@@ -1034,27 +1003,27 @@ export function SettingsPanel({
   };
   const songPreviewState: ProjectionState = {
     ...state,
-    songStyle,
+    songStyle: effectiveSong,
     text: {
       ...state.text,
-      html: "<p>Señor mi Dios, al contemplar los cielos<br>El firmamento y las estrellas mil</p>",
+      html: songSamples.normal,
       kind: "canto",
       sourceSongStanzas: null,
       visible: true,
-      fontSize: songStyle.fontSize,
-      fontFamily: songStyle.fontFamily,
-      color: songStyle.textColor,
-      backgroundColor: songStyle.backgroundColor,
-      position: songStyle.position,
-      align: songStyle.align,
-      borderRadius: songStyle.borderRadius,
-      template: songStyle.template,
-      title: songStyle.showTitle ? "Cuán grande es Él" : "",
-      titlePosition: songStyle.titlePosition,
-      titleColor: songStyle.titleColor,
-      titleBackground: songStyle.titleBackground,
-      titleFontSize: songStyle.titleFontSize,
-      titleStyle: songStyle.titleStyle,
+      fontSize: effectiveSong.fontSize,
+      fontFamily: effectiveSong.fontFamily,
+      color: effectiveSong.textColor,
+      backgroundColor: effectiveSong.backgroundColor,
+      position: effectiveSong.position,
+      align: effectiveSong.align,
+      borderRadius: effectiveSong.borderRadius,
+      template: effectiveSong.template,
+      title: effectiveSong.showTitle ? "Título de la canción" : "",
+      titlePosition: effectiveSong.titlePosition,
+      titleColor: effectiveSong.titleColor,
+      titleBackground: effectiveSong.titleBackground,
+      titleFontSize: effectiveSong.titleFontSize,
+      titleStyle: effectiveSong.titleStyle,
     },
     presentation: { ...state.presentation, visible: false },
     blackout: false,
@@ -1700,6 +1669,12 @@ export function SettingsPanel({
           {/* ============================ BIBLIAS ============================ */}
           {section === "biblias" && (
             <>
+              <div className="w11-hint">
+                <span>El tipo de letra, el color, el tamaño y las mayúsculas de los versículos se configuran en la pestaña General.</span>
+                <button type="button" className="w11-button subtle" onClick={() => setSection("texto")}>
+                  Ir a General
+                </button>
+              </div>
               <SettingsGroup
                 title="Versiones instaladas"
                 action={
@@ -1876,6 +1851,12 @@ export function SettingsPanel({
           {/* ============================ CANCIONES ============================ */}
           {section === "canciones" && (
             <>
+              <div className="w11-hint">
+                <span>El tipo de letra, el color, el tamaño y las mayúsculas de las canciones se configuran en la pestaña General.</span>
+                <button type="button" className="w11-button subtle" onClick={() => setSection("texto")}>
+                  Ir a General
+                </button>
+              </div>
               <SettingsGroup title="Ubicación y fondo">
                 <SettingRow title="Posición">
                   <Select
@@ -2179,7 +2160,16 @@ export function SettingsPanel({
         </div>
 
         {savable && (
-          <SaveBar dirty={Boolean(dirty[section])} saving={saving} onSave={saveCurrent} onDiscard={discardCurrent} />
+          <SaveBar
+            dirty={
+              navSection === "texto"
+                ? Boolean(dirty.texto || dirty.biblias || dirty.canciones)
+                : Boolean(dirty[section])
+            }
+            saving={saving}
+            onSave={saveCurrent}
+            onDiscard={discardCurrent}
+          />
         )}
       </div>
 

@@ -989,11 +989,11 @@ html .app-shell .w11-page-header h1 { margin: 2px 0 4px; color: var(--fl-text); 
   border: 1px solid var(--fl-control-stroke) !important;
   border-bottom-color: var(--fl-control-stroke-bottom) !important;
   border-radius: 6px !important;
-  background: #111 !important;
+  background: var(--fl-surface) !important;
   font-size: 22px;
   line-height: 1.35;
 }
-html[data-theme="light"] #root .app-shell .pro-content-section .announcement-editor { background: #1f1f1f !important; color: #fff !important; }
+#root .app-shell .pro-content-section .announcement-editor .tiptap { min-height: 120px; padding: 0 !important; border: 0 !important; background: transparent !important; outline: 0 !important; }
 #root .app-shell .pro-content-section .announcement-editor:focus-within { border-bottom: 2px solid var(--fl-accent) !important; }
 .pro-content-section .announcement-rich > small,
 .pro-content-section .announcement-page-note { color: var(--fl-tertiary) !important; font-size: 12px !important; line-height: 1.45; }
@@ -1497,3 +1497,53 @@ html[data-theme="light"] #root .app-shell .pro-content-section .announcement-edi
 #root .app-shell .bible-history-clear:hover:not(:disabled) { background: var(--fl-subtle-hover) !important; }
 #root .app-shell .bible-history-clear:disabled { color: var(--fl-tertiary) !important; opacity: 1 !important; }
 #root .app-shell :is(.bible-slide-empty, .win11-empty-state) svg { color: var(--fl-tertiary) !important; }
+
+/* Barra de formato (anuncios, canciones, estrofas): estilo de barra de comandos */
+#root .app-shell .announcement-toolbar .toolbar-color-menu {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#root .app-shell .announcement-toolbar :is(> button, .toolbar-color-menu > button) {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0 !important;
+  color: var(--fl-text) !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+#root .app-shell .announcement-toolbar :is(> button, .toolbar-color-menu > button):hover { background: var(--fl-subtle-hover) !important; }
+#root .app-shell .announcement-toolbar :is(> button, .toolbar-color-menu > button).active { color: var(--fl-accent) !important; background: var(--fl-accent-soft) !important; }
+#root .app-shell .announcement-toolbar svg { width: 16px !important; height: 16px !important; }
+#root .app-shell .announcement-toolbar .toolbar-divider { width: 1px; height: 20px; margin: 0 4px; background: var(--fl-border) !important; }
+#root .app-shell .announcement-toolbar .toolbar-size {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 10px !important;
+  color: var(--fl-muted) !important;
+  border: 1px solid var(--fl-control-stroke) !important;
+  border-bottom-color: var(--fl-control-stroke-bottom) !important;
+  border-radius: 4px !important;
+  background: var(--fl-control-fill) !important;
+  font-size: 12px !important;
+}
+#root .app-shell .announcement-toolbar .toolbar-size input { width: 52px; height: 26px !important; min-height: 0 !important; padding: 0 4px !important; border: 0 !important; background: transparent !important; color: var(--fl-text) !important; }
+#root .app-shell .announcement-toolbar select { height: 32px !important; border-radius: 4px !important; font-size: 13px !important; }
+#root .app-shell .toolbar-palette {
+  color: var(--fl-text) !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--fl-surface) !important;
+  box-shadow: var(--fl-flyout-shadow) !important;
+}
+#root .app-shell .toolbar-palette strong { color: var(--fl-muted) !important; font-size: 12px !important; letter-spacing: 0 !important; text-transform: none !important; }
+#root .app-shell .announcement-page-tabs button { height: 30px; border-radius: 4px !important; font-size: 13px !important; }
+#root .app-shell .pro-content-section .announcement-editor .tiptap { font-size: 20px !important; line-height: 1.4 !important; }
+.w11-hint { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding: 10px 12px 10px 16px; color: var(--fl-muted); border: 1px solid var(--fl-control-stroke); border-radius: 6px; background: var(--fl-surface-alt); font-size: 13px; }
+.w11-hint span { flex: 1; }
