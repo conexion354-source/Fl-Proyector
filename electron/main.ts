@@ -1167,10 +1167,22 @@ async function createControlWindow() {
 
 /** Factor automático según el área útil del monitor (en píxeles lógicos). */
 function automaticInterfaceScale(width: number, height: number) {
-  if (width <= 1440 || height <= 820) return 0.8; // HD 1280×720 / 1366×768, notebooks
-  if (width <= 1920 || height <= 1100) return 0.9; // Full HD
+  if (width <= 1440 || height <= 820) return 0.75; // HD 1280×720 / 1366×768, notebooks
+  if (width <= 1920 || height <= 1100) return 0.85; // Full HD
   if (width <= 2560) return 1; // 2K, o 4K con escala de Windows 150 %
   return 1.1; // 4K al 100 %
+}
+
+/** Ctrl + / Ctrl − / Ctrl 0: cambia el tamaño de la interfaz y lo recuerda. */
+function changeInterfaceScale(step: number | "reset") {
+  const settings = database.getDisplaySettings();
+  const win = controlWindow;
+  const current = win && !win.isDestroyed() ? Math.round(win.webContents.getZoomFactor() * 100) : 100;
+  const next = step === "reset" ? 0 : Math.max(60, Math.min(150, Math.round((current + step) / 5) * 5));
+  database.saveDisplaySettings({ ...settings, uiScale: next });
+  applyInterfaceScale();
+  const applied = win && !win.isDestroyed() ? Math.round(win.webContents.getZoomFactor() * 100) : 100;
+  return { scale: next, applied };
 }
 
 function applyInterfaceScale() {
@@ -2857,6 +2869,11 @@ if (hasSingleInstanceLock)
       return true;
     });
     ipcMain.handle("settings:display:get", () => database.getDisplaySettings());
+    ipcMain.handle("ui:scale", (_event, step: number | "reset") => changeInterfaceScale(step));
+    ipcMain.handle("ui:scale:get", () => ({
+      scale: Number(database.getDisplaySettings().uiScale) || 0,
+      applied: controlWindow && !controlWindow.isDestroyed() ? Math.round(controlWindow.webContents.getZoomFactor() * 100) : 100,
+    }));
     ipcMain.handle(
       "settings:display:set",
       async (_event, settings: DisplaySettings) => {

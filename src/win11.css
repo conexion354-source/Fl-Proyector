@@ -2105,3 +2105,12 @@ html[data-theme="dark"] #root .ste-warnings li { color: #fcd34d; }
   #root .app-shell .overlay-controls { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   #root .app-shell .overlay-controls > :last-child { grid-column: 1 / -1; }
 }
+
+/* Tamaño de la interfaz en la barra superior */
+#root .app-shell .ui-scale { display: inline-flex; height: 32px; align-items: center; padding: 2px; border: 1px solid var(--fl-control-stroke); border-radius: 4px; background: var(--fl-control-fill); }
+#root .app-shell .ui-scale button { display: grid; height: 26px; min-width: 26px; place-items: center; padding: 0 6px !important; color: var(--fl-text) !important; border: 0 !important; border-radius: 3px !important; background: transparent !important; box-shadow: none !important; font-size: 12px !important; font-weight: 400 !important; white-space: nowrap; cursor: pointer; }
+#root .app-shell .ui-scale button:hover { background: var(--fl-subtle-hover) !important; }
+#root .app-shell .ui-scale button svg { width: 15px; height: 15px; }
+#root .app-shell .ui-scale-value { min-width: 58px !important; color: var(--fl-muted) !important; font-variant-numeric: tabular-nums; }
+#root .ui-scale-toast { position: fixed; top: 64px; left: 50%; z-index: 2000; padding: 8px 14px; color: var(--fl-text); border: 1px solid var(--fl-border); border-radius: 6px; background: var(--fl-surface); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); font-size: 13px; transform: translateX(-50%); pointer-events: none; }
+@media (max-width: 1100px) { #root .app-shell .topbar-search span { display: none; } #root .app-shell .topbar-search { width: auto; } }

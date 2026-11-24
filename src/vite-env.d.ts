@@ -41,6 +41,8 @@ declare global {
       clearPreviewState(): Promise<void>;
       clearProjectionContent(): Promise<void>;
       listCaptureSources(): Promise<CaptureSource[]>;
+      changeInterfaceScale(step: number | "reset"): Promise<{ scale: number; applied: number }>;
+      getInterfaceScale(): Promise<{ scale: number; applied: number }>;
       finishVideoPlayback(): Promise<void>;
       onState(callback: (state: ProjectionState) => void): () => void;
       onLiveState(callback: (state: ProjectionState) => void): () => void;

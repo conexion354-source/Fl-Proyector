@@ -127,6 +127,20 @@ export function App() {
   const [floatingPreviewOpen, setFloatingPreviewOpen] = useState(false);
   const [previewPanelMode, setPreviewPanelMode] = useState<"live" | "prepare">("live");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Tamaño de la interfaz (Ctrl + / Ctrl − / Ctrl 0 y botones de la barra superior).
+  const [uiScale, setUiScale] = useState<{ scale: number; applied: number }>({ scale: 0, applied: 100 });
+  const [uiScaleToast, setUiScaleToast] = useState(false);
+  const uiScaleToastTimer = useRef<number | null>(null);
+  useEffect(() => {
+    void window.flProyector.getInterfaceScale?.().then(setUiScale).catch(() => {});
+  }, []);
+  const changeUiScale = useCallback(async (step: number | "reset") => {
+    const next = await window.flProyector.changeInterfaceScale(step);
+    setUiScale(next);
+    setUiScaleToast(true);
+    if (uiScaleToastTimer.current) window.clearTimeout(uiScaleToastTimer.current);
+    uiScaleToastTimer.current = window.setTimeout(() => setUiScaleToast(false), 1600);
+  }, []);
   const runShortcutRef = useRef<(action: ShortcutAction) => Promise<void>>(async () => {});
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [updateNoticeDismissed, setUpdateNoticeDismissed] = useState(false);
@@ -247,6 +261,11 @@ export function App() {
     };
     runShortcutRef.current = runShortcut;
     const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && ["+", "=", "-", "_", "0"].includes(event.key)) {
+        event.preventDefault();
+        void changeUiScale(event.key === "0" ? "reset" : event.key === "-" || event.key === "_" ? -5 : 5);
+        return;
+      }
       // Ctrl+K (Cmd+K en Mac): búsqueda global desde cualquier pantalla.
       if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -276,7 +295,7 @@ export function App() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [projectionFrozen, state.blackout, state.logo, status.open, update]);
+  }, [projectionFrozen, state.blackout, state.logo, status.open, update, changeUiScale]);
   useEffect(() => {
     localStorage.setItem("fl-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
   }, [sidebarCollapsed]);
@@ -550,6 +569,27 @@ export function App() {
           <span>Buscar canción, versículo o acción</span>
           <kbd>{navigator.platform.toLowerCase().includes("mac") ? "⌘K" : "Ctrl+K"}</kbd>
         </button>
+        <div className="ui-scale" role="group" aria-label="Tamaño de la interfaz">
+          <button type="button" onClick={() => void changeUiScale(-5)} title="Achicar la interfaz (Ctrl −)" aria-label="Achicar la interfaz">
+            <ZoomOut aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="ui-scale-value"
+            onClick={() => void changeUiScale("reset")}
+            title={uiScale.scale ? "Volver al tamaño automático (Ctrl 0)" : "Tamaño automático según la pantalla"}
+          >
+            {uiScale.applied} %{uiScale.scale ? "" : " · auto"}
+          </button>
+          <button type="button" onClick={() => void changeUiScale(5)} title="Agrandar la interfaz (Ctrl +)" aria-label="Agrandar la interfaz">
+            <ZoomIn aria-hidden="true" />
+          </button>
+        </div>
+        {uiScaleToast && (
+          <div className="ui-scale-toast" role="status">
+            Interfaz al {uiScale.applied} %{uiScale.scale ? " · Ctrl 0 vuelve a automático" : " · automático"}
+          </div>
+        )}
         <div
           className={`on-air on-air-${outputState.tone}`}
           role="status"

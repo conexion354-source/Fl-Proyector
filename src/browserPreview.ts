@@ -95,6 +95,14 @@ if (!window.flProyector) {
     },
     clearPreviewState: async () => {},
     listCaptureSources: async () => [],
+    getInterfaceScale: async () => ({ scale: 0, applied: Math.round((Number(document.documentElement.style.zoom) || 1) * 100) }),
+    changeInterfaceScale: async (step: number | "reset") => {
+      const current = Math.round((Number(document.documentElement.style.zoom) || 1) * 100);
+      const next = step === "reset" ? 0 : Math.max(60, Math.min(150, Math.round((current + step) / 5) * 5));
+      const applied = next || 100;
+      document.documentElement.style.zoom = String(applied / 100);
+      return { scale: next, applied };
+    },
     clearProjectionContent: async () => {
       state = {
         ...state,
