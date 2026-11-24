@@ -2089,3 +2089,19 @@ html[data-theme="dark"] #root .ste-warnings li { color: #fcd34d; }
 #root .app-shell .rp-switch input:checked + i { border-color: var(--fl-accent); background: var(--fl-accent); }
 #root .app-shell .rp-switch input:checked + i::after { left: 23px; background: var(--fl-on-accent); }
 #root .app-shell .rp-switch input:focus-visible + i { outline: 2px solid var(--fl-text); outline-offset: 2px; }
+
+/* ---------- Panel en vivo angosto (300–380 px): nada se corta ---------- */
+#root .app-shell .master-grid button { min-width: 0; white-space: nowrap; }
+#root .app-shell .master-grid button > :not(svg):not(small) { overflow: hidden; text-overflow: ellipsis; }
+#root .app-shell .overlay-controls { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 4px !important; }
+#root .app-shell .overlay-controls .overlay-action { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#root .app-shell .overlay-controls .overlay-action svg { flex: 0 0 16px; }
+@container live (max-width: 380px) {
+  /* Título: queda el punto rojo; el selector En vivo / Preparar entra entero. */
+  #root .app-shell .live-panel .panel-heading > div:first-child { font-size: 0 !important; gap: 0 !important; }
+  #root .app-shell .live-panel .panel-heading > div:first-child .live-dot { margin-right: 4px; }
+  #root .app-shell .master-grid button { gap: 8px !important; padding: 0 10px !important; font-size: 13px !important; }
+  /* Cronómetro y Detener lado a lado; Mostrar hora abajo, a lo ancho. */
+  #root .app-shell .overlay-controls { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  #root .app-shell .overlay-controls > :last-child { grid-column: 1 / -1; }
+}
