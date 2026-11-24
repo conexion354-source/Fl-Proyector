@@ -3475,51 +3475,7 @@ function AnnouncementPreview({
   previewAspectRatio: string;
   onOpenPreview: () => void;
 }) {
-  const p = item.payload as any;
-  const previewPages = announcementPages(p);
-  const previewPage = Math.max(0, Math.min(Number(p.announcementPage || 0), previewPages.length - 1));
-  const selectedBackground = media.find(
-    (value) => value.id === Number(p.backgroundId),
-  );
-  const previewState: ProjectionState = {
-    ...state,
-    blackout: false,
-    logo: false,
-    background: selectedBackground
-      ? {
-          ...state.background,
-          id: selectedBackground.id,
-          url: selectedBackground.url,
-          name: selectedBackground.name,
-        }
-      : state.background,
-    lowerThird: { ...state.lowerThird, visible: false },
-    text: {
-      ...state.text,
-      html: (() => {
-        const html = previewPages[previewPage] || String(p.html || "");
-        // Con el anuncio vacío se muestra un texto de ejemplo, para poder
-        // elegir ubicación y estilo antes de escribir.
-        return html.replace(/<[^>]+>/g, "").trim()
-          ? html
-          : "<p>Escribí tu anuncio</p>";
-      })(),
-      visible: true,
-      kind: item.type === "bible" ? "biblia" : "anuncio",
-      position: p.position || "center",
-      fontSize: Number(p.fontSize || 64),
-      fontFamily: p.fontFamily || "Inter",
-      color: p.color || "#ffffff",
-      backgroundColor: p.backgroundColor || "rgba(0,0,0,0)",
-      align: p.align || "center",
-      borderRadius: Number(p.borderRadius || 0),
-      template: p.template || "plain",
-      animation: p.animation || "fade",
-      shadowEnabled: p.shadowEnabled !== false,
-      shadowColor: p.shadowColor || "#000000",
-      shadowBlur: Number(p.shadowBlur ?? 14),
-    },
-  };
+  const previewState = announcementPreviewState(item.type, item.payload as any, media, state);
   return (
     <aside className="announcement-preview">
       <div className="preview-heading">
@@ -3546,6 +3502,61 @@ function AnnouncementPreview({
       <p>Así se verá en el proyector, con el fondo y el formato reales.</p>
     </aside>
   );
+}
+
+/** Estado de proyección para previsualizar un anuncio (o cita) con su diseño y fondo. */
+function announcementPreviewState(
+  type: MeetingItem["type"],
+  p: any,
+  media: MediaItem[],
+  state: ProjectionState,
+  sampleText = "Escribí tu anuncio",
+): ProjectionState {
+  const previewPages = announcementPages(p);
+  const previewPage = Math.max(0, Math.min(Number(p.announcementPage || 0), previewPages.length - 1));
+  const selectedBackground = media.find(
+    (value) => value.id === Number(p.backgroundId),
+  );
+  return {
+    ...state,
+    blackout: false,
+    logo: false,
+    background: selectedBackground
+      ? {
+          ...state.background,
+          id: selectedBackground.id,
+          url: selectedBackground.url,
+          name: selectedBackground.name,
+          kind: selectedBackground.kind,
+        }
+      : state.background,
+    lowerThird: { ...state.lowerThird, visible: false },
+    text: {
+      ...state.text,
+      html: (() => {
+        const html = previewPages[previewPage] || String(p.html || "");
+        // Con el anuncio vacío se muestra un texto de ejemplo, para poder
+        // elegir ubicación y estilo antes de escribir.
+        return html.replace(/<[^>]+>/g, "").trim()
+          ? html
+          : `<p>${sampleText}</p>`;
+      })(),
+      visible: true,
+      kind: type === "bible" ? "biblia" : "anuncio",
+      position: p.position || "center",
+      fontSize: Number(p.fontSize || 64),
+      fontFamily: p.fontFamily || "Inter",
+      color: p.color || "#ffffff",
+      backgroundColor: p.backgroundColor || "rgba(0,0,0,0)",
+      align: p.align || "center",
+      borderRadius: Number(p.borderRadius || 0),
+      template: p.template || "plain",
+      animation: p.animation || "fade",
+      shadowEnabled: p.shadowEnabled !== false,
+      shadowColor: p.shadowColor || "#000000",
+      shadowBlur: Number(p.shadowBlur ?? 14),
+    },
+  };
 }
 
 /**

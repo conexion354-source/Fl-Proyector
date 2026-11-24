@@ -1539,17 +1539,8 @@ function LiveContentControls({
       </section>
     );
   }
-  if (state.background.kind === "image" && state.background.url)
-    return (
-      <ImageZoomControls
-        url={state.background.url}
-        name={state.background.name}
-        zoom={state.background.zoom}
-        fit="fill"
-        ratio={state.outputViewport.width / Math.max(1, state.outputViewport.height)}
-        onZoom={(zoom) => update({ background: { zoom } })}
-      />
-    );
+  // El zoom es solo para imágenes proyectadas desde el orden del culto; un
+  // fondo (con texto encima) no muestra este control.
   if (state.background.kind !== "video") return null;
   const videoProgress =
     videoDuration > 0
