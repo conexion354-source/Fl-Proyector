@@ -1152,7 +1152,36 @@ async function createControlWindow() {
     tagsDialogWindow = null;
     projectionDisplayId = null;
   });
+  // La interfaz se adapta a la pantalla: en HD y Full HD se achica para que
+  // todo entre con espacio; en 2K y 4K queda a tamaño normal.
+  controlWindow.webContents.on("did-finish-load", applyInterfaceScale);
+  let scaleTimer: NodeJS.Timeout | null = null;
+  const rescale = () => {
+    if (scaleTimer) clearTimeout(scaleTimer);
+    scaleTimer = setTimeout(applyInterfaceScale, 250);
+  };
+  controlWindow.on("moved", rescale);
+  controlWindow.on("enter-full-screen", rescale);
   await controlWindow.loadURL(rendererUrl());
+}
+
+/** Factor automático según el área útil del monitor (en píxeles lógicos). */
+function automaticInterfaceScale(width: number, height: number) {
+  if (width <= 1440 || height <= 820) return 0.8; // HD 1280×720 / 1366×768, notebooks
+  if (width <= 1920 || height <= 1100) return 0.9; // Full HD
+  if (width <= 2560) return 1; // 2K, o 4K con escala de Windows 150 %
+  return 1.1; // 4K al 100 %
+}
+
+function applyInterfaceScale() {
+  const win = controlWindow;
+  if (!win || win.isDestroyed()) return;
+  const chosen = Number(database.getDisplaySettings().uiScale) || 0;
+  const { workAreaSize } = screen.getDisplayMatching(win.getBounds());
+  const factor = chosen > 0
+    ? Math.max(0.6, Math.min(1.5, chosen / 100))
+    : automaticInterfaceScale(workAreaSize.width, workAreaSize.height);
+  if (Math.abs(win.webContents.getZoomFactor() - factor) > 0.001) win.webContents.setZoomFactor(factor);
 }
 
 async function openProjection() {
@@ -2271,6 +2300,7 @@ if (hasSingleInstanceLock)
     screen.on("display-added", refreshProjectionGeometry);
     screen.on("display-removed", refreshProjectionGeometry);
     screen.on("display-metrics-changed", refreshProjectionGeometry);
+    screen.on("display-metrics-changed", () => applyInterfaceScale());
     const biblePath = join(app.getAppPath(), "assets", "bibles", "rv1909.json");
     const bibleData = JSON.parse(
       await readFile(biblePath, "utf8"),
@@ -2831,6 +2861,7 @@ if (hasSingleInstanceLock)
       "settings:display:set",
       async (_event, settings: DisplaySettings) => {
         database.saveDisplaySettings(settings);
+        applyInterfaceScale();
         mergeState({ outputViewport: projectionViewport(settings) });
         await synchronizeProjectionWindows(settings);
         if (settings.previewEnabled && settings.previewDisplayId === null)

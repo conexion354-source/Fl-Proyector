@@ -136,6 +136,8 @@ export type DisplaySettings = {
   previewDisplayId: number | null;
   /** "powerpoint": usa el PowerPoint instalado (Windows) para ver los efectos tal cual. */
   presentationEngine: "powerpoint" | "builtin";
+  /** Tamaño de la interfaz: 0 = automático según la pantalla; si no, porcentaje. */
+  uiScale: number;
 };
 
 export type ChurchSettings = {
@@ -237,6 +239,7 @@ export const initialDisplaySettings: DisplaySettings = {
   previewEnabled: false,
   previewDisplayId: null,
   presentationEngine: "powerpoint",
+  uiScale: 0,
 };
 export const initialChurchSettings: ChurchSettings = {
   name: "Mi Iglesia",

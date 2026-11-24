@@ -1255,6 +1255,28 @@ export function SettingsPanel({
                 </SettingRow>
               </SettingsGroup>
 
+              <SettingsGroup title="Interfaz">
+                <SettingRow
+                  title="Tamaño de la interfaz"
+                  description="Automático achica todo en pantallas HD y Full HD para que entre con espacio, y lo deja normal en 2K y 4K."
+                >
+                  <Select
+                    label="Tamaño de la interfaz"
+                    value={String(settings.uiScale ?? 0)}
+                    onChange={(value) => setSettings((current) => ({ ...current, uiScale: Number(value) }))}
+                    options={[
+                      { value: "0", label: "Automático (recomendado)" },
+                      { value: "75", label: "75 %" },
+                      { value: "80", label: "80 %" },
+                      { value: "90", label: "90 %" },
+                      { value: "100", label: "100 %" },
+                      { value: "110", label: "110 %" },
+                      { value: "125", label: "125 %" },
+                    ]}
+                  />
+                </SettingRow>
+              </SettingsGroup>
+
               <SettingsGroup title="Presentaciones de PowerPoint">
                 <SettingRow
                   title="Mostrar con"
