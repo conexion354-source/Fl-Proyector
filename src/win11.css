@@ -2040,3 +2040,52 @@ html[data-theme="dark"] #root .ste-warnings li { color: #fcd34d; }
 
 /* Lo que está proyectándose se marca solo con el borde rojo (sin etiqueta "Al aire") */
 #root .app-shell .media-card.selected { border-color: #c42b1c !important; box-shadow: 0 0 0 1px #c42b1c !important; }
+
+/* ---------- Control remoto ---------- */
+#root .app-shell .rp { display: flex; max-width: 980px; flex-direction: column; gap: 8px; padding: 28px 32px 40px; overflow-y: auto; }
+#root .app-shell .rp-title { margin-bottom: 12px; }
+#root .app-shell .rp-title h2 { margin: 2px 0 4px; font-size: 28px; font-weight: 600; }
+#root .app-shell .rp-title p { margin: 0; color: var(--fl-muted); font-size: 14px; }
+#root .app-shell .rp-hero { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 28px; align-items: start; padding: 24px; border: 1px solid var(--fl-border); border-radius: 8px; background: var(--fl-surface); }
+@container (max-width: 640px) { #root .app-shell .rp-hero { grid-template-columns: 1fr; } }
+#root .app-shell .rp-qr { display: grid; width: 200px; height: 200px; place-items: center; padding: 10px; border-radius: 8px; background: #fff; }
+#root .app-shell .rp-qr img { width: 100%; height: 100%; image-rendering: pixelated; }
+#root .app-shell .rp-qr svg { width: 48px; height: 48px; color: #9ca3af; }
+#root .app-shell .rp-steps h3 { margin: 0 0 12px; font-size: 18px; font-weight: 600; }
+#root .app-shell .rp-steps ol { display: flex; flex-direction: column; gap: 14px; margin: 0; padding: 0; list-style: none; counter-reset: rp; }
+#root .app-shell .rp-steps li { position: relative; padding-left: 36px; color: var(--fl-muted); font-size: 13px; line-height: 1.5; counter-increment: rp; }
+#root .app-shell .rp-steps li::before { content: counter(rp); position: absolute; left: 0; top: -1px; display: grid; width: 24px; height: 24px; place-items: center; color: var(--fl-on-accent); border-radius: 50%; background: var(--fl-accent); font-size: 12px; font-weight: 700; }
+#root .app-shell .rp-steps li b { color: var(--fl-text); font-weight: 600; }
+#root .app-shell .rp-address { display: flex; min-width: 0; align-items: center; gap: 6px; margin-top: 6px; }
+#root .app-shell .rp-address code { min-width: 0; flex: 1; overflow: hidden; height: 32px; padding: 0 10px; color: var(--fl-text); border: 1px solid var(--fl-control-stroke); border-radius: 4px; background: var(--fl-control-fill); font: 13px/30px "Cascadia Mono", Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+#root .app-shell :is(.rp-address, .rp-code) button, #root .app-shell .rp-button { display: inline-flex; height: 32px; flex: 0 0 auto; align-items: center; gap: 6px; padding: 0 12px !important; color: var(--fl-text) !important; border: 1px solid var(--fl-control-stroke) !important; border-radius: 4px !important; background: var(--fl-control-fill) !important; box-shadow: none !important; font-size: 13px !important; font-weight: 400 !important; white-space: nowrap; cursor: pointer; }
+#root .app-shell :is(.rp-address, .rp-code) button:hover:not(:disabled), #root .app-shell .rp-button:hover:not(:disabled) { background: var(--fl-control-hover, var(--fl-subtle-hover)) !important; }
+#root .app-shell :is(.rp-address, .rp-code) button svg { width: 15px; height: 15px; }
+#root .app-shell .rp-button.rp-primary { color: var(--fl-on-accent) !important; border-color: transparent !important; background: var(--fl-accent) !important; font-weight: 600 !important; }
+#root .app-shell .rp-offline { margin: 0; color: var(--fl-muted); font-size: 13px; }
+#root .app-shell .rp-manual { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--fl-border); }
+#root .app-shell .rp-link { padding: 0 !important; color: var(--fl-accent-text, var(--fl-accent)) !important; border: 0 !important; background: transparent !important; box-shadow: none !important; font-size: 13px !important; cursor: pointer; }
+#root .app-shell .rp-manual p { margin: 8px 0 4px; color: var(--fl-muted); font-size: 13px; }
+#root .app-shell .rp-host { display: block; color: var(--fl-text); font: 600 28px/1.2 "Segoe UI Variable Display", "Segoe UI", sans-serif; letter-spacing: 0.02em; user-select: all; }
+#root .app-shell .rp-group-title { margin: 20px 0 4px; font-size: 14px; font-weight: 600; }
+#root .app-shell .rp-group { display: flex; flex-direction: column; gap: 2px; }
+#root .app-shell .rp-row { display: flex; min-height: 64px; align-items: center; gap: 16px; padding: 12px 16px; border: 1px solid var(--fl-border); border-radius: 6px; background: var(--fl-surface); }
+#root .app-shell .rp-row-intro { min-height: 0; padding: 10px 16px; }
+#root .app-shell .rp-row-icon { display: grid; width: 20px; flex: 0 0 20px; place-items: center; color: var(--fl-text); }
+#root .app-shell .rp-row-icon svg { width: 20px; height: 20px; }
+#root .app-shell .rp-row.is-on .rp-row-icon { color: var(--fl-accent); }
+#root .app-shell .rp-row-text { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+#root .app-shell .rp-row-text b { font-size: 14px; font-weight: 400; }
+#root .app-shell .rp-row-text small { color: var(--fl-muted); font-size: 12px; line-height: 1.4; }
+#root .app-shell .rp-row .rp-address { width: min(420px, 50%); margin: 0; }
+#root .app-shell .rp-row.success small { color: #16a34a; }
+#root .app-shell .rp-row.error small { color: #dc2626; }
+#root .app-shell .rp-code { display: flex; align-items: center; gap: 6px; }
+#root .app-shell .rp-code input { width: 160px; height: 32px; font-size: 13px; }
+#root .app-shell .rp-switch { display: inline-flex; align-items: center; gap: 10px; color: var(--fl-text); font-size: 13px; cursor: pointer; }
+#root .app-shell .rp-switch input { position: absolute; opacity: 0; pointer-events: none; }
+#root .app-shell .rp-switch i { position: relative; width: 40px; height: 20px; border: 1px solid var(--fl-muted); border-radius: 10px; background: var(--fl-control-fill); }
+#root .app-shell .rp-switch i::after { content: ""; position: absolute; left: 3px; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--fl-muted); transform: translateY(-50%); transition: left 140ms ease; }
+#root .app-shell .rp-switch input:checked + i { border-color: var(--fl-accent); background: var(--fl-accent); }
+#root .app-shell .rp-switch input:checked + i::after { left: 23px; background: var(--fl-on-accent); }
+#root .app-shell .rp-switch input:focus-visible + i { outline: 2px solid var(--fl-text); outline-offset: 2px; }

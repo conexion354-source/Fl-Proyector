@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { Copy, Music2, Power, QrCode, ShieldCheck, Smartphone } from "lucide-react";
+import { Copy, Music2, QrCode, ShieldCheck, Smartphone } from "lucide-react";
 import { withSaveNotification } from "./SaveNotification";
 
 export function RemotePanel({
@@ -66,132 +66,178 @@ export function RemotePanel({
       setFullControlBusy(false);
     }
   };
+  const host = (() => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return "";
+    }
+  })();
+  const ready = Boolean(url && host);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [collabCopied, setCollabCopied] = useState(false);
   return (
-    <section className="remote-panel-page">
-      <div className="section-title">
-        <div>
-          <span className="eyebrow">Control remoto</span>
-          <h2>Conectá un teléfono</h2>
-        </div>
-      </div>
+    <section className="remote-panel-page rp">
+      <header className="rp-title">
+        <span className="eyebrow">Control remoto</span>
+        <h2>Teléfono y equipo</h2>
+        <p>Controlá la proyección desde el celular y prepará reuniones desde otra computadora de la misma red.</p>
+      </header>
 
-      <div className="remote-connect-card">
-        <div className="remote-qr-wrap">
-          {qr ? <img src={qr} alt="Código QR para control remoto" /> : <QrCode />}
+      <section className="rp-hero" aria-label="Conectar un teléfono">
+        <div className="rp-qr">
+          {ready && qr ? <img src={qr} alt="Código QR para conectar el teléfono" /> : <QrCode aria-hidden="true" />}
         </div>
-        <div className="remote-connect-copy">
-          <div className="remote-connect-heading">
-            <div className="remote-icon"><Smartphone /></div>
-            <div>
-              <h3>Escaneá el código QR</h3>
-              <p>Conectá el teléfono a la misma red Wi-Fi.</p>
-            </div>
-          </div>
-          {url ? (
-            <>
-              <div className="remote-url-row">
-                <code title={url}>{url}</code>
-                <button onClick={copy}><Copy size={16} />{copied ? "Copiada" : "Copiar"}</button>
-              </div>
-              <p className="remote-webapp-note">
-                Abrila en el navegador y elegí <b>Instalar app</b> o <b>Agregar a pantalla de inicio</b>.
-                Después detectará el sistema de la red Wi-Fi actual y cargará sus reuniones; no necesita Internet.
-              </p>
-              <p className="remote-manual-address">
-                Si el teléfono no encuentra la PC solo, escribí esta dirección en la app
-                (Android: «Escanear código QR» o escribila y tocá «Conectar al proyector»; iPhone: el cuadro «Conectar» de la app):
-                <b>{(() => {
-                  try {
-                    return new URL(url).hostname;
-                  } catch {
-                    return url;
-                  }
-                })()}</b>
-              </p>
-              {window.flProyector.platform === "win32" && (
-                <div className={`remote-firewall ${firewallResult ?? ""}`}>
-                  <div>
-                    <ShieldCheck size={18} />
-                    <span>
-                      <b>Acceso desde otros equipos</b>
-                      Si el enlace no abre, habilitá FL Proyector en el Firewall de Windows.
-                    </span>
-                  </div>
-                  <button type="button" disabled={firewallBusy} onClick={enableWindowsAccess}>
-                    {firewallBusy ? "Esperando permiso…" : "Habilitar acceso"}
+        <div className="rp-steps">
+          <h3>Conectar un teléfono</h3>
+          {ready ? (
+            <ol>
+              <li>
+                <b>Conectá el teléfono al mismo Wi-Fi</b> que esta computadora.
+              </li>
+              <li>
+                <b>Escaneá el código QR</b> con la cámara o abrí esta dirección:
+                <span className="rp-address">
+                  <code title={url}>{url}</code>
+                  <button type="button" onClick={copy}>
+                    <Copy aria-hidden="true" /> {copied ? "Copiada" : "Copiar"}
                   </button>
-                  {firewallResult === "success" && <small>Acceso habilitado. Probá nuevamente el enlace.</small>}
-                  {firewallResult === "error" && <small>No se pudo habilitar. Aceptá el permiso de administrador e intentá otra vez.</small>}
+                </span>
+              </li>
+              <li>
+                <b>Instalala</b> con «Instalar app» o «Agregar a pantalla de inicio». La próxima vez encuentra la PC sola, sin Internet.
+              </li>
+            </ol>
+          ) : (
+            <p className="rp-offline">
+              No se detectó una red. Conectá esta computadora a un Wi-Fi o a un cable de red y volvé a abrir esta pantalla.
+            </p>
+          )}
+          {ready && (
+            <div className={`rp-manual ${manualOpen ? "open" : ""}`}>
+              <button type="button" className="rp-link" aria-expanded={manualOpen} onClick={() => setManualOpen((value) => !value)}>
+                ¿El teléfono no encuentra la PC?
+              </button>
+              {manualOpen && (
+                <div>
+                  <p>
+                    En la app, tocá <b>Conectar</b> (iPhone) o <b>Escanear código QR / Conectar al proyector</b> (Android) y escribí:
+                  </p>
+                  <strong className="rp-host">{host}</strong>
                 </div>
               )}
-            </>
-          ) : (
-            <p className="remote-unavailable">No se detectó una dirección de red. Verificá la conexión Wi-Fi.</p>
+            </div>
           )}
         </div>
-      </div>
-
-      <div className="remote-feature-grid">
-        <article><b>Biblia</b><span>Elegí versión, libro y capítulo para proyectar versículos.</span></article>
-        <article><b>Multimedia</b><span>Elegí una reunión y enviá videos, imágenes o PowerPoints.</span></article>
-      </div>
-
-      <section className={`remote-full-control ${fullControlEnabled ? "enabled" : ""}`}>
-        <div className="remote-full-control-icon"><Music2 /></div>
-        <div>
-          <span className="eyebrow">Permiso temporal</span>
-          <h3>App · Control total</h3>
-          <p>
-            Habilita en el teléfono las canciones del orden del culto, sus
-            estrofas y el control en vivo. Se desactiva al cerrar el programa.
-          </p>
-        </div>
-        <button
-          type="button"
-          className={fullControlEnabled ? "danger" : ""}
-          disabled={fullControlBusy}
-          onClick={toggleFullControl}
-          aria-pressed={fullControlEnabled}
-        >
-          <Power size={16} />
-          {fullControlBusy
-            ? "Aplicando…"
-            : fullControlEnabled
-              ? "Desactivar"
-              : "Activar"}
-        </button>
       </section>
 
-      <section className="collaborator-section">
-        <header className="collaborator-heading">
-          <div><span className="eyebrow">Acceso de equipo</span><h3>Colaborador</h3></div>
-        </header>
-        <div className="collaborator-card">
-          <p>Permite editar canciones y preparar reuniones desde otra computadora de la misma red. No permite controlar el proyector.</p>
-          <div className="collaborator-fields">
-            <label className="collaborator-url-field">
-              Dirección de acceso
-              <div className="collaborator-link">
-                {collaboratorUrl && <code title={collaboratorUrl}>{collaboratorUrl}</code>}
-                <button onClick={async () => { await navigator.clipboard.writeText(collaboratorUrl).catch(() => undefined); }}>
-                  <Copy size={15} />Copiar URL
-                </button>
-              </div>
-            </label>
-            <div className="collaborator-code-row">
-              <label>
-                Código de acceso
-                <input value={collaboratorCode} disabled={!editingCode} onChange={(event) => setCollaboratorCode(event.target.value)} placeholder="Creá un código" type="password" autoComplete="new-password" />
-              </label>
-              <div className="collaborator-actions">
-                {editingCode ? (
-                  <><button className="secondary" onClick={() => { setCollaboratorCode(savedCode); setEditingCode(false); }}>Cancelar</button><button onClick={saveCode}>{saved ? "Guardado" : "Guardar"}</button></>
-                ) : <button onClick={() => setEditingCode(true)}>Editar código</button>}
-              </div>
-            </div>
+      <h3 className="rp-group-title">Permisos</h3>
+      <div className="rp-group">
+        <div className={`rp-row ${fullControlEnabled ? "is-on" : ""}`}>
+          <span className="rp-row-icon"><Music2 aria-hidden="true" /></span>
+          <span className="rp-row-text">
+            <b>Control total desde el teléfono</b>
+            <small>Canciones del orden del culto, sus estrofas y los controles en vivo. Se desactiva solo al cerrar el programa.</small>
+          </span>
+          <label className="rp-switch">
+            <span>{fullControlBusy ? "Aplicando…" : fullControlEnabled ? "Activado" : "Desactivado"}</span>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={fullControlEnabled}
+              disabled={fullControlBusy}
+              onChange={() => void toggleFullControl()}
+              aria-label="Control total desde el teléfono"
+            />
+            <i aria-hidden="true" />
+          </label>
+        </div>
+        <div className="rp-row">
+          <span className="rp-row-icon"><Smartphone aria-hidden="true" /></span>
+          <span className="rp-row-text">
+            <b>Siempre disponible</b>
+            <small>Biblia (versión, libro y capítulo) y Multimedia (videos, imágenes y PowerPoint de las reuniones).</small>
+          </span>
+        </div>
+        {window.flProyector.platform === "win32" && (
+          <div className={`rp-row ${firewallResult ?? ""}`}>
+            <span className="rp-row-icon"><ShieldCheck aria-hidden="true" /></span>
+            <span className="rp-row-text">
+              <b>Firewall de Windows</b>
+              <small>
+                {firewallResult === "success"
+                  ? "Acceso habilitado. Probá de nuevo desde el teléfono."
+                  : firewallResult === "error"
+                    ? "No se pudo habilitar. Aceptá el permiso de administrador e intentá otra vez."
+                    : "Si el teléfono no abre la dirección, permití a FL Proyector recibir conexiones."}
+              </small>
+            </span>
+            <button type="button" className="rp-button" disabled={firewallBusy} onClick={enableWindowsAccess}>
+              {firewallBusy ? "Esperando permiso…" : "Habilitar acceso"}
+            </button>
           </div>
+        )}
+      </div>
+
+      <h3 className="rp-group-title">Colaborador</h3>
+      <div className="rp-group">
+        <div className="rp-row rp-row-intro">
+          <span className="rp-row-text">
+            <small>Otra computadora de la misma red puede editar canciones y preparar reuniones. No puede controlar el proyector.</small>
+          </span>
         </div>
-      </section>
+        <div className="rp-row">
+          <span className="rp-row-text">
+            <b>Dirección</b>
+            <small>Abrila en el navegador de la otra computadora.</small>
+          </span>
+          <span className="rp-address">
+            <code title={collaboratorUrl}>{ready ? collaboratorUrl : "Sin red"}</code>
+            <button
+              type="button"
+              disabled={!ready}
+              onClick={async () => {
+                await navigator.clipboard.writeText(collaboratorUrl).catch(() => undefined);
+                setCollabCopied(true);
+                window.setTimeout(() => setCollabCopied(false), 1500);
+              }}
+            >
+              <Copy aria-hidden="true" /> {collabCopied ? "Copiada" : "Copiar"}
+            </button>
+          </span>
+        </div>
+        <div className="rp-row">
+          <span className="rp-row-text">
+            <b>Código de acceso</b>
+            <small>{savedCode ? "Se pide al entrar como colaborador." : "Creá un código para habilitar el acceso."}</small>
+          </span>
+          <span className="rp-code">
+            <input
+              value={collaboratorCode}
+              disabled={!editingCode}
+              onChange={(event) => setCollaboratorCode(event.target.value)}
+              placeholder={editingCode ? "Escribí un código" : savedCode ? "••••••" : "Sin código"}
+              type="password"
+              autoComplete="new-password"
+              aria-label="Código de acceso"
+            />
+            {editingCode ? (
+              <>
+                <button type="button" className="rp-button" onClick={() => { setCollaboratorCode(savedCode); setEditingCode(false); }}>
+                  Cancelar
+                </button>
+                <button type="button" className="rp-button rp-primary" onClick={saveCode}>
+                  {saved ? "Guardado" : "Guardar"}
+                </button>
+              </>
+            ) : (
+              <button type="button" className="rp-button" onClick={() => setEditingCode(true)}>
+                {savedCode ? "Cambiar" : "Crear código"}
+              </button>
+            )}
+          </span>
+        </div>
+      </div>
     </section>
   );
 }
