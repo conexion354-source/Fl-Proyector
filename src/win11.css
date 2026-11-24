@@ -2196,3 +2196,10 @@ html .app-shell .sidebar > .sidebar-bottom { margin-top: auto !important; }
 #root .ann-background .background-gallery button { display: flex; flex-direction: column; gap: 4px; padding: 4px !important; border-radius: 6px !important; }
 #root .ann-background .background-gallery button strong { overflow: hidden; font-size: 12px !important; font-weight: 400 !important; text-overflow: ellipsis; white-space: nowrap; }
 #root .ann-background .background-choice > p { margin: 0; color: var(--fl-muted); font-size: 12px !important; line-height: 1.45; }
+
+/* Historial bíblico: cada versículo con su altura completa. Los botones se
+   achicaban dentro de la lista (flex) y el texto se encimaba con el siguiente. */
+#root .app-shell .bible-slide-list > button { display: flex !important; flex: 0 0 auto !important; flex-direction: column; align-items: stretch; gap: 4px; height: auto !important; min-height: max-content !important; overflow: visible !important; }
+#root .app-shell .bible-slide-list > button > b { display: block; margin: 0 !important; color: var(--fl-accent-text, var(--fl-accent)) !important; font-size: 12px !important; font-weight: 600 !important; line-height: 16px; }
+#root .app-shell .bible-slide-list > button .bible-slide-content { display: block; overflow: visible; }
+#root .app-shell .bible-slide-list > button .bible-slide-content :is(p, div, span) { position: static !important; margin: 0; font-size: 13px !important; line-height: 1.45 !important; }
