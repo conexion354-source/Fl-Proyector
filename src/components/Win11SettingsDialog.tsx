@@ -53,7 +53,7 @@ export function Win11SettingsDialog({
           <h2>{title}</h2>
           <button
             type="button"
-            className="win11-settings-close"
+            className="fl-close win11-settings-close"
             aria-label="Cerrar"
             onClick={onCancel}
           >

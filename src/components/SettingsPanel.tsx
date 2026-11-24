@@ -2216,7 +2216,7 @@ export function SettingsPanel({
               </div>
               <button
                 type="button"
-                className="dialog-close"
+                className="fl-close dialog-close"
                 aria-label="Cerrar"
                 onClick={() => setReleaseHistoryOpen(false)}
               >

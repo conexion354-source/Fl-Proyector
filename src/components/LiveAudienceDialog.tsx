@@ -51,7 +51,7 @@ export function LiveAudienceDialog({
               <h2 id="live-audience-title">Lectura en vivo por QR</h2>
             </div>
           </div>
-          <button className="live-audience-dialog-close" type="button" aria-label="Cerrar" onClick={onClose}>
+          <button className="fl-close live-audience-dialog-close" type="button" aria-label="Cerrar" onClick={onClose}>
             <X />
           </button>
         </header>

@@ -398,7 +398,7 @@ export function MediaLibrary({ state, update }: Props) {
               </div>
               <button
                 type="button"
-                className="media-tags-close"
+                className="fl-close media-tags-close"
                 aria-label="Cerrar"
                 onClick={() => setAddDialogOpen(false)}
               >
@@ -570,7 +570,7 @@ export function MediaLibrary({ state, update }: Props) {
               </div>
               <button
                 type="button"
-                className="media-tags-close"
+                className="fl-close media-tags-close"
                 aria-label="Cerrar"
                 onClick={() => setEditingTags(null)}
               >

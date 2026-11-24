@@ -71,7 +71,7 @@ export function NewSongDialog({ onClose, onManual, onImport }: Props) {
       >
         <button
           type="button"
-          className="dialog-close"
+          className="fl-close dialog-close"
           aria-label="Cerrar"
           onClick={onClose}
         >

@@ -133,7 +133,7 @@ function StanzaEditDialog({
       >
         <button
           type="button"
-          className="dialog-close"
+          className="fl-close dialog-close"
           aria-label="Cerrar"
           onClick={onCancel}
         >
@@ -992,7 +992,7 @@ export function SongLibrary({
           >
             <button
               type="button"
-              className="dialog-close"
+              className="fl-close dialog-close"
               aria-label="Cerrar"
               onClick={() => setNewMeeting(null)}
             >
@@ -1152,7 +1152,7 @@ export function SongLibrary({
           >
             <button
               type="button"
-              className="dialog-close"
+              className="fl-close dialog-close"
               aria-label="Cerrar"
               onClick={() => setRenamingSong(null)}
             >
@@ -1233,7 +1233,7 @@ export function SongLibrary({
           >
             <button
               type="button"
-              className="dialog-close"
+              className="fl-close dialog-close"
               aria-label="Cerrar"
               onClick={() => {
                 setNewCategoryDialog(false);

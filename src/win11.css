@@ -2005,3 +2005,35 @@ html[data-theme="dark"] #root .ste-warnings li { color: #fcd34d; }
 #root .ste-meta label { align-self: start; }
 #root .ste-meta label > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 18px; }
 #root .ste-meta :is(input, select) { box-sizing: border-box; height: 32px !important; min-height: 32px; padding-top: 0 !important; padding-bottom: 0 !important; }
+
+/* ---------- Botón Cerrar único (Windows 11) ----------
+   Un solo estilo para todas las ventanas, diálogos y avisos: cuadrado
+   de 32 px, ícono de 16 px, sin círculo ni fondo hasta pasar el mouse. */
+#root .fl-close,
+#root .app-shell .fl-close {
+  display: grid !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  flex: 0 0 32px !important;
+  place-items: center;
+  padding: 0 !important;
+  color: var(--fl-muted) !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+#root .fl-close:hover,
+#root .app-shell .fl-close:hover { color: var(--fl-text) !important; background: var(--fl-subtle-hover) !important; }
+#root .fl-close:active,
+#root .app-shell .fl-close:active { color: var(--fl-muted) !important; background: var(--fl-control-fill) !important; }
+#root .fl-close:focus-visible { outline: 2px solid var(--fl-text) !important; outline-offset: -2px; }
+#root .fl-close svg,
+#root .app-shell .fl-close svg { width: 16px !important; height: 16px !important; stroke-width: 1.75 !important; }
+/* En los diálogos va siempre en la esquina superior derecha, a la misma distancia. */
+#root .app-shell :is(.dialog-close, .win11-settings-close, .help-dialog-close).fl-close { position: absolute !important; top: 12px !important; right: 12px !important; left: auto !important; z-index: 5; }

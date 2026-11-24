@@ -1699,7 +1699,7 @@ export function MeetingBuilder({
           >
             <button
               type="button"
-              className="dialog-close"
+              className="fl-close dialog-close"
               aria-label="Cerrar"
               onClick={() => setNewMeeting(null)}
             >
@@ -1915,7 +1915,7 @@ export function MeetingBuilder({
           >
             <button
               type="button"
-              className="dialog-close"
+              className="fl-close dialog-close"
               aria-label="Cerrar"
               onClick={() => setRenamingMeeting(null)}
             >
@@ -1968,7 +1968,7 @@ export function MeetingBuilder({
           <div
             className={`item-edit-dialog ${["announcement", "bible"].includes(selected.type) ? "visual-dialog" : ""} ${selected.type === "announcement" ? "announcement-visual-dialog" : ""} ${selected.type === "song" ? "song-edit-dialog" : ""}`}
           >
-            <button type="button" className="dialog-close" aria-label="Cerrar" onClick={closeEditor}>
+            <button type="button" className="fl-close dialog-close" aria-label="Cerrar" onClick={closeEditor}>
               <X />
             </button>
             <ItemEditor
@@ -2040,7 +2040,7 @@ export function MeetingBuilder({
           <div className="background-assignment-dialog">
             <button
               type="button"
-              className="dialog-close"
+              className="fl-close dialog-close"
               aria-label="Cerrar"
               onClick={() => setBackgroundTarget(null)}
             >
@@ -2074,7 +2074,7 @@ export function MeetingBuilder({
           <div className="preview-only-dialog" role="dialog" aria-modal="true" aria-label="Vista previa sin proyectar" onMouseDown={(event) => event.stopPropagation()}>
             <header>
               <span className="eyebrow">Vista previa</span>
-              <button type="button" className="dialog-close" aria-label="Cerrar" onClick={() => { setPreviewDraft(null); void window.flProyector.clearPreviewState(); }}><X /></button>
+              <button type="button" className="fl-close dialog-close" aria-label="Cerrar" onClick={() => { setPreviewDraft(null); void window.flProyector.clearPreviewState(); }}><X /></button>
             </header>
             <p>Así se vería en la pantalla. Todavía no se envió al proyector.</p>
             <div className="preview-only-frame" style={{ aspectRatio: previewAspectRatio }}><ProjectionPreview state={previewDraft} /></div>
@@ -2154,7 +2154,7 @@ function MeetingStanzaEditDialog({
       >
         <button
           type="button"
-          className="dialog-close"
+          className="fl-close dialog-close"
           aria-label="Cerrar"
           onClick={onCancel}
         >
@@ -2491,7 +2491,7 @@ function LibraryPicker({
   return (
     <div className="modal-backdrop">
       <div className="library-picker">
-        <button type="button" className="dialog-close" aria-label="Cerrar" onClick={onClose}>
+        <button type="button" className="fl-close dialog-close" aria-label="Cerrar" onClick={onClose}>
           <X />
         </button>
         <span className="eyebrow">Agregar a la reunión</span>
@@ -2637,7 +2637,7 @@ function BiblePicker({
   return (
     <div className="modal-backdrop">
       <div className="bible-picker">
-        <button type="button" className="dialog-close" aria-label="Cerrar" onClick={onClose}>
+        <button type="button" className="fl-close dialog-close" aria-label="Cerrar" onClick={onClose}>
           <X />
         </button>
         <span className="eyebrow">Agregar cita a la reunión</span>
@@ -3617,7 +3617,7 @@ function CaptureSourcePicker({
             <h2 id="cap-title">Proyectar una ventana</h2>
             <p>Mostrá en vivo un navegador, una reunión de Zoom u otro programa.</p>
           </div>
-          <button className="cap-icon-button" onClick={onCancel} aria-label="Cerrar" title="Cerrar">
+          <button className="fl-close cap-icon-button" onClick={onCancel} aria-label="Cerrar" title="Cerrar">
             <X />
           </button>
         </header>

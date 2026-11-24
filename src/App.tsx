@@ -253,6 +253,17 @@ export function App() {
         setPaletteOpen((current) => !current);
         return;
       }
+      // Esc cierra la ventana abierta de arriba, igual en todo el sistema.
+      if (event.key === "Escape" && !event.defaultPrevented) {
+        const dialogs = document.querySelectorAll<HTMLElement>(".modal-backdrop");
+        const top = dialogs[dialogs.length - 1];
+        const close = top?.querySelector<HTMLButtonElement>(".fl-close");
+        if (close) {
+          event.preventDefault();
+          close.click();
+          return;
+        }
+      }
       if (!event.isTrusted || event.repeat || isEditableTarget(event.target)) return;
       const pressed = normalizeShortcut(event).toLowerCase();
       const action = (Object.entries(loadShortcuts()) as [ShortcutAction, string][])
@@ -1162,7 +1173,7 @@ export function App() {
             </button>
             <button
               type="button"
-              className="update-floating-close"
+              className="fl-close update-floating-close"
               aria-label="Cerrar aviso de actualización"
               onClick={() => setUpdateNoticeDismissed(true)}
             >

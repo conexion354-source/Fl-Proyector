@@ -810,7 +810,7 @@ export function BibleOperator({
                 <span>División A/B</span>
                 <h3>{splitEditor.verse.book} {splitEditor.verse.chapter}:{splitEditor.verse.verse}</h3>
               </div>
-              <button type="button" onClick={() => setSplitEditor(null)} aria-label="Cerrar"><X /></button>
+              <button type="button" className="fl-close" onClick={() => setSplitEditor(null)} aria-label="Cerrar"><X /></button>
             </header>
             <p className="bible-split-help">Elegí la última palabra de la parte A. La parte B comienza en la palabra siguiente.</p>
             <div className="bible-split-preview">
@@ -860,7 +860,7 @@ export function BibleOperator({
               onClick={() => highlightPhrase(color)}
             />
           ))}
-          <button className="highlight-close" onClick={() => setHighlightSelection(null)}>
+          <button className="fl-close highlight-close" onClick={() => setHighlightSelection(null)}>
             <X size={15} />
           </button>
         </div>

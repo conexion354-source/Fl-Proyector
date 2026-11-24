@@ -55,7 +55,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
           </div>
           <button
             type="button"
-            className="help-dialog-close"
+            className="fl-close help-dialog-close"
             onClick={onClose}
             aria-label="Cerrar ayuda"
           >

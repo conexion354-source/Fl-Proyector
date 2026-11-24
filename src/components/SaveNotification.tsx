@@ -72,7 +72,7 @@ export function SaveNotificationHost() {
         <strong>{notice.kind === "success" ? "Guardado" : "No se pudo guardar"}</strong>
         <span>{notice.message}</span>
       </div>
-      <button aria-label="Cerrar notificación" onClick={() => setNotice(null)}>
+      <button className="fl-close" aria-label="Cerrar notificación" onClick={() => setNotice(null)}>
         <X />
       </button>
     </div>
