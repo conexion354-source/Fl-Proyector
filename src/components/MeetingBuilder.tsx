@@ -13,6 +13,7 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronUp,
+  Copy,
   Edit3,
   GripVertical,
   Image,
@@ -2771,6 +2772,23 @@ function ItemEditor({
   const p = item.payload as any;
   const visual = ["announcement", "bible"].includes(item.type);
   const ItemIcon = itemIcons[item.type];
+  if (item.type === "announcement")
+    return (
+      <AnnouncementStudio
+        item={item}
+        media={media}
+        projectionState={projectionState}
+        previewAspectRatio={previewAspectRatio}
+        setItem={setItem}
+        setPayload={setPayload}
+        onSave={onSave}
+        onDelete={onDelete}
+        onPreview={onPreview}
+        onAnnouncementPage={onAnnouncementPage}
+        onCancel={onCancel}
+        isDraft={isDraft}
+      />
+    );
   return (
     <div className={`item-editor ${visual ? "visual-item-editor pro-editor" : ""}`}>
       <div className="item-editor-controls">
@@ -2836,7 +2854,7 @@ function ItemEditor({
             </select>
           </label>
         )}
-        {item.type === "announcement" && (
+        {(item.type as string) === "announcement" && (
           <section className="pro-section pro-content-section">
             <AnnouncementPagesEditor
               payload={p}
@@ -2858,7 +2876,7 @@ function ItemEditor({
           <DesignControls
             payload={p}
             setPayload={setPayload}
-            showSize={item.type !== "announcement"}
+            showSize={(item.type as string) !== "announcement"}
           />
         )}
         {item.type === "presentation" && (
@@ -3020,7 +3038,9 @@ function RichAnnouncementEditor({
   shadow,
   onShadowChange,
   onChange,
+  compact = false,
 }: {
+  compact?: boolean;
   html: string;
   fontSize: number;
   onFontSize: (value: number) => void;
@@ -3054,8 +3074,8 @@ function RichAnnouncementEditor({
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
   return (
-    <div className="announcement-rich">
-      <h3 className="pro-section-title">Texto del anuncio</h3>
+    <div className={`announcement-rich ${compact ? "is-compact" : ""}`}>
+      {!compact && <h3 className="pro-section-title">Texto del anuncio</h3>}
       <RichTextToolbar
         editor={editor}
         fontSize={fontSize}
@@ -3078,10 +3098,12 @@ function RichAnnouncementEditor({
             : "none",
         }}
       />
-      <small>
-        Seleccioná una palabra o frase para darle formato solo a esa parte. Sin
-        selección, el tamaño y el color se aplican a todo el anuncio.
-      </small>
+      {!compact && (
+        <small>
+          Seleccioná una palabra o frase para darle formato solo a esa parte. Sin
+          selección, el tamaño y el color se aplican a todo el anuncio.
+        </small>
+      )}
     </div>
   );
 }
@@ -3800,5 +3822,262 @@ function StanzaRow({
         <div className="stanza-text" dangerouslySetInnerHTML={{ __html: html }} />
       </span>
     </button>
+  );
+}
+
+/** Diseños listos: combinan ubicación, estilo, colores, tipografía y animación. */
+const announcementPresets: Array<{ id: string; name: string; detail: string; patch: Record<string, unknown> }> = [
+  { id: "bienvenida", name: "Bienvenida", detail: "Vidrio al centro", patch: { position: "center", template: "glass", borderRadius: 14, backgroundColor: "#111827", color: "#ffffff", fontFamily: "Inter", align: "center", animation: "fade", fontSize: 64, shadowEnabled: true } },
+  { id: "titular", name: "Titular", detail: "Texto grande, sin caja", patch: { position: "center", template: "plain", borderRadius: 0, color: "#ffffff", fontFamily: "Bebas Neue", align: "center", animation: "zoom", fontSize: 96, shadowEnabled: true, shadowBlur: 18 } },
+  { id: "evento", name: "Evento", detail: "Degradado violeta", patch: { position: "center", template: "gradient", borderRadius: 10, backgroundColor: "#4c1d95", color: "#ffffff", fontFamily: "Montserrat", align: "center", animation: "zoom", fontSize: 64, shadowEnabled: false } },
+  { id: "elegante", name: "Elegante", detail: "Serif clásico", patch: { position: "center", template: "classic", borderRadius: 4, backgroundColor: "#000000", color: "#f5f0e6", fontFamily: "Georgia", align: "center", animation: "fade", fontSize: 60, shadowEnabled: false } },
+  { id: "acento", name: "Acento", detail: "Caja con barra de color", patch: { position: "center", template: "accent", borderRadius: 6, backgroundColor: "#172554", color: "#ffffff", fontFamily: "Inter", align: "left", animation: "slide-left", fontSize: 58, shadowEnabled: false } },
+  { id: "aviso", name: "Aviso urgente", detail: "Franja roja abajo", patch: { position: "bottom", template: "solid", borderRadius: 0, backgroundColor: "#7f1d1d", color: "#ffffff", fontFamily: "Oswald", align: "center", animation: "slide-up", fontSize: 54, shadowEnabled: false } },
+  { id: "zocalo", name: "Zócalo TV", detail: "Estilo noticiero", patch: { position: "lower", template: "broadcast", borderRadius: 2, backgroundColor: "#172554", color: "#ffffff", fontFamily: "Inter", align: "left", animation: "slide-left", fontSize: 48, shadowEnabled: false } },
+  { id: "lower", name: "Lower third", detail: "Sobrio, abajo a la izquierda", patch: { position: "lower", template: "lower-third", borderRadius: 6, backgroundColor: "#111827", color: "#ffffff", fontFamily: "Raleway", align: "left", animation: "slide-left", fontSize: 46, shadowEnabled: false } },
+  { id: "franja", name: "Franja superior", detail: "Información breve arriba", patch: { position: "top", template: "solid", borderRadius: 0, backgroundColor: "#000000", color: "#ffffff", fontFamily: "Inter", align: "center", animation: "fade", fontSize: 44, shadowEnabled: false } },
+  { id: "cristal", name: "Cristal animado", detail: "Vidrio con brillo", patch: { position: "center", template: "glass-accent", borderRadius: 12, backgroundColor: "#164e63", color: "#ffffff", fontFamily: "Montserrat", align: "center", animation: "zoom", fontSize: 60, shadowEnabled: true } },
+];
+
+/**
+ * Editor de anuncios: partes a la izquierda, lienzo en vivo con el texto
+ * debajo, e inspector con Diseños listos, Estilo y Fondo a la derecha.
+ */
+function AnnouncementStudio({
+  item,
+  media,
+  projectionState,
+  previewAspectRatio,
+  setItem,
+  setPayload,
+  onSave,
+  onDelete,
+  onPreview,
+  onAnnouncementPage,
+  onCancel,
+  isDraft,
+}: {
+  item: MeetingItem;
+  media: MediaItem[];
+  projectionState: ProjectionState;
+  previewAspectRatio: string;
+  setItem: (item: MeetingItem) => void;
+  setPayload: (patch: Record<string, unknown>) => void;
+  onSave: () => void;
+  onDelete: () => void;
+  onPreview: () => void;
+  onAnnouncementPage: (html: string, payload: Record<string, unknown>) => void;
+  onCancel: () => void;
+  isDraft: boolean;
+}) {
+  const p = item.payload as any;
+  const [tab, setTab] = useState<"disenos" | "estilo" | "fondo">("disenos");
+  const pages = announcementPages(p);
+  const current = Math.max(0, Math.min(Number(p.announcementPage || 0), pages.length - 1));
+  const plain = (html: string) => {
+    const holder = document.createElement("div");
+    holder.innerHTML = html.replace(/<br\s*\/?>/gi, " ").replace(/<\/(p|div|h[1-6])>/gi, "$& ");
+    return (holder.textContent || "").replace(/\s+/g, " ").trim();
+  };
+  const commitPages = (nextPages: string[], index: number) => {
+    const safe = nextPages.length ? nextPages : ["<p></p>"];
+    const page = Math.max(0, Math.min(index, safe.length - 1));
+    const next = { ...p, announcementPages: safe, announcementPage: page, html: safe[0] };
+    setPayload({ announcementPages: safe, announcementPage: page, html: safe[0] });
+    onAnnouncementPage(safe[page], next);
+  };
+  const selectPage = (index: number) => commitPages(pages, index);
+  const addPage = () => {
+    const next = [...pages];
+    next.splice(current + 1, 0, "<p></p>");
+    commitPages(next, current + 1);
+  };
+  const duplicatePage = (index: number) => {
+    const next = [...pages];
+    next.splice(index + 1, 0, pages[index]);
+    commitPages(next, index + 1);
+  };
+  const removePage = (index: number) => {
+    if (pages.length <= 1) return;
+    const next = pages.filter((_, position) => position !== index);
+    commitPages(next, Math.min(index, next.length - 1));
+  };
+  const movePage = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= pages.length) return;
+    const next = [...pages];
+    [next[index], next[target]] = [next[target], next[index]];
+    commitPages(next, target);
+  };
+  const changeText = (html: string) => {
+    const next = [...pages];
+    next[current] = html;
+    const payload = { ...p, html: next[0], announcementPages: next, announcementPage: current };
+    setPayload(payload);
+    onAnnouncementPage(next[current], payload);
+  };
+  const applyPreset = (patch: Record<string, unknown>) => {
+    setPayload({ ...patch, designPreset: undefined });
+    onAnnouncementPage(pages[current], { ...p, ...patch });
+  };
+  const activePreset = announcementPresets.find((preset) =>
+    ["position", "template", "backgroundColor", "fontFamily"].every(
+      (key) => String(p[key] ?? "") === String(preset.patch[key] ?? ""),
+    ),
+  )?.id;
+  const sample = plain(pages[current] || "") || "Escribí tu anuncio";
+  const ItemIcon = itemIcons.announcement;
+  return (
+    <div className="ann-studio">
+      <header className="ann-head">
+        <span className="ann-head-icon"><ItemIcon aria-hidden="true" /></span>
+        <label className="ann-name">
+          <small>Anuncio · nombre en el orden del culto</small>
+          <input
+            value={item.title}
+            placeholder="Nombre del anuncio"
+            aria-label="Nombre del anuncio en el orden del culto"
+            onChange={(event) =>
+              setItem({ ...item, title: event.target.value, payload: { ...item.payload, announcementTitleMode: "manual" } })
+            }
+          />
+        </label>
+      </header>
+
+      <div className="ann-body">
+        <aside className="ann-parts" aria-label="Partes del anuncio">
+          <div className="ann-pane-title">
+            <b>Partes</b>
+            <small>{pages.length} {pages.length === 1 ? "pantalla" : "pantallas"}</small>
+          </div>
+          <ol>
+            {pages.map((page, index) => (
+              <li key={index} className={index === current ? "active" : ""}>
+                <button type="button" className="ann-part" onClick={() => selectPage(index)} aria-current={index === current}>
+                  <span className="ann-part-num">{index + 1}</span>
+                  <span className="ann-part-text">{plain(page) || <em>Vacía</em>}</span>
+                </button>
+                <span className="ann-part-actions">
+                  <button type="button" title="Subir" aria-label={`Subir la parte ${index + 1}`} disabled={index === 0} onClick={() => movePage(index, -1)}><ChevronUp /></button>
+                  <button type="button" title="Bajar" aria-label={`Bajar la parte ${index + 1}`} disabled={index === pages.length - 1} onClick={() => movePage(index, 1)}><ChevronDown /></button>
+                  <button type="button" title="Duplicar" aria-label={`Duplicar la parte ${index + 1}`} onClick={() => duplicatePage(index)}><Copy /></button>
+                  <button type="button" title="Eliminar" aria-label={`Eliminar la parte ${index + 1}`} disabled={pages.length <= 1} onClick={() => removePage(index)}><Trash2 /></button>
+                </span>
+              </li>
+            ))}
+          </ol>
+          <button type="button" className="ann-add-part" onClick={addPage}>
+            <Plus aria-hidden="true" /> Agregar parte
+          </button>
+          <p className="ann-hint">Cada parte es una pantalla. En el culto pasás de una a otra con Siguiente.</p>
+        </aside>
+
+        <main className="ann-center">
+          <div className="ann-stage-head">
+            <span><i className="live-dot" /> Parte {current + 1} de {pages.length}</span>
+            <button type="button" className="ann-ghost" onClick={onPreview} title="Ver en la ventana de vista previa, sin enviar al proyector">
+              <MonitorPlay aria-hidden="true" /> Ver en grande
+            </button>
+          </div>
+          <div className="ann-stage" style={{ aspectRatio: previewAspectRatio }}>
+            <ProjectionPreview state={announcementPreviewState("announcement", p, media, projectionState)} />
+          </div>
+          <div className="ann-text">
+            <RichAnnouncementEditor
+              key={`announcement-page-${current}-${pages.length}`}
+              compact
+              html={pages[current]}
+              fontSize={Number(p.fontSize || 64)}
+              onFontSize={(fontSize) => setPayload({ fontSize })}
+              fontFamily={String(p.fontFamily || "Inter")}
+              onFontFamily={(fontFamily) => setPayload({ fontFamily })}
+              onTextColor={(color) => setPayload({ color })}
+              shadow={{
+                enabled: p.shadowEnabled !== false,
+                color: String(p.shadowColor || "#000000"),
+                blur: Number(p.shadowBlur ?? 14),
+              }}
+              onShadowChange={(shadow) =>
+                setPayload({ shadowEnabled: shadow.enabled, shadowColor: shadow.color, shadowBlur: shadow.blur })
+              }
+              onChange={changeText}
+            />
+          </div>
+        </main>
+
+        <aside className="ann-inspector" aria-label="Diseño del anuncio">
+          <div className="ann-tabs" role="tablist">
+            {([
+              ["disenos", "Diseños"],
+              ["estilo", "Estilo"],
+              ["fondo", "Fondo"],
+            ] as const).map(([value, label]) => (
+              <button type="button" role="tab" aria-selected={tab === value} className={tab === value ? "active" : ""} onClick={() => setTab(value)} key={value}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="ann-inspector-body">
+            {tab === "disenos" && (
+              <div className="ann-presets">
+                {announcementPresets.map((preset) => (
+                  <button
+                    type="button"
+                    key={preset.id}
+                    className={`ann-preset ${activePreset === preset.id ? "active" : ""}`}
+                    onClick={() => applyPreset(preset.patch)}
+                    aria-pressed={activePreset === preset.id}
+                  >
+                    <span className="ann-preset-thumb" style={{ aspectRatio: previewAspectRatio }}>
+                      <ProjectionPreview
+                        state={announcementPreviewState(
+                          "announcement",
+                          // En miniatura el texto se agranda para que se lea el diseño.
+                          { ...p, ...preset.patch, animation: "none", fontSize: Math.round(Number(preset.patch.fontSize || 64) * 1.7) },
+                          media,
+                          projectionState,
+                          sample,
+                        )}
+                      />
+                    </span>
+                    <span className="ann-preset-name">
+                      <b>{preset.name}</b>
+                      <small>{preset.detail}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {tab === "estilo" && (
+              <div className="ann-style">
+                <DesignControls payload={p} setPayload={setPayload} showSize={false} />
+              </div>
+            )}
+            {tab === "fondo" && (
+              <div className="ann-background">
+                <BackgroundChoice
+                  media={media}
+                  backgroundId={p.backgroundId}
+                  onChange={(backgroundId) => setPayload({ backgroundId })}
+                />
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
+
+      <footer className="ann-foot">
+        {!isDraft && (
+          <button type="button" className="ann-danger" onClick={onDelete}>
+            <Trash2 aria-hidden="true" /> Eliminar
+          </button>
+        )}
+        <span className="ann-foot-note">{isDraft ? "Se agrega a la reunión al guardar." : "Si está en el aire, los cambios se ven al instante."}</span>
+        <button type="button" className="ann-button" onClick={onCancel}>Cancelar</button>
+        <button type="button" className="ann-button ann-primary" onClick={onSave}>
+          <Save aria-hidden="true" /> {isDraft ? "Agregar a la reunión" : "Guardar"}
+        </button>
+      </footer>
+    </div>
   );
 }

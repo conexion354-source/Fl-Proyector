@@ -60,6 +60,19 @@ export function RichTextToolbar({
     null,
   );
   const [sizeInput, setSizeInput] = useState(String(fontSize ?? 64));
+  // Negrita/cursiva marcadas según el texto seleccionado: antes el botón no
+  // se actualizaba al mover el cursor porque la barra no se redibujaba.
+  const [, refresh] = useState(0);
+  useEffect(() => {
+    if (!editor) return;
+    const update = () => refresh((value) => value + 1);
+    editor.on("selectionUpdate", update);
+    editor.on("transaction", update);
+    return () => {
+      editor.off("selectionUpdate", update);
+      editor.off("transaction", update);
+    };
+  }, [editor]);
   useEffect(() => {
     if (fontSize !== undefined) setSizeInput(String(fontSize));
   }, [fontSize]);

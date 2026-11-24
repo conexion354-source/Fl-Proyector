@@ -2120,3 +2120,79 @@ html[data-theme="dark"] #root .ste-warnings li { color: #fcd34d; }
 html .app-shell .workspace { min-height: 0; }
 html .app-shell .sidebar { height: auto !important; max-height: none !important; align-self: stretch !important; display: flex !important; flex-direction: column; }
 html .app-shell .sidebar > .sidebar-bottom { margin-top: auto !important; }
+
+/* ---------- Editor de anuncios (estudio) ---------- */
+#root .app-shell .item-edit-dialog.announcement-visual-dialog { width: min(1480px, calc(100vw - 32px)) !important; max-width: none !important; height: min(900px, calc(100vh - 32px)) !important; max-height: none !important; padding: 0 !important; overflow: hidden !important; display: flex !important; flex-direction: column; }
+#root .ann-studio { display: flex; height: 100%; min-height: 0; flex: 1; flex-direction: column; color: var(--fl-text); font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+#root .ann-head { display: flex; align-items: center; gap: 12px; padding: 14px 60px 12px 20px; border-bottom: 1px solid var(--fl-border); background: var(--fl-surface); }
+#root .ann-head-icon { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; color: var(--fl-accent); border-radius: 6px; background: var(--fl-control-fill); }
+#root .ann-head-icon svg { width: 18px; height: 18px; }
+#root .ann-name { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+#root .ann-name small { color: var(--fl-muted); font-size: 12px; }
+#root .ann-name input { max-width: 560px; height: 32px; padding: 0 6px !important; color: var(--fl-text); border: 1px solid transparent !important; border-radius: 4px !important; background: transparent !important; box-shadow: none !important; font: 600 20px "Segoe UI Variable Display", "Segoe UI", sans-serif; }
+#root .ann-name input:hover, #root .ann-name input:focus { border-color: var(--fl-control-stroke) !important; background: var(--fl-control-fill) !important; outline: none; }
+#root .ann-body { display: grid; min-height: 0; flex: 1; grid-template-columns: 220px minmax(0, 1fr) 320px; }
+#root .ann-parts, #root .ann-inspector { display: flex; min-height: 0; flex-direction: column; background: var(--fl-surface); }
+#root .ann-parts { gap: 8px; padding: 14px 10px; border-right: 1px solid var(--fl-border); overflow-y: auto; }
+#root .ann-pane-title { display: flex; align-items: baseline; justify-content: space-between; padding: 0 4px; }
+#root .ann-pane-title b { font-size: 13px; font-weight: 600; }
+#root .ann-pane-title small { color: var(--fl-muted); font-size: 12px; }
+#root .ann-parts ol { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+#root .ann-parts li { position: relative; border: 1px solid var(--fl-border); border-radius: 6px; background: var(--fl-control-fill); }
+#root .ann-parts li.active { border-color: var(--fl-accent); box-shadow: inset 0 0 0 1px var(--fl-accent); }
+#root .ann-part { display: flex; width: 100%; align-items: flex-start; gap: 8px; padding: 8px 8px 30px !important; color: var(--fl-text) !important; border: 0 !important; background: transparent !important; box-shadow: none !important; text-align: left; cursor: pointer; }
+#root .ann-part-num { display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; color: var(--fl-muted); border-radius: 4px; background: var(--fl-surface); font-size: 11px; font-weight: 700; }
+#root li.active .ann-part-num { color: var(--fl-on-accent); background: var(--fl-accent); }
+#root .ann-part-text { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font-size: 12px; line-height: 1.4; }
+#root .ann-part-text em { color: var(--fl-muted); }
+#root .ann-part-actions { position: absolute; right: 4px; bottom: 4px; display: flex; gap: 2px; opacity: 0.55; }
+#root .ann-parts li:hover .ann-part-actions, #root .ann-parts li.active .ann-part-actions { opacity: 1; }
+#root .ann-part-actions button { display: grid; width: 22px; height: 22px; place-items: center; padding: 0 !important; color: var(--fl-muted) !important; border: 0 !important; border-radius: 3px !important; background: transparent !important; box-shadow: none !important; cursor: pointer; }
+#root .ann-part-actions button:hover:not(:disabled) { color: var(--fl-text) !important; background: var(--fl-subtle-hover) !important; }
+#root .ann-part-actions button:disabled { opacity: 0.3; cursor: default; }
+#root .ann-part-actions svg { width: 13px; height: 13px; }
+#root .ann-add-part { display: inline-flex; height: 32px; align-items: center; justify-content: center; gap: 6px; padding: 0 10px !important; color: var(--fl-text) !important; border: 1px dashed var(--fl-control-stroke) !important; border-radius: 6px !important; background: transparent !important; box-shadow: none !important; font-size: 13px !important; cursor: pointer; }
+#root .ann-add-part:hover { background: var(--fl-subtle-hover) !important; }
+#root .ann-add-part svg { width: 15px; height: 15px; }
+#root .ann-hint { margin: 4px 4px 0; color: var(--fl-muted); font-size: 11px; line-height: 1.4; }
+#root .ann-center { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 10px; padding: 14px 18px; overflow-y: auto; background: var(--fl-bg, var(--fl-sidebar)); }
+#root .ann-stage-head { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; }
+#root .ann-stage-head .live-dot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #e81123; }
+#root .ann-ghost { display: inline-flex; height: 28px; align-items: center; gap: 6px; padding: 0 10px !important; color: var(--fl-text) !important; border: 1px solid var(--fl-control-stroke) !important; border-radius: 4px !important; background: var(--fl-control-fill) !important; box-shadow: none !important; font-size: 12px !important; font-weight: 400 !important; cursor: pointer; }
+#root .ann-ghost svg { width: 14px; height: 14px; }
+#root .ann-stage { position: relative; width: 100%; max-height: 52vh; margin: 0 auto; overflow: hidden; border: 1px solid var(--fl-border); border-radius: 6px; background: #000; }
+#root .ann-stage > * { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; }
+#root .ann-text .announcement-rich.is-compact { display: flex; flex-direction: column; gap: 6px; }
+#root .ann-text .announcement-editor { min-height: 110px; max-height: 220px; overflow-y: auto; }
+#root .ann-inspector { border-left: 1px solid var(--fl-border); }
+#root .ann-tabs { display: flex; gap: 2px; margin: 12px 12px 0; padding: 2px; border: 1px solid var(--fl-control-stroke); border-radius: 5px; background: var(--fl-control-fill); }
+#root .ann-tabs button { height: 28px; flex: 1; padding: 0 !important; color: var(--fl-muted) !important; border: 0 !important; border-radius: 3px !important; background: transparent !important; box-shadow: none !important; font-size: 13px !important; font-weight: 400 !important; cursor: pointer; }
+#root .ann-tabs button.active { color: var(--fl-text) !important; background: var(--fl-surface) !important; box-shadow: 0 0 0 1px var(--fl-control-stroke) !important; font-weight: 600 !important; }
+#root .ann-inspector-body { min-height: 0; flex: 1; overflow-y: auto; padding: 12px; }
+#root .ann-presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+#root .ann-preset { display: flex; min-width: 0; flex-direction: column; gap: 6px; padding: 5px !important; color: var(--fl-text) !important; border: 1px solid var(--fl-border) !important; border-radius: 6px !important; background: var(--fl-control-fill) !important; box-shadow: none !important; text-align: left; cursor: pointer; }
+#root .ann-preset:hover { border-color: var(--fl-control-stroke) !important; }
+#root .ann-preset.active { border-color: var(--fl-accent) !important; box-shadow: inset 0 0 0 1px var(--fl-accent) !important; }
+#root .ann-preset-thumb { position: relative; display: block; width: 100%; overflow: hidden; border-radius: 4px; background: #000; pointer-events: none; }
+#root .ann-preset-thumb > * { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; }
+#root .ann-preset-name { display: flex; flex-direction: column; padding: 0 2px 2px; }
+#root .ann-preset-name b { font-size: 12px; font-weight: 600; }
+#root .ann-preset-name small { overflow: hidden; color: var(--fl-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+#root .ann-style .pro-section { padding: 0 0 14px !important; border: 0 !important; }
+#root .ann-style .pro-choice-grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+#root .ann-style .announcement-design-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+#root .ann-style .pro-section-row { display: flex !important; flex-direction: column; gap: 14px; }
+#root .ann-background .background-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+#root .ann-foot { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--fl-border); background: var(--fl-surface); }
+#root .ann-foot-note { flex: 1; color: var(--fl-muted); font-size: 12px; }
+#root .ann-button, #root .ann-danger { display: inline-flex; height: 32px; align-items: center; gap: 6px; padding: 0 16px !important; color: var(--fl-text) !important; border: 1px solid var(--fl-control-stroke) !important; border-radius: 4px !important; background: var(--fl-control-fill) !important; box-shadow: none !important; font-size: 13px !important; font-weight: 400 !important; cursor: pointer; }
+#root .ann-button svg, #root .ann-danger svg { width: 15px; height: 15px; }
+#root .ann-danger { color: var(--fl-danger, #c42b1c) !important; }
+#root .ann-primary { color: var(--fl-on-accent) !important; border-color: transparent !important; background: var(--fl-accent) !important; font-weight: 600 !important; }
+@media (max-width: 1100px) { #root .ann-body { grid-template-columns: 180px minmax(0, 1fr) 270px; } #root .ann-presets { grid-template-columns: 1fr; } }
+#root .ann-background .background-choice { display: flex; flex-direction: column; gap: 10px; }
+#root .ann-background .field-label { color: var(--fl-text); font-size: 13px !important; font-weight: 600; }
+#root .ann-background .background-gallery { display: grid !important; gap: 8px !important; }
+#root .ann-background .background-gallery button { display: flex; flex-direction: column; gap: 4px; padding: 4px !important; border-radius: 6px !important; }
+#root .ann-background .background-gallery button strong { overflow: hidden; font-size: 12px !important; font-weight: 400 !important; text-overflow: ellipsis; white-space: nowrap; }
+#root .ann-background .background-choice > p { margin: 0; color: var(--fl-muted); font-size: 12px !important; line-height: 1.45; }
