@@ -2037,3 +2037,6 @@ html[data-theme="dark"] #root .ste-warnings li { color: #fcd34d; }
 #root .app-shell .fl-close svg { width: 16px !important; height: 16px !important; stroke-width: 1.75 !important; }
 /* En los diálogos va siempre en la esquina superior derecha, a la misma distancia. */
 #root .app-shell :is(.dialog-close, .win11-settings-close, .help-dialog-close).fl-close { position: absolute !important; top: 12px !important; right: 12px !important; left: auto !important; z-index: 5; }
+
+/* Lo que está proyectándose se marca solo con el borde rojo (sin etiqueta "Al aire") */
+#root .app-shell .media-card.selected { border-color: #c42b1c !important; box-shadow: 0 0 0 1px #c42b1c !important; }

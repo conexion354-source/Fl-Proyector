@@ -327,7 +327,6 @@ export function MediaLibrary({ state, update }: Props) {
                   }}
                 />
               )}
-              <div className="playing-indicator">Al aire</div>
             </div>
             <div className="media-meta">
               <div>

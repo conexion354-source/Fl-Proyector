@@ -1626,7 +1626,6 @@ export function MeetingBuilder({
                   <strong>{displayItemTitle(item)}</strong>
                   <span>{itemLabels[item.type]}</span>
                 </div>
-                {itemOnAir && <em className="rundown-on-air">Al aire</em>}
               </article>
             );
           })}
@@ -2253,7 +2252,6 @@ function ItemSummary({
           <small>{itemLabels[item.type]}</small>
           <h3 title={displayItemTitle(item)}>{displayItemTitle(item)}</h3>
         </div>
-        {isOnAir && <strong className="summary-on-air">Al aire</strong>}
       </div>
       {song ? (
         <>
@@ -3782,9 +3780,7 @@ function StanzaRow({
       <span className="stanza-body">
         <span className="stanza-head">
           <span className="stanza-tag">{tag}</span>
-          {live ? (
-            <em className="stanza-state is-live">Al aire</em>
-          ) : next ? (
+          {live ? null : next ? (
             <em className="stanza-state is-next">Siguiente</em>
           ) : active ? (
             <em className="stanza-state">Seleccionada</em>
