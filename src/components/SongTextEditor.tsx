@@ -516,7 +516,7 @@ export function SongTextEditor({
             <input value={draft.copyright} onChange={(event) => set({ copyright: event.target.value })} />
           </label>
           <label>
-            <span>Máximo de renglones por diapositiva</span>
+            <span title="Máximo de renglones por diapositiva">Renglones por diapositiva</span>
             <select value={draft.maxLines} onChange={(event) => set({ maxLines: Number(event.target.value) })}>
               <option value={0}>Sin límite</option>
               {[2, 3, 4, 5, 6, 8].map((value) => (
