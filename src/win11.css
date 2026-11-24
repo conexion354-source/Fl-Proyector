@@ -2114,3 +2114,9 @@ html[data-theme="dark"] #root .ste-warnings li { color: #fcd34d; }
 #root .app-shell .ui-scale-value { min-width: 58px !important; color: var(--fl-muted) !important; font-variant-numeric: tabular-nums; }
 #root .ui-scale-toast { position: fixed; top: 64px; left: 50%; z-index: 2000; padding: 8px 14px; color: var(--fl-text); border: 1px solid var(--fl-border); border-radius: 6px; background: var(--fl-surface); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); font-size: 13px; transform: translateX(-50%); pointer-events: none; }
 @media (max-width: 1100px) { #root .app-shell .topbar-search span { display: none; } #root .app-shell .topbar-search { width: auto; } }
+
+/* Menú lateral: ocupa siempre todo el alto, así "Ayuda" queda abajo en
+   cualquier resolución y tamaño de interfaz. */
+html .app-shell .workspace { min-height: 0; }
+html .app-shell .sidebar { height: auto !important; max-height: none !important; align-self: stretch !important; display: flex !important; flex-direction: column; }
+html .app-shell .sidebar > .sidebar-bottom { margin-top: auto !important; }

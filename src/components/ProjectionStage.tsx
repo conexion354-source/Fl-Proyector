@@ -767,7 +767,11 @@ function PresentationLayer({
           navigationTimer.current = window.setTimeout(enterPresentation, 100);
           return;
         }
-        handle.setMode("present");
+        // Al entrar a presentación se descartan avances pedidos antes de
+        // que el visor estuviera listo (si no, saltaba la primera animación).
+        seenNavigationId.current = Number(presentation.navigationId || 0);
+        if (typeof (handle as { setMode?: unknown }).setMode === "function") handle.setMode("present");
+        else console.warn("El visor de PowerPoint no permite el modo presentación; se navega igual con las flechas.");
         // Do not call goTo here: it jumps straight to the final canvas of a
         // slide and bypasses its opening animation groups. Entering present
         // mode starts at the first slide and lets its own timeline seed it.
@@ -788,7 +792,9 @@ function PresentationLayer({
     const navigationId = Number(presentation.navigationId || 0);
     if (!content || !presentation.visible || navigationId <= seenNavigationId.current)
       return;
-    if (viewerMode !== "present") return;
+    // Aunque el visor no haya entrado al modo presentación (por ejemplo en
+    // Mac sin pantalla completa), Siguiente/Anterior siguen cambiando de
+    // diapositiva: antes el pedido se ignoraba y la presentación no avanzaba.
     seenNavigationId.current = navigationId;
     // The viewer's own presentation handler advances pending animation builds
     // first. It moves to the next slide only after the last build, matching
@@ -800,7 +806,7 @@ function PresentationLayer({
         cancelable: true,
       }),
     );
-  }, [content, presentation.navigationDirection, presentation.navigationId, presentation.visible, viewerMode]);
+  }, [content, presentation.navigationDirection, presentation.navigationId, presentation.visible]);
 
   if (!presentation.visible)
     return <div className="presentation-layer layer-hidden" />;

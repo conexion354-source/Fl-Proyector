@@ -776,8 +776,12 @@ function startNativePowerPoint(presentation: ProjectionState["presentation"]) {
     onSlide: (slideNumber) => {
       if (nativeShow?.controller !== controller) return;
       nativeShow.slide = slideNumber;
-      if (state.presentation.slideIndex !== slideNumber - 1)
-        mergeState({ presentation: { slideIndex: slideNumber - 1 } });
+      // Después de la última diapositiva PowerPoint muestra la pantalla
+      // negra final (posición = total + 1): el operador sigue en la última.
+      const total = state.presentation.slideCount || slideNumber;
+      const index = Math.max(0, Math.min(total, slideNumber) - 1);
+      if (state.presentation.slideIndex !== index)
+        mergeState({ presentation: { slideIndex: index } });
     },
     onEnded: (reason, message) => {
       if (nativeShow?.controller !== controller) return;
@@ -1662,6 +1666,9 @@ async function transcodeVideoToMp4(source: string, destination: string) {
         "fast",
         "-crf",
         "20",
+        // libx264 con yuv420p exige ancho y alto pares (algunos celulares no).
+        "-vf",
+        "scale=trunc(iw/2)*2:trunc(ih/2)*2",
         "-pix_fmt",
         "yuv420p",
         "-c:a",
@@ -1699,15 +1706,25 @@ const meetingMediaFromPayload = (payload: Record<string, unknown>) => {
 
 async function importMeetingMediaFile(source: string): Promise<MediaItem> {
   const extension = extname(source).toLowerCase();
-  const convert =
-    needsMeetingMediaConversion(extension) ||
-    ([".mp4", ".webm"].includes(extension) && (await modernVideoNeedsConversion(source)));
-  const filename = convert
-    ? `${Date.now()}-${basename(source, extension)}.mp4`
-    : `${Date.now()}-${basename(source)}`;
-  const destination = join(meetingMediaDir, filename);
+  const required = needsMeetingMediaConversion(extension);
+  const optional =
+    !required && [".mp4", ".webm"].includes(extension) && (await modernVideoNeedsConversion(source));
+  let convert = required || optional;
+  let destination = join(
+    meetingMediaDir,
+    convert ? `${Date.now()}-${basename(source, extension)}.mp4` : `${Date.now()}-${basename(source)}`,
+  );
   if (convert) {
-    await transcodeVideoToMp4(source, destination);
+    try {
+      await transcodeVideoToMp4(source, destination);
+    } catch (error) {
+      if (!optional) throw error;
+      // MP4/WebM: si la conversión falla, se usa el original como antes.
+      console.warn("No se pudo convertir el video; se usa el original", error);
+      convert = false;
+      destination = join(meetingMediaDir, `${Date.now()}-${basename(source)}`);
+      await copyFile(source, destination);
+    }
   } else {
     await copyFile(source, destination);
   }
@@ -2021,13 +2038,20 @@ async function syncMedia() {
 
 async function importMediaFile(source: string) {
   const extension = extname(source).toLowerCase();
-  if (
-    needsVideoConversion(extension) ||
-    ([".mp4", ".webm"].includes(extension) && (await modernVideoNeedsConversion(source)))
-  ) {
+  if (needsVideoConversion(extension)) {
     const destination = join(mediaDir, `${basename(source, extension)}-compatible.mp4`);
     await transcodeVideoToMp4(source, destination);
     return destination;
+  }
+  if ([".mp4", ".webm"].includes(extension) && (await modernVideoNeedsConversion(source))) {
+    const destination = join(mediaDir, `${basename(source, extension)}-compatible.mp4`);
+    try {
+      await transcodeVideoToMp4(source, destination);
+      return destination;
+    } catch (error) {
+      // Si la conversión falla, se importa el original como antes.
+      console.warn("No se pudo convertir el video; se usa el original", error);
+    }
   }
   const destination = join(mediaDir, basename(source));
   if (source !== destination) await copyFile(source, destination);
