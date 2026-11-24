@@ -1,6 +1,6 @@
 {
   "name": "fl-proyector",
-  "version": "10.12.5",
+  "version": "10.12.6",
   "description": "Software de proyeccion profesional para iglesias",
   "repository": {
     "type": "git",
@@ -109,7 +109,8 @@
         "dmg",
         "zip"
       ],
-      "category": "public.app-category.video"
+      "category": "public.app-category.video",
+      "artifactName": "Fl-Proyector-${version}-${arch}-mac.${ext}"
     },
     "win": {
       "icon": "assets/fl-proyector.ico",

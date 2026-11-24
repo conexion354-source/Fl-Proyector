@@ -13,12 +13,12 @@ import {
 } from "electron";
 import { join, basename, extname } from "node:path";
 import { pathToFileURL } from "node:url";
-import { mkdir, readdir, copyFile, readFile, rename, rm } from "node:fs/promises";
+import { mkdir, readdir, copyFile, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { createWriteStream, createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { networkInterfaces } from "node:os";
+import { networkInterfaces, tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import chokidar from "chokidar";
@@ -575,6 +575,113 @@ async function configureAutoUpdater() {
   // useful for local release testing but is not required in production.
   if (repository) autoUpdater.setFeedURL({ provider: "github", ...repository });
   updaterConfigured = true;
+  return true;
+}
+
+/**
+ * Actualización en Mac. La app se firma "ad-hoc" (sin certificado de Apple)
+ * y el actualizador estándar (Squirrel.Mac) exige que la versión nueva tenga
+ * la misma firma que la instalada: con firmas ad-hoc eso nunca se cumple y la
+ * actualización fallaba. Acá se descarga el ZIP publicado, se descomprime con
+ * ditto y, al instalar, un script reemplaza la app y la vuelve a abrir.
+ */
+let macDownloadedApp: string | null = null;
+
+async function macUpdateZipUrl(version: string) {
+  const repository = await githubUpdateRepository();
+  if (!repository) throw new Error("Falta el repositorio de actualizaciones.");
+  const base = `https://github.com/${repository.owner}/${repository.repo}/releases/download/v${version}`;
+  const response = await net.fetch(`${base}/latest-mac.yml`);
+  if (!response.ok) throw new Error(`No se encontró la información de la versión ${version} para Mac.`);
+  const yml = await response.text();
+  const urls = [...yml.matchAll(/url:\s*(.+?-mac\.zip)\s*$/gm)].map((match) => match[1].trim());
+  const arch = process.arch === "arm64" ? "arm64" : "x64";
+  const chosen =
+    urls.find((url) => url.includes(arch)) ??
+    (arch === "arm64" ? urls.find((url) => !url.includes("x64")) : urls.find((url) => !url.includes("arm64")));
+  if (!chosen)
+    throw new Error(
+      arch === "x64"
+        ? "Esta versión se publicó solo para Mac con Apple Silicon (M1 o posterior)."
+        : "La versión publicada no incluye el archivo para Mac.",
+    );
+  return `${base}/${chosen.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+async function downloadMacUpdate(version: string) {
+  const url = await macUpdateZipUrl(version);
+  const folder = join(tmpdir(), `fl-proyector-update-${version}`);
+  await rm(folder, { recursive: true, force: true });
+  await mkdir(folder, { recursive: true });
+  const zipPath = join(folder, "update.zip");
+  // Versiones anteriores se publicaron con un espacio en el nombre, que
+  // GitHub reemplaza por un punto ("Fl.Proyector-…"): se prueban ambas.
+  let response = await net.fetch(url);
+  if (response.status === 404) response = await net.fetch(url.replace(/Fl-Proyector-/, "Fl.Proyector-"));
+  if (!response.ok || !response.body) throw new Error(`No se pudo descargar (${response.status}).`);
+  const total = Number(response.headers.get("content-length") || 0);
+  let received = 0;
+  const reader = response.body.getReader();
+  const output = createWriteStream(zipPath);
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (!output.write(value)) await new Promise((resolve) => output.once("drain", resolve));
+      if (total)
+        publishUpdateStatus({
+          state: "downloading",
+          progress: Math.max(0, Math.min(99, Math.round((received / total) * 100))),
+          message: "Descargando la actualización…",
+        });
+    }
+  } finally {
+    await new Promise<void>((resolve) => output.end(() => resolve()));
+  }
+  const extracted = join(folder, "app");
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn("/usr/bin/ditto", ["-x", "-k", zipPath, extracted]);
+    child.once("error", reject);
+    child.once("close", (code) => (code === 0 ? resolve() : reject(new Error(`No se pudo descomprimir (código ${code}).`))));
+  });
+  const bundle = (await readdir(extracted)).find((name) => name.endsWith(".app"));
+  if (!bundle) throw new Error("La descarga no contiene la aplicación.");
+  macDownloadedApp = join(extracted, bundle);
+  publishUpdateStatus({
+    state: "downloaded",
+    availableVersion: version,
+    progress: 100,
+    message: "La actualización está descargada. Instalála para terminar.",
+  });
+}
+
+async function installMacUpdate() {
+  if (!macDownloadedApp) return false;
+  // .../Fl Proyector.app/Contents/MacOS/Fl Proyector → .../Fl Proyector.app
+  const target = join(app.getPath("exe"), "..", "..", "..");
+  if (!target.endsWith(".app")) throw new Error("No se encontró la aplicación instalada.");
+  const script = join(tmpdir(), "fl-proyector-install.sh");
+  await writeFile(
+    script,
+    `#!/bin/bash
+PID=${process.pid}
+TARGET=${JSON.stringify(target)}
+NEW=${JSON.stringify(macDownloadedApp)}
+while kill -0 "$PID" 2>/dev/null; do sleep 0.3; done
+rm -rf "$TARGET.old"
+if mv "$TARGET" "$TARGET.old" && /usr/bin/ditto "$NEW" "$TARGET"; then
+  rm -rf "$TARGET.old"
+else
+  rm -rf "$TARGET"; mv "$TARGET.old" "$TARGET"
+fi
+/usr/bin/xattr -dr com.apple.quarantine "$TARGET" 2>/dev/null
+/usr/bin/open "$TARGET"
+`,
+    { mode: 0o755 },
+  );
+  spawn("/bin/bash", [script], { detached: true, stdio: "ignore" }).unref();
+  setImmediate(() => app.quit());
   return true;
 }
 
@@ -2479,7 +2586,8 @@ if (hasSingleInstanceLock)
         message: "Preparando la descarga…",
       });
       try {
-        await autoUpdater.downloadUpdate();
+        if (process.platform === "darwin") await downloadMacUpdate(String(updateStatus.availableVersion));
+        else await autoUpdater.downloadUpdate();
       } catch (error) {
         publishUpdateStatus({
           state: "error",
@@ -2489,8 +2597,20 @@ if (hasSingleInstanceLock)
       }
       return updateStatus;
     });
-    ipcMain.handle("updates:install", () => {
+    ipcMain.handle("updates:install", async () => {
       if (updateStatus.state !== "downloaded") return false;
+      if (process.platform === "darwin") {
+        try {
+          return await installMacUpdate();
+        } catch (error) {
+          publishUpdateStatus({
+            state: "error",
+            progress: null,
+            message: `No se pudo instalar: ${error instanceof Error ? error.message : String(error)}`,
+          });
+          return false;
+        }
+      }
       setImmediate(() => autoUpdater.quitAndInstall(false, true));
       return true;
     });
