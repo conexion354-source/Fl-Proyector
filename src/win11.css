@@ -1865,3 +1865,4 @@ html[data-theme="dark"] #root .app-shell .song-editor.is-reading .song-rich-edit
 html[data-theme="dark"] #root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > p:is([data-song-section-type="prechorus"], [data-song-section-type="bridge"])::before { color: #fcd34d; background: rgba(251, 191, 36, 0.14); }
 #root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > :is(hr, p:not([data-song-section-label])) { display: none; }
 #root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > p[data-song-section-label] { text-shadow: none; }
+#root .app-shell .song-editor.is-reading .song-rich-editor .tiptap > p[data-song-section-label] { font-size: calc(16px * var(--song-editor-stanza-scale, 1)) !important; line-height: 1.45; }
