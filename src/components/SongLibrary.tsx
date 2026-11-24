@@ -48,6 +48,7 @@ import {
   withoutLegacyEditorPrompt,
 } from "../editorPlaceholders";
 import { NewSongDialog } from "./NewSongDialog";
+import { SongTextEditor } from "./SongTextEditor";
 import { onCommand } from "../commandBus";
 
 const songColors = [
@@ -196,6 +197,13 @@ export function SongLibrary({
   } | null>(null);
   const [renamingSong, setRenamingSong] = useState<Song | null>(null);
   const [newSongDialog, setNewSongDialog] = useState(false);
+  // Editor de texto (marcas de sección) o editor con formato.
+  const [editorMode, setEditorMode] = useState<"text" | "rich">(() =>
+    localStorage.getItem("fl-song-editor-mode") === "rich" ? "rich" : "text",
+  );
+  useEffect(() => {
+    localStorage.setItem("fl-song-editor-mode", editorMode);
+  }, [editorMode]);
   const [newCategoryDialog, setNewCategoryDialog] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [assignNewCategory, setAssignNewCategory] = useState(false);
@@ -625,7 +633,7 @@ export function SongLibrary({
   return (
     <section
       ref={songsPageRef}
-      className="songs-page"
+      className={`songs-page ${editing && editorMode === "text" ? "is-text-editing" : ""}`}
       style={
         {
           "--song-list-width": `${songListWidth}px`,
@@ -743,6 +751,31 @@ export function SongLibrary({
           )
         }
       />
+      {editing && editorMode === "text" ? (
+        <div className="song-editor is-text-editing">
+          <SongTextEditor
+            key={selected.id ?? "new"}
+            song={selected}
+            categories={categories}
+            onCancel={cancelEdit}
+            onRichMode={() => {
+              editor?.commands.setContent(withoutLegacyEditorPrompt(selected.content || emptyRichText, "song"));
+              setEditorMode("rich");
+            }}
+            onSave={async (song) => {
+              await withSaveNotification(async () => {
+                const id = await window.flProyector.saveSong(song);
+                const saved = (await window.flProyector.listSongs()).find((value) => value.id === id);
+                reload();
+                if (saved) {
+                  setSelected(saved);
+                  editor?.commands.setContent(withoutLegacyEditorPrompt(saved.content, "song"));
+                }
+              }, "La canción fue guardada.");
+            }}
+          />
+        </div>
+      ) : (
       <div className={`song-editor ${editing ? "is-editing" : "is-reading"}`}>
         {!selected.id && !editing ? (
           <SongHome
@@ -913,6 +946,9 @@ export function SongLibrary({
           </button>
           {editing ? (
             <>
+              <button className="secondary" onClick={() => setEditorMode("text")} title="Volver al editor de letra con marcas de sección">
+                Editor de texto
+              </button>
               <button className="secondary" onClick={cancelEdit}>
                 <X size={16} />
                 Cancelar
@@ -944,6 +980,7 @@ export function SongLibrary({
         </>
         )}
       </div>
+      )}
       {newMeeting && (
         <div className="modal-backdrop">
           <form

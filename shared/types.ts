@@ -63,6 +63,16 @@ export type Song = {
   shadowEnabled: boolean;
   shadowColor: string;
   shadowBlur: number;
+  /** Letra en texto con marcas [Estrofa 1]… (editor de texto). */
+  lyrics?: string;
+  /** Orden de presentación: nombres de sección, se pueden repetir. */
+  arrangement?: string[];
+  /** Máximo de renglones por diapositiva (0 = sin límite). */
+  maxLines?: number;
+  author?: string;
+  songKey?: string;
+  tags?: string;
+  copyright?: string;
   createdAt: string;
   updatedAt: string;
 };

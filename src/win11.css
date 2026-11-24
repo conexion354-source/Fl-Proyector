@@ -1906,3 +1906,98 @@ html[data-theme="dark"] #root .app-shell .song-editor.is-reading .song-rich-edit
 #root .app-shell .rundown-list article strong { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #root .command-input input:focus, #root .command-input input:focus-visible { outline: none !important; border: 0 !important; box-shadow: none !important; }
 #root .command-input:focus-within { box-shadow: inset 0 -2px 0 var(--fl-accent); }
+
+/* ---------- Editor de canciones (texto con marcas) ---------- */
+#root .app-shell .songs-page.is-text-editing { grid-template-columns: 0 0 minmax(0, 1fr) !important; }
+#root .app-shell .songs-page.is-text-editing > :is(.song-browser, .column-resizer) { overflow: hidden; visibility: hidden; }
+#root .app-shell .song-editor.is-text-editing { padding: 0 !important; overflow: hidden; }
+#root .ste { display: flex; height: 100%; min-height: 0; flex-direction: column; container: ste / inline-size; color: var(--fl-text); }
+#root .ste-header { display: flex; align-items: center; gap: 6px; padding: 12px 14px 6px; background: var(--fl-surface); }
+#root .ste-header .ste-title { flex: 1 1 auto; max-width: none; }
+#root .ste-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 4px 10px 8px; border-bottom: 1px solid var(--fl-border); background: var(--fl-surface); }
+#root :is(.ste-toolbar, .ste-header) button { display: inline-flex; height: 30px; align-items: center; gap: 6px; padding: 0 10px !important; color: var(--fl-text) !important; border: 1px solid transparent !important; border-radius: 4px !important; background: transparent !important; box-shadow: none !important; font-size: 13px !important; font-weight: 400 !important; white-space: nowrap; cursor: pointer; }
+#root :is(.ste-toolbar, .ste-header) button:hover:not(:disabled) { border-color: var(--fl-control-stroke) !important; background: var(--fl-control-fill) !important; }
+#root :is(.ste-toolbar, .ste-header) button svg { width: 15px; height: 15px; }
+#root .ste-header .ste-primary { color: var(--fl-on-accent) !important; background: var(--fl-accent) !important; font-weight: 600 !important; }
+#root .ste-header .ste-primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--fl-accent) !important; }
+#root .ste-header .ste-link { color: var(--fl-accent-text, var(--fl-accent)) !important; }
+#root .ste-title { min-width: 160px; flex: 0 1 260px; height: 32px; padding: 0 8px !important; color: var(--fl-text); border: 1px solid transparent !important; border-radius: 4px !important; background: transparent !important; box-shadow: none !important; font: 600 17px "Segoe UI Variable Display", "Segoe UI", sans-serif; }
+#root .ste-title:hover, #root .ste-title:focus { border-color: var(--fl-control-stroke) !important; background: var(--fl-control-fill) !important; outline: none; }
+#root .ste-sep { width: 1px; height: 20px; margin: 0 4px; background: var(--fl-border); }
+#root .ste-grow { flex: 1; }
+#root .ste-toolbar .ste-section { padding: 0 7px !important; font-family: "Cascadia Mono", Consolas, monospace !important; font-size: 12px !important; }
+#root .ste-tone-chorus { color: #7c3aed !important; }
+#root .ste-tone-bridge, #root .ste-tone-prechorus { color: #b45309 !important; }
+#root .ste-tone-verse { color: #0f766e !important; }
+html[data-theme="dark"] #root .ste-tone-chorus { color: #c4b5fd !important; }
+html[data-theme="dark"] #root .ste-tone-bridge, html[data-theme="dark"] #root .ste-tone-prechorus { color: #fcd34d !important; }
+html[data-theme="dark"] #root .ste-tone-verse { color: #5eead4 !important; }
+#root .ste-notice { display: flex; align-items: center; gap: 8px; margin: 10px 14px 0; padding: 8px 12px; color: var(--fl-text); border: 1px solid #c4790033; border-radius: 6px; background: #f59e0b1f; font-size: 12px; }
+#root .ste-notice svg { width: 16px; height: 16px; flex: 0 0 16px; color: #d97706; }
+#root .ste-columns { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr) 220px; }
+@container ste (max-width: 980px) { #root .ste-columns { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); overflow-y: auto; } #root .ste-meta { grid-column: 1 / -1; display: grid !important; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); border-top: 1px solid var(--fl-border); } #root .ste-meta > header { grid-column: 1 / -1; } }
+@container ste (max-width: 620px) { #root .ste-columns { grid-template-columns: minmax(0, 1fr); } #root .ste-lyrics { min-height: 360px; } }
+#root .ste-pane { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: 10px; padding: 14px; border-right: 1px solid var(--fl-border); }
+#root .ste-pane:last-child { border-right: 0; }
+#root .ste-pane > header, #root .ste-order > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+#root .ste-pane header b { font-size: 14px; font-weight: 600; }
+#root .ste-pane header small { color: var(--fl-muted); font-size: 12px; }
+#root .ste-code { position: relative; min-height: 0; flex: 1; overflow: hidden; border: 1px solid var(--fl-control-stroke); border-bottom: 2px solid var(--fl-muted); border-radius: 6px; background: var(--fl-control-fill); }
+#root .ste-code:focus-within { border-bottom-color: var(--fl-accent); }
+#root .ste-code pre, #root .ste-code textarea { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 12px 14px !important; overflow: auto; border: 0 !important; font: 14px/1.65 "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace !important; letter-spacing: 0; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; }
+#root .ste-code pre { color: var(--fl-text); pointer-events: none; }
+#root .ste-code textarea { resize: none; color: transparent !important; caret-color: var(--fl-text); outline: none !important; background: transparent !important; box-shadow: none !important; }
+#root .ste-code textarea::placeholder { color: var(--fl-muted); }
+#root .ste-code textarea::selection { color: transparent; background: color-mix(in srgb, var(--fl-accent) 35%, transparent); }
+#root .ste-mark { font-weight: 700; }
+#root .ste-mark-chorus { color: #7c3aed; } #root .ste-mark-verse { color: #0f766e; } #root .ste-mark-bridge, #root .ste-mark-prechorus { color: #b45309; } #root .ste-mark-other, #root .ste-mark-intro, #root .ste-mark-ending, #root .ste-mark-interlude { color: #2563eb; }
+html[data-theme="dark"] #root .ste-mark-chorus { color: #c4b5fd; } html[data-theme="dark"] #root .ste-mark-verse { color: #5eead4; } html[data-theme="dark"] #root :is(.ste-mark-bridge, .ste-mark-prechorus) { color: #fcd34d; } html[data-theme="dark"] #root :is(.ste-mark-other, .ste-mark-intro, .ste-mark-ending, .ste-mark-interlude) { color: #93c5fd; }
+#root .ste-slides { overflow-y: auto; }
+#root .ste-slide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+#root .ste-empty { grid-column: 1 / -1; margin: 0; padding: 30px 10px; color: var(--fl-muted); font-size: 13px; text-align: center; }
+#root .ste-slide { margin: 0; }
+#root .ste-screen { display: grid; aspect-ratio: 16 / 9; container-type: inline-size; place-items: center; overflow: hidden; padding: 6%; color: #fff; border: 2px solid transparent; border-radius: 4px; background: #000; text-align: center; }
+#root .ste-screen > span { display: flex; flex-direction: column; font-size: var(--ste-size); font-weight: 600; line-height: 1.16; }
+#root .ste-slide.is-focused .ste-screen { border-color: var(--fl-accent); }
+#root .ste-slide.is-warned .ste-screen { border-color: #f59e0b; }
+#root .ste-slide figcaption { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; }
+#root .ste-slide figcaption span { min-width: 16px; color: var(--fl-muted); font-variant-numeric: tabular-nums; }
+#root .ste-slide figcaption b { overflow: hidden; color: var(--fl-muted); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+#root .ste-slide[data-type="chorus"] figcaption b { color: #7c3aed; }
+html[data-theme="dark"] #root .ste-slide[data-type="chorus"] figcaption b { color: #c4b5fd; }
+#root .ste-warnings { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+#root .ste-warnings li { display: flex; align-items: center; gap: 6px; color: #b45309; font-size: 12px; }
+html[data-theme="dark"] #root .ste-warnings li { color: #fcd34d; }
+#root .ste-warnings svg { width: 14px; height: 14px; flex: 0 0 14px; }
+#root .ste-order { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--fl-border); }
+#root .ste-order .ste-link { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; padding: 0 !important; color: var(--fl-accent-text, var(--fl-accent)) !important; border: 0 !important; background: transparent !important; font-size: 12px !important; cursor: pointer; }
+#root .ste-order .ste-link svg { width: 13px; height: 13px; }
+#root .ste-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#root .ste-chip { display: inline-flex; height: 28px; align-items: center; gap: 4px; padding: 0 4px 0 2px; border: 1px solid var(--fl-control-stroke); border-radius: 4px; background: var(--fl-control-fill); font-size: 12px; font-weight: 600; cursor: grab; user-select: none; }
+#root .ste-chip.is-dragging { opacity: 0.4; }
+#root .ste-chip > svg { width: 14px; height: 14px; color: var(--fl-muted); }
+#root .ste-chip button { display: grid; width: 20px; height: 20px; place-items: center; padding: 0 !important; color: var(--fl-muted) !important; border: 0 !important; border-radius: 3px !important; background: transparent !important; cursor: pointer; }
+#root .ste-chip button:hover:not(:disabled) { color: var(--fl-text) !important; background: var(--fl-subtle-hover) !important; }
+#root .ste-chip button:disabled { opacity: 0.3; }
+#root .ste-chip button svg { width: 12px; height: 12px; }
+#root .ste-chip-add { position: relative; display: inline-flex; height: 28px; align-items: center; gap: 4px; padding: 0 8px; color: var(--fl-muted); border: 1px dashed var(--fl-control-stroke); border-radius: 4px; font-size: 12px; }
+#root .ste-chip-add svg { width: 14px; height: 14px; }
+#root .ste-chip-add select { height: 26px; padding: 0 !important; color: var(--fl-muted); border: 0 !important; background: transparent !important; box-shadow: none !important; font-size: 12px; cursor: pointer; }
+#root .ste-meta { gap: 12px; overflow-y: auto; background: var(--fl-surface); }
+#root .ste-meta label { display: flex; flex-direction: column; gap: 4px; }
+#root .ste-meta label > span { color: var(--fl-text); font-size: 12px; font-weight: 600; }
+#root .ste-meta label > small { color: var(--fl-muted); font-size: 11px; }
+#root .ste-meta :is(input, select) { width: 100%; height: 32px; font-size: 13px; }
+
+#root .ste-header .ste-primary:disabled { opacity: 0.55; cursor: default; }
+#root .ste-meta-toggle { display: flex; width: 100%; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0 !important; color: var(--fl-text) !important; border: 0 !important; background: transparent !important; box-shadow: none !important; text-align: left; cursor: default; }
+#root .ste-meta-toggle small { display: none; color: var(--fl-muted); font-size: 12px; }
+@container ste (max-width: 980px) {
+  #root .ste-meta { padding: 10px 14px; }
+  #root .ste-meta-toggle { cursor: pointer; }
+  #root .ste-meta-toggle small { display: block; }
+  #root .ste-meta-toggle b::after { content: " ▾"; color: var(--fl-muted); }
+  #root .ste-meta:not(.is-open) > label { display: none; }
+  #root .ste-meta:not(.is-open) { display: block !important; }
+  #root .ste-meta:not(.is-open) .ste-meta-toggle b::after { content: " ▸"; }
+}

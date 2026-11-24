@@ -121,6 +121,18 @@ export class AppDatabase {
       this.db.exec(
         "ALTER TABLE songs ADD COLUMN section_types TEXT NOT NULL DEFAULT '[]'",
       );
+    // Editor de texto: letra con marcas, orden de presentación y datos.
+    for (const [column, definition] of [
+      ["lyrics", "TEXT NOT NULL DEFAULT ''"],
+      ["arrangement", "TEXT NOT NULL DEFAULT '[]'"],
+      ["max_lines", "INTEGER NOT NULL DEFAULT 0"],
+      ["author", "TEXT NOT NULL DEFAULT ''"],
+      ["song_key", "TEXT NOT NULL DEFAULT ''"],
+      ["tags", "TEXT NOT NULL DEFAULT ''"],
+      ["copyright", "TEXT NOT NULL DEFAULT ''"],
+    ] as const)
+      if (!songColumns.has(column))
+        this.db.exec(`ALTER TABLE songs ADD COLUMN ${column} ${definition}`);
     const meetingColumns = new Set(
       (
         this.db.prepare("PRAGMA table_info(meetings)").all() as Array<{
@@ -232,17 +244,26 @@ export class AppDatabase {
     const filter = `%${search}%`;
     const rows = this.db
       .prepare(
-        `SELECT s.id,s.title,s.color,s.category_id categoryId,c.name categoryName,s.content,s.section_types sectionTypes,s.shadow_enabled shadowEnabled,s.shadow_color shadowColor,s.shadow_blur shadowBlur,s.created_at createdAt,s.updated_at updatedAt FROM songs s LEFT JOIN song_categories c ON c.id=s.category_id WHERE (s.title LIKE ? OR s.content LIKE ?) AND (? IS NULL OR s.category_id=?) ORDER BY s.title COLLATE NOCASE`,
+        `SELECT s.id,s.title,s.color,s.category_id categoryId,c.name categoryName,s.content,s.section_types sectionTypes,s.shadow_enabled shadowEnabled,s.shadow_color shadowColor,s.shadow_blur shadowBlur,s.lyrics lyrics,s.arrangement arrangement,s.max_lines maxLines,s.author author,s.song_key songKey,s.tags tags,s.copyright copyright,s.created_at createdAt,s.updated_at updatedAt FROM songs s LEFT JOIN song_categories c ON c.id=s.category_id WHERE (s.title LIKE ? OR s.content LIKE ? OR s.author LIKE ? OR s.tags LIKE ?) AND (? IS NULL OR s.category_id=?) ORDER BY s.title COLLATE NOCASE`,
       )
-      .all(filter, filter, categoryId ?? null, categoryId ?? null) as Array<
-      Omit<Song, "shadowEnabled" | "sectionTypes"> & {
+      .all(filter, filter, filter, filter, categoryId ?? null, categoryId ?? null) as Array<
+      Omit<Song, "shadowEnabled" | "sectionTypes" | "arrangement"> & {
         shadowEnabled: number;
         sectionTypes: string;
+        arrangement: string;
       }
     >;
     return rows.map((row) => ({
       ...row,
       shadowEnabled: Boolean(row.shadowEnabled),
+      arrangement: (() => {
+        try {
+          const parsed = JSON.parse(row.arrangement || "[]");
+          return Array.isArray(parsed) ? parsed.map(String) : [];
+        } catch {
+          return [];
+        }
+      })(),
       sectionTypes: (() => {
         try {
           const parsed = JSON.parse(row.sectionTypes);
@@ -258,11 +279,29 @@ export class AppDatabase {
       shadowColor = song.shadowColor || "#000000",
       shadowBlur = Math.max(0, Math.min(40, Number(song.shadowBlur ?? 14))),
       color = song.color || "#8b5cf6",
-      sectionTypes = JSON.stringify(song.sectionTypes || []);
+      sectionTypes = JSON.stringify(song.sectionTypes || []),
+      // Quien guarda sin estos datos (control remoto, colaboradores,
+      // edición de una estrofa) no debe borrarlos.
+      previous = song.id
+        ? (this.db
+            .prepare("SELECT lyrics,arrangement,max_lines maxLines,author,song_key songKey,tags,copyright FROM songs WHERE id=?")
+            .get(song.id) as Record<string, unknown> | undefined)
+        : undefined,
+      pick = <T,>(value: T | undefined, key: string, fallback: unknown) =>
+        value !== undefined ? value : (previous?.[key] ?? fallback),
+      extra = [
+        String(pick(song.lyrics, "lyrics", "")),
+        song.arrangement !== undefined ? JSON.stringify(song.arrangement) : String(previous?.arrangement ?? "[]"),
+        Math.max(0, Math.min(12, Number(pick(song.maxLines, "maxLines", 0)) || 0)),
+        String(pick(song.author, "author", "")),
+        String(pick(song.songKey, "songKey", "")),
+        String(pick(song.tags, "tags", "")),
+        String(pick(song.copyright, "copyright", "")),
+      ] as const;
     if (song.id) {
       this.db
         .prepare(
-          "UPDATE songs SET title=?,color=?,category_id=?,content=?,section_types=?,shadow_enabled=?,shadow_color=?,shadow_blur=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+          "UPDATE songs SET title=?,color=?,category_id=?,content=?,section_types=?,shadow_enabled=?,shadow_color=?,shadow_blur=?,lyrics=?,arrangement=?,max_lines=?,author=?,song_key=?,tags=?,copyright=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
         )
         .run(
           song.title,
@@ -273,6 +312,7 @@ export class AppDatabase {
           shadowEnabled,
           shadowColor,
           shadowBlur,
+          ...extra,
           song.id,
         );
       return song.id;
@@ -280,7 +320,7 @@ export class AppDatabase {
     return Number(
       this.db
         .prepare(
-          "INSERT INTO songs(title,color,category_id,content,section_types,shadow_enabled,shadow_color,shadow_blur) VALUES (?,?,?,?,?,?,?,?)",
+          "INSERT INTO songs(title,color,category_id,content,section_types,shadow_enabled,shadow_color,shadow_blur,lyrics,arrangement,max_lines,author,song_key,tags,copyright) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         )
         .run(
           song.title,
@@ -291,6 +331,7 @@ export class AppDatabase {
           shadowEnabled,
           shadowColor,
           shadowBlur,
+          ...extra,
         ).lastInsertRowid,
     );
   }
