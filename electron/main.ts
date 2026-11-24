@@ -14,7 +14,8 @@ import {
 import { join, basename, extname } from "node:path";
 import { pathToFileURL } from "node:url";
 import { mkdir, readdir, copyFile, readFile, rename, rm } from "node:fs/promises";
-import { createWriteStream } from "node:fs";
+import { createWriteStream, createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { networkInterfaces } from "node:os";
@@ -1505,6 +1506,57 @@ const needsVideoConversion = (extension: string) =>
 const needsMeetingMediaConversion = (extension: string) =>
   needsVideoConversion(extension) || extension === ".gif";
 
+const MEDIA_TYPES: Record<string, string> = {
+  ".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm",
+  ".mkv": "video/x-matroska", ".ogv": "video/ogg", ".mp3": "audio/mpeg", ".m4a": "audio/mp4",
+  ".wav": "audio/wav", ".ogg": "audio/ogg", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+  ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml",
+  ".bmp": "image/bmp", ".avif": "image/avif",
+};
+
+/**
+ * Sirve los archivos de medios con soporte de rangos (206). Sin esto, los
+ * videos cuyo índice está al final del archivo (muy común en los MP4 que
+ * llegan por WhatsApp o salen del celular) no se podían reproducir ni
+ * adelantar: el reproductor necesita pedir el final del archivo primero.
+ */
+async function serveMediaFile(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const path = decodeURIComponent(url.pathname.slice(1));
+    const info = await stat(path);
+    if (!info.isFile()) return new Response("No encontrado", { status: 404 });
+    const size = info.size;
+    const type = MEDIA_TYPES[extname(path).toLowerCase()] ?? "application/octet-stream";
+    const range = /bytes=(\d*)-(\d*)/.exec(request.headers.get("range") ?? "");
+    if (range && (range[1] || range[2])) {
+      let start = range[1] ? Number(range[1]) : size - Number(range[2]);
+      let end = range[1] && range[2] ? Number(range[2]) : size - 1;
+      start = Math.max(0, start);
+      end = Math.min(size - 1, end);
+      if (start > end || start >= size)
+        return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}` } });
+      const body = Readable.toWeb(createReadStream(path, { start, end })) as unknown as ReadableStream;
+      return new Response(body, {
+        status: 206,
+        headers: {
+          "Content-Type": type,
+          "Content-Length": String(end - start + 1),
+          "Content-Range": `bytes ${start}-${end}/${size}`,
+          "Accept-Ranges": "bytes",
+        },
+      });
+    }
+    const body = Readable.toWeb(createReadStream(path)) as unknown as ReadableStream;
+    return new Response(body, {
+      status: 200,
+      headers: { "Content-Type": type, "Content-Length": String(size), "Accept-Ranges": "bytes" },
+    });
+  } catch {
+    return new Response("No encontrado", { status: 404 });
+  }
+}
+
 /**
  * Lee los códecs de un archivo con FFmpeg ("ffmpeg -i" sin salida imprime la
  * información de las pistas). Devuelve null si no se pudo leer.
@@ -2241,12 +2293,7 @@ if (hasSingleInstanceLock)
       );
       database.seedBible(code, name, parseXmlBible(xml));
     }
-    protocol.handle("fl-media", (request) => {
-      const url = new URL(request.url);
-      return net.fetch(
-        pathToFileURL(decodeURIComponent(url.pathname.slice(1))).toString(),
-      );
-    });
+    protocol.handle("fl-media", (request) => serveMediaFile(request));
     remoteServer = startRemoteServer(() => state, mergeState, {
       listVersions: () => database.listBibleVersions(true),
       listBooks: (versionId) => database.listBibleBooks(versionId),

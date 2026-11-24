@@ -2251,7 +2251,7 @@ function ItemSummary({
         <span style={{ background: item.color }} />
         <div>
           <small>{itemLabels[item.type]}</small>
-          <h3>{displayItemTitle(item)}</h3>
+          <h3 title={displayItemTitle(item)}>{displayItemTitle(item)}</h3>
         </div>
         {isOnAir && <strong className="summary-on-air">Al aire</strong>}
       </div>

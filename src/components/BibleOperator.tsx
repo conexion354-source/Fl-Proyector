@@ -1,3 +1,4 @@
+import { onCommand } from "../commandBus";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, Highlighter, Pencil, Search, Trash2, X } from "lucide-react";
 import type {
@@ -112,6 +113,8 @@ export function BibleOperator({
   } | null>(null);
   // Entering the Bible tab starts the keyboard route at Version, so arrows
   // can be used immediately without an extra mouse click.
+  // Ctrl+K: buscar en la Biblia desde cualquier pantalla.
+  useEffect(() => onCommand("bible-search", (request) => setQuery(request.query)), []);
   useEffect(() => {
     const frame = requestAnimationFrame(() => versionSelectRef.current?.focus());
     return () => cancelAnimationFrame(frame);

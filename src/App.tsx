@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import QRCode from "qrcode";
 import {
   MonitorPlay,
@@ -26,6 +26,7 @@ import {
   X,
   ZoomIn,
   ZoomOut,
+  Search,
 } from "lucide-react";
 import { ProjectionPreview } from "./components/ProjectionStage";
 import { MediaLibrary } from "./components/MediaLibrary";
@@ -47,7 +48,9 @@ import {
   storedColumnWidth,
 } from "./components/ColumnResizer";
 import { useProjectionState } from "./hooks/useProjectionState";
-import { isEditableTarget, loadShortcuts, normalizeShortcut, type ShortcutAction } from "./keyboardShortcuts";
+import { isEditableTarget, loadShortcuts, normalizeShortcut, shortcutLabels, type ShortcutAction } from "./keyboardShortcuts";
+import { CommandPalette, type PaletteAction } from "./components/CommandPalette";
+import { sendCommand } from "./commandBus";
 import {
   initialDisplaySettings,
   initialProjectionState,
@@ -123,6 +126,8 @@ export function App() {
   const [projectionFrozen, setProjectionFrozen] = useState(false);
   const [floatingPreviewOpen, setFloatingPreviewOpen] = useState(false);
   const [previewPanelMode, setPreviewPanelMode] = useState<"live" | "prepare">("live");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const runShortcutRef = useRef<(action: ShortcutAction) => Promise<void>>(async () => {});
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [updateNoticeDismissed, setUpdateNoticeDismissed] = useState(false);
   const [openVersionSectionSignal, setOpenVersionSectionSignal] = useState(0);
@@ -240,7 +245,14 @@ export function App() {
       }
       await window.flProyector.clearProjectionContent();
     };
+    runShortcutRef.current = runShortcut;
     const onKeyDown = (event: KeyboardEvent) => {
+      // Ctrl+K (Cmd+K en Mac): búsqueda global desde cualquier pantalla.
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((current) => !current);
+        return;
+      }
       if (!event.isTrusted || event.repeat || isEditableTarget(event.target)) return;
       const pressed = normalizeShortcut(event).toLowerCase();
       const action = (Object.entries(loadShortcuts()) as [ShortcutAction, string][])
@@ -474,6 +486,37 @@ export function App() {
     localStorage.setItem(`fl-layout-live-${tab}`, String(livePanelWidth));
   }, [tab, livePanelWidth]);
 
+  const shortcutMap = loadShortcuts();
+  const paletteAction = (action: ShortcutAction, icon: ReactNode, label?: string, keywords?: string): PaletteAction => ({
+    id: action,
+    label: label ?? shortcutLabels[action],
+    hint: shortcutMap[action],
+    icon,
+    keywords,
+    run: () => runShortcutRef.current(action),
+  });
+  const paletteActions: PaletteAction[] = [
+    paletteAction("pantallaNegra", <Square />, state.blackout ? "Quitar pantalla negra" : "Pantalla negra", "negro apagar"),
+    paletteAction("logo", <MonitorPlay />, state.logo ? "Ocultar logo" : "Mostrar logo"),
+    paletteAction("congelar", <Pause />, projectionFrozen ? "Publicar (descongelar)" : "Congelar pantalla"),
+    paletteAction("limpiar", <Eraser />, "Limpiar pantalla", "borrar quitar"),
+    paletteAction("qr", <QrCode />, liveAudienceQrOnAir ? "Quitar QR" : "Mostrar QR en vivo"),
+    paletteAction(status.open ? "cerrarProyector" : "proyector", <MonitorUp />, status.open ? "Cerrar proyector" : "Enviar al proyector"),
+    {
+      id: "alertas",
+      label: "Alertas",
+      icon: <BellRing />,
+      keywords: "aviso mensaje bebé",
+      run: () => setShowAlertSettings(true),
+    },
+    paletteAction("reuniones", <CalendarRange />, "Ir a Reuniones"),
+    paletteAction("canciones", <Music2 />, "Ir a Canciones"),
+    paletteAction("fondos", <Film />, "Ir a Fondos"),
+    paletteAction("biblia", <BookOpenText />, "Ir a Biblia"),
+    paletteAction("remoto", <Smartphone />, "Ir a Remoto", "teléfono celular"),
+    paletteAction("ajustes", <Settings />, "Ir a Ajustes", "configuración"),
+  ];
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -486,6 +529,16 @@ export function App() {
             <span>Control de proyección</span>
           </div>
         </div>
+        <button
+          type="button"
+          className="topbar-search"
+          onClick={() => setPaletteOpen(true)}
+          title="Buscar canciones, versículos o acciones"
+        >
+          <Search aria-hidden="true" />
+          <span>Buscar canción, versículo o acción</span>
+          <kbd>{navigator.platform.toLowerCase().includes("mac") ? "⌘K" : "Ctrl+K"}</kbd>
+        </button>
         <div
           className={`on-air on-air-${outputState.tone}`}
           role="status"
@@ -512,6 +565,19 @@ export function App() {
           {status.open ? "Cerrar proyector" : "Enviar al proyector"}
         </button>
       </header>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        actions={paletteActions}
+        onOpenSong={(song) => {
+          setTab("canciones");
+          sendCommand({ kind: "open-song", songId: song.id });
+        }}
+        onBibleSearch={(query) => {
+          setTab("biblia");
+          sendCommand({ kind: "bible-search", query });
+        }}
+      />
       <div
         className="workspace"
         style={
@@ -750,23 +816,30 @@ export function App() {
                   update({ presentation: { slideIndex } });
               }}
             />
+            {!isSettings && projectionFrozen && (
+              // Congelado: lo que se está preparando se ve en miniatura, sin
+              // tocar lo que ve la iglesia. Clic para intercambiar.
+              <button
+                type="button"
+                className="preview-pip"
+                title={previewPanelMode === "live" ? "Ver la preparación en grande" : "Ver lo que está en vivo en grande"}
+                onClick={() => setPreviewPanelMode(previewPanelMode === "live" ? "prepare" : "live")}
+              >
+                <ProjectionPreview state={previewPanelMode === "live" ? state : liveState} />
+                <span>{previewPanelMode === "live" ? "Preparación" : "En vivo"}</span>
+              </button>
+            )}
             {!isSettings && <div className={`preview-label ${previewPanelMode === "prepare" ? "prepare" : ""}`}>
               {previewPanelMode === "live" ? (projectionFrozen ? "En vivo · congelado" : "En vivo") : "Preparación"}
             </div>}
           </div>
-          {isSettings ? <p className="settings-preview-note">Esta vista sirve solo para diseñar. La proyección en vivo no cambia hasta que guardes y envíes contenido.</p> : <><LiveContentControls
-            state={state}
-            update={update}
-            videoTime={videoTime}
-            videoDuration={videoDuration}
-            setVideoTime={updateVideoTime}
-          />
+          {isSettings ? <p className="settings-preview-note">Esta vista sirve solo para diseñar. La proyección en vivo no cambia hasta que guardes y envíes contenido.</p> : <>
           <div className="master-controls">
             <span className="eyebrow">Controles maestros</span>
             <div className="master-grid master-grid-five">
               <button
                 className={projectionFrozen ? "active amber" : ""}
-                title="Mantiene intacta la salida mientras preparás otro contenido"
+                title={`Mantiene intacta la salida mientras preparás otro contenido (${shortcutMap.congelar})`}
                 onClick={toggleFreeze}
               >
                 {projectionFrozen ? <Play /> : <Pause />}
@@ -774,6 +847,7 @@ export function App() {
               </button>
               <button
                 className={state.blackout ? "active red" : ""}
+                title={`Pantalla negra (${shortcutMap.pantallaNegra})`}
                 onClick={() => update({ blackout: !state.blackout })}
               >
                 <Square fill="currentColor" />
@@ -797,7 +871,7 @@ export function App() {
               </button>
               <button
                 aria-label="Limpiar contenido de la proyección"
-                title="Quita textos, videos, imágenes, PowerPoint y alertas; conserva el fondo global"
+                title={`Quita textos, videos, imágenes, PowerPoint y alertas; conserva el fondo global (${shortcutMap.limpiar})`}
                 onClick={() => window.flProyector.clearProjectionContent()}
               >
                 <Eraser aria-hidden="true" />
@@ -805,6 +879,7 @@ export function App() {
               </button>
               <button
                 className={state.logo ? "active blue" : ""}
+                title={`Mostrar u ocultar el logo (${shortcutMap.logo})`}
                 onClick={toggleLogo}
               >
                 <MonitorPlay />
@@ -812,6 +887,13 @@ export function App() {
               </button>
             </div>
           </div>
+          <LiveContentControls
+            state={state}
+            update={update}
+            videoTime={videoTime}
+            videoDuration={videoDuration}
+            setVideoTime={updateVideoTime}
+          />
           <div className="background-controls">
             <div className="background-control">
               <div className="control-title">

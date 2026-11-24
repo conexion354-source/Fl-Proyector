@@ -48,6 +48,7 @@ import {
   withoutLegacyEditorPrompt,
 } from "../editorPlaceholders";
 import { NewSongDialog } from "./NewSongDialog";
+import { onCommand } from "../commandBus";
 
 const songColors = [
   "#ef4444",
@@ -303,6 +304,19 @@ export function SongLibrary({
     setEditing(false);
     editor?.commands.setContent(withoutLegacyEditorPrompt(song.content, "song"));
   };
+  // Ctrl+K: abrir una canción elegida en la búsqueda global.
+  useEffect(
+    () =>
+      onCommand("open-song", async (request) => {
+        const all = await window.flProyector.listSongs("", null);
+        const song = all.find((value) => value.id === request.songId);
+        if (!song) return;
+        setQuery("");
+        setCategoryId(null);
+        choose(song);
+      }),
+    [editor],
+  );
   // Al entrar, se muestra la primera canción de la lista en vez de un panel vacío.
   useEffect(() => {
     if (!editor || editing || selected.id || newSongDialog || !sortedSongs.length) return;
