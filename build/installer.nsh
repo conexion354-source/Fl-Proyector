@@ -12,10 +12,14 @@
   nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="FL Proyector - Descubrimiento local"'
   nsExec::ExecToLog 'netsh advfirewall firewall add rule name="FL Proyector - Control remoto" dir=in action=allow protocol=TCP localport=3001 remoteip=${FL_REMOTE_IPS} profile=any enable=yes'
   nsExec::ExecToLog 'netsh advfirewall firewall add rule name="FL Proyector - Descubrimiento local" dir=in action=allow protocol=UDP localport=5353 remoteip=${FL_REMOTE_IPS} profile=any enable=yes'
+  ; Reglas que bloquean el programa (por "Cancelar" en el aviso del Firewall) ganan sobre los permisos.
+  nsExec::ExecToLog 'netsh advfirewall firewall delete rule name=all program="$INSTDIR\${APP_EXECUTABLE_FILENAME}"'
+  nsExec::ExecToLog 'netsh advfirewall firewall add rule name="FL Proyector - Programa" dir=in action=allow program="$INSTDIR\${APP_EXECUTABLE_FILENAME}" remoteip=${FL_REMOTE_IPS} profile=any enable=yes'
 !macroend
 
 !macro customUnInstall
   DetailPrint "Quitando las reglas de red local de FL Proyector..."
   nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="FL Proyector - Control remoto"'
   nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="FL Proyector - Descubrimiento local"'
+  nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="FL Proyector - Programa"'
 !macroend

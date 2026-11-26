@@ -1917,6 +1917,12 @@ function enableWindowsRemoteAccess() {
     'netsh advfirewall firewall delete rule name="FL Proyector - Descubrimiento local"',
     `netsh advfirewall firewall add rule name="FL Proyector - Control remoto" dir=in action=allow protocol=TCP localport=3001 remoteip=${remoteIps} profile=any enable=yes`,
     `netsh advfirewall firewall add rule name="FL Proyector - Descubrimiento local" dir=in action=allow protocol=UDP localport=5353 remoteip=${remoteIps} profile=any enable=yes`,
+    // Si alguna vez se tocó "Cancelar" en el aviso del Firewall, Windows
+    // creó una regla que BLOQUEA el programa, y un bloqueo gana sobre
+    // cualquier permiso: el teléfono nunca encontraba la PC. Se borran las
+    // reglas del programa y se permite explícitamente.
+    `netsh advfirewall firewall delete rule name=all program="${process.execPath}"`,
+    `netsh advfirewall firewall add rule name="FL Proyector - Programa" dir=in action=allow program="${process.execPath}" remoteip=${remoteIps} profile=any enable=yes`,
   ].join(" & ");
   return new Promise<boolean>((resolve) => {
     const command =
